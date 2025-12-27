@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Hỏi đáp | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .chat-container {
+    max-width: 800px;
+    margin: 18px auto 0 auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+  }
+
+  #chat-window {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: #f9fafb;
+    min-height: 400px;
+    max-height: 60vh;
+  }
+
+  .message {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 15px;
+    max-width: 85%;
+  }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 10px;
+    flex-shrink: 0;
+  }
+
+  .message-content {
+    padding: 10px 15px;
+    border-radius: 18px;
+    line-height: 1.5;
+  }
+
+  /* Bot messages */
+  .bot-msg {
+    align-self: flex-start;
+    margin-right: auto;
+  }
+  .bot-msg .message-content {
+    background-color: #e9e9eb;
+    color: #1c1c1e;
+    border-bottom-left-radius: 4px;
+  }
+
+  /* User messages */
+  .user-msg {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+    /* push the whole message container to the right */
+    margin-left: auto;
+  }
+  .user-msg .message-content {
+    background-color: #107bedff; /* Màu xanh dương cho tin nhắn người dùng */
+    color: white; /* Đổi màu chữ thành trắng */
+    border-bottom-right-radius: 4px;
+    text-align: right; /* căn phải nội dung tin nhắn */
+  }
+  .user-msg .avatar {
+    background-color: #107bedff; /* A light blue background for user avatar */
+  }
+
+  #chat-input-area {
+    display: flex;
+    padding: 12px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #ffffffff;
+  }
+
+
+
+  .suggestion-bubbles {
+    padding: 10px 20px;
+    background-color: #f9fafb;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .suggestion-bubble {
+    padding: 6px 12px;
+    border-radius: 16px;
+    background-color: #e9e9eb;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s;
+  }
+  .suggestion-bubble:hover {
+    background-color: #dcdfe6;
+  }
+  @media (max-width: 640px) {
+    .chat-container { margin: 12px; }
+    .btn-export { padding: 7px 10px; font-size: 0.9em; }
+  }
+</style>
+
+  <h1 style="margin-top:18px;">Hỏi đáp các thông tin về cà chua và bệnh trên lá cà chua</h1>
+
+  <main style="margin-top:18px">
+    <div class="chat-container">
+      <div id="chat-window">
+        <!-- Tin nhắn sẽ được thêm vào đây bằng JavaScript -->
+      </div>
+
+      <div class="suggestion-bubbles">
+        <div class="suggestion-bubble" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Triệu chứng bệnh sớm?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Cách phòng ngừa virus xoắn lá?')">Phòng ngừa virus xoắn lá?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Lá khỏe mạnh?</div>
+      </div>
+
+      <div id="chat-input-area">
+        <input id="chat-input" type="text" placeholder="Nhập câu hỏi (ví dụ: 'Triệu chứng Tomato_Early_blight là gì?')" style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
+        <button id="chat-send" class="btn">Gửi</button>
+      </div>
+    </div>
+  </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const chatWindow = document.getElementById('chat-window');
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send');
+
+  const BOT_AVATAR = "{{ url_for('static', filename='images/bot.png') }}";
+  const USER_AVATAR = "{{ url_for('static', filename='images/avatar.jpg') }}";
+
+  function append(msg, who='user'){
+    const el = document.createElement('div');
+    el.classList.add('message', `${who}-msg`);
+
+    const avatar = document.createElement('img');
+    avatar.className = 'avatar';
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+
+    if(who==='user'){
+      avatar.src = USER_AVATAR;
+      content.textContent = msg;
+    } else {
+      avatar.src = BOT_AVATAR;
+      // Sử dụng textContent để tránh XSS từ nội dung trả về. Nếu muốn cho phép
+      // một lượng HTML an toàn, hãy xử lý / sanitize phía server hoặc dùng thư viện
+      // như DOMPurify phía client.
+      content.textContent = msg;
+    }
+
+    el.appendChild(avatar);
+    el.appendChild(content);
+    chatWindow.appendChild(el);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  async function send(){
+    const q = input.value.trim();
+    if(!q) return;
+    append(q,'user');
+    input.value = '';
+    // Phát hiện lời chào và trả lời ngay với câu trả lời có sẵn
+    if (isGreeting(q)) {
+      const greetingReplies = [
+        'Chào bạn 👋 Hãy hỏi tôi về triệu chứng, nguyên nhân, khái niệm hoặc phòng ngừa.'
+      ];
+      const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
+      append(reply, 'bot');
+      return;
+    }
+
+    // For non-greeting: show a thinking indicator and ensure it's visible for at least 2s
+    append('Đang suy nghĩ...', 'bot');
+    const thinkingEl = chatWindow.querySelectorAll('.message.bot-msg');
+    const thinking = thinkingEl.length ? thinkingEl[thinkingEl.length-1] : null;
+
+    const minimumDelay = sleep(2000); // 2 seconds minimum
+    const fetchPromise = fetch('{{ url_for('api_chat') }}', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q})
+    }).then(r => r.json()).catch(e => ({ error: true }));
+
+    const [data] = await Promise.all([fetchPromise, minimumDelay]).then(results => [results[0]]).catch(() => [{ error: true }]);
+
+    // Xóa biểu tượng đang suy nghĩ
+    if (thinking) thinking.remove();
+
+    if (!data || data.error) {
+      append('Lỗi kết nối.', 'bot');
+    } else {
+      append(data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín hoặc hỏi ý kiến từ các chuyên gia.', 'bot');
+    }
+  }
+
+  function isGreeting(text) {
+    if (!text) return false;
+    const t = text.trim().toLowerCase();
+    // Các lời chào phổ biến tiếng Việt và tiếng Anh
+    const greetings = ['chào', 'xin chào', 'chào bạn', 'chào anh', 'chào em', 'hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
+    // Kiểm tra xem toàn bộ tin nhắn có phải là lời chào ngắn hay bắt đầu bằng lời chào
+    for (const g of greetings) {
+      if (t === g) return true;
+      if (t.startsWith(g + ' ') || t.startsWith(g + '!') || t.startsWith(g + ',')) return true;
+    }
+    // Cũng coi các tin nhắn rất ngắn như 'hi' hoặc 'hey' là lời chào
+    if (t.length <= 4 && greetings.includes(t)) return true;
+    return false;
+  }
+
+  function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  function askSuggestion(question) {
+    const input = document.getElementById('chat-input');
+    input.value = question;
+    send();
+  }
+
+  btn.addEventListener('click', send);
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
+
+  // Thêm tin nhắn chào mừng ban đầu
+  document.addEventListener('DOMContentLoaded', function() {
+    append('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua.', 'bot');
+  });
+</script>
+{% endblock %}

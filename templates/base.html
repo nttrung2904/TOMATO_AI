@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}🍅 DỰ ĐOÁN BỆNH TRÊN LÁ CÀ CHUA{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='images/tomato.svg') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="container">
+    <header class="site-header nav">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='images/tomato.svg') }}" alt="logo">
+        <h2>DỰ ĐOÁN BỆNH TRÊN LÁ CÀ CHUA</h2>
+      </div>
+      <div class="links">
+        <a href="{{ url_for('index') }}" style="font-weight: bold; color: var(--tomato-700);">Trang chủ</a>
+        <a href="{{ url_for('about_page') }}" style="font-weight: bold; color: var(--tomato-700);">Giới thiệu</a>
+        <a href="{{ url_for('chat') }}" style="font-weight: bold; color: var(--tomato-700);">Hỏi đáp</a>
+        <a href="{{ url_for('admin_feedback') }}" style="font-weight: bold; color: var(--tomato-700);">Quản lý</a>
+      </div>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <footer class="footer">
+      &copy; 2025 Tomato AI | Dự án thử nghiệm. <br><i>Bản quyền thuộc về Nguyễn Thành Trung &amp; Võ Công Đoàn</i>
+    </footer>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

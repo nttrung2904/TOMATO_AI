@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alert alert--error">
+          {% for msg in messages %}
+            <div>{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="hero card">
+      <div style="display:flex;gap:20px;align-items:center;">
+        <div style="flex:1; padding-right: 20px;">
+          <h1 style="margin:0 0 8px 0;color:var(--tomato-700)">Nhận diện bệnh trên lá cà chua bằng các mô hình học sâu</h1>
+          <p class="desc">Tải ảnh lá cà chua, chọn model và pipeline. Hệ thống sẽ đưa ra dự đoán và hướng dẫn phòng ngừa.</p>
+          <ol style="margin-top:12px">
+            <li>Ảnh đầu vào nên dễ nhìn và rõ nét (sáng, không quá mờ để mô hình nhận dạng chính xác hơn).</li>
+            <li>Chọn model và pipeline phù hợp.</li>
+            <li>Nhấn Dự đoán để xem kết quả và biện pháp xử lý.</li>
+          </ol>
+        </div>
+        <div style="width:420px">
+          <img src="https://inkythuatso.com/uploads/thumbnails/800/2023/03/4-hinh-anh-qua-ca-chua-tren-canh-inkythuatso-30-10-13-45.jpg" style="width:100%;height:240px;object-fit:cover;border-radius:12px;" alt="Tomato hero">
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex;gap:24px;margin-top:18px;align-items:flex-start;">
+      <div style="flex:1;min-width:360px">
+        <div class="card"> 
+          <form id="upload-form" action="{{ url_for('predict') }}" method="post" enctype="multipart/form-data" style="margin-bottom: 0;">
+            <!-- Cải tiến vùng upload ảnh, hỗ trợ kéo thả -->
+            <div class="file-drop-area">
+              <span class="file-msg">Kéo và thả ảnh vào đây, hoặc <strong class="btn-like">nhấn để chọn ảnh</strong></span>
+              <input id="file" name="file" type="file" class="file-input" accept="image/*" onchange="onFileChange(event)">
+            </div>
+            <div id="file-info" style="margin-top:10px; text-align:center; display:none;">
+              <span id="file-name" style="font-weight:600;"></span>
+              <button type="button" id="remove-file-btn" class="btn small danger" style="margin-left:8px;">Xóa</button>
+            </div>
+            
+            <!-- Phần chọn model và pipeline -->
+            <div style="margin-top:12px;display:flex;gap:12px;">
+              <div style="flex:1">
+                <label>Chọn model:</label>
+                <select name="model_select" required id="model-select">
+                  {% for m in models %}
+                    <option value="{{m}}" {% if m == last_model %}selected{% endif %}>{{m}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="width:220px">
+                <label>Pipeline:</label>
+                <select name="pipeline_select" required>
+                  {% for p in pipelines %}
+                    <option value="{{p}}" {% if p == last_pipeline %}selected{% endif %}>{{p}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            
+            <!-- Thông báo khuyến nghị -->
+            <div style="margin-top:10px;padding:10px;background:#e3f2fd;border-left:4px solid #2196f3;border-radius:4px;font-size:0.9em;">
+              <strong>💡 Lưu ý:</strong> 
+              <ul style="margin:5px 0 0 20px;padding:0;">
+                <li>Nếu ảnh bị từ chối, hãy thử chụp lại hoặc chọn ảnh lá rõ ràng hơn</li>
+                <li><strong>Khuyến nghị:</strong> Với ảnh không rõ, thử nhiều models để so sánh kết quả</li>
+              </ul>
+            </div>
+            
+            <div style="margin-top:14px;display:flex;gap:12px;align-items:center">
+              <button type="submit" id="predict-btn" class="btn" style="width: 120px;">Dự đoán</button>
+              <div style="flex:1;text-align:right"><small class="desc">Chọn ảnh lá rõ để kết quả chính xác hơn.</small></div>
+        </div>
+          </form>
+          <div id="loading" style="display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
+            <div class="spinner"></div>
+            <p style="margin-top:10px; font-size:1.2em; color:var(--tomato-700);">Xin vui lòng chờ trong giây lát...</p>
+          </div>
+        </div>
+        
+        <div style="margin-top:14px" class="card">
+          <h3 style="margin-top:0">Mẹo chụp ảnh</h3>
+          <ul>
+            <li>Ánh sáng tự nhiên, tránh bóng tối vùng lá.</li>
+            <li>Chụp toàn bộ lá hoặc phần có tổn thương rõ ràng.</li>
+            <li>Không chụp quá sát làm mất bối cảnh.</li>
+          </ul>
+        </div>
+      </div>
+
+      <aside style="width:320px">
+        <div class="card">
+          <h3 style="margin-top:0; text-align:center;">Ảnh đầu vào</h3>
+          <div id="preview-container" style="display:flex;justify-content:center;align-items:center;min-height:200px;background-color:#f9f9f9;border-radius:8px;">
+            <img id="preview" class="preview" src="#" alt="Preview" style="display:none;max-width:100%;max-height:250px;border-radius:8px;"/>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin-top:0">Bộ sưu tập</h3>
+          <div class="tomato-gallery">
+            <img src="https://tse2.mm.bing.net/th/id/OIP.fiTPNS81lLkNK5R4ZYQYpwHaFj?cb=12&rs=1&pid=ImgDetMain&o=7&rm=3" alt="Tomato leaf">
+            <img src="https://congtydelta.com/public/upload/slide/benh-heo-vang-tren-cay-ca-chua-kimnonggoldstar-vn-2-1.jpg" alt="Tomato disease">
+            <img src="https://bloganchoi.com/wp-content/uploads/2016/06/ca-chua-dep.jpg" alt="Tomato">
+          </div>
+        </div>
+      </aside>
+    </section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const fileInput = document.getElementById('file');
+    const fileNameEl = document.getElementById('file-name');
+    const fileInfoEl = document.getElementById('file-info');
+    const preview = document.getElementById('preview');
+    const previewContainer = document.getElementById('preview-container');
+    const removeBtn = document.getElementById('remove-file-btn');
+    const fileDropArea = document.querySelector('.file-drop-area');
+
+    function handleFile(file) {
+      if (file) {
+        fileNameEl.textContent = file.name;
+        fileInfoEl.style.display = 'block';
+        fileDropArea.classList.add('has-file');
+
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        previewContainer.style.background = 'none';
+      }
+    }
+
+    function resetFile() {
+        fileInput.value = ''; // Quan trọng để có thể chọn lại cùng 1 file
+        fileNameEl.textContent = '';
+        fileInfoEl.style.display = 'none';
+        fileDropArea.classList.remove('has-file');
+
+        preview.src = '#';
+        preview.style.display = 'none';
+        previewContainer.style.background = '#f9f9f9';
+    }
+
+    function onFileChange(e){
+      const file = e.target.files && e.target.files.length ? e.target.files[0] : null;
+      handleFile(file);
+    }
+
+    removeBtn.addEventListener('click', resetFile);
+
+    // Sự kiện kéo thả (drag and drop)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      fileDropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, () => fileDropArea.classList.add('highlight'), false);
+    });
+    fileDropArea.addEventListener('dragleave', () => fileDropArea.classList.remove('highlight'), false);
+    fileDropArea.addEventListener('drop', (e) => {
+        fileDropArea.classList.remove('highlight');
+        handleFile(e.dataTransfer.files[0]);
+    }, false);
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('upload-form');
+        const loading = document.getElementById('loading');
+        const predictBtn = document.getElementById('predict-btn');
+
+        form.addEventListener('submit', function() {
+            loading.style.display = 'flex'; // Hiển thị thông báo chờ
+            predictBtn.disabled = true; // Vô hiệu hóa nút Dự đoán
+        });
+    });
+</script>
+{% endblock %}

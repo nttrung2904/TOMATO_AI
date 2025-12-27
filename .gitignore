@@ -1,0 +1,23 @@
+# --- FILE HỆ THỐNG ---
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# --- CHẶN MODEL NẶNG (THỦ PHẠM SỐ 1) ---
+*.keras
+*.h5
+model/
+
+# --- CHẶN DỮ LIỆU & LOG (THỦ PHẠM SỐ 2) ---
+logs/
+data/
+*.xlsx
+*.pkl
+*.jsonl
+
+# --- CHẶN ẢNH RÁC & FEEDBACK (THỦ PHẠM SỐ 3) ---
+static/feedback/
+static/uploaded/
+static/images/not_tomato_samples/
+static/images/tomato_samples/

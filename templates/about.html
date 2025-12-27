@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Giới thiệu | Tomato AI{% endblock %}
+
+{% block content %}
+    <section id="about" class="card" style="margin-top:18px">
+      <div class="about-header">
+        <img src="{{ url_for('static', filename='images/tomato.svg') }}" alt="logo" style="width:50px; height:50px;">
+        <h1 style="margin:0;">Về dự án Tomato AI</h1>
+      </div>
+
+      <div class="about-section">
+        <div class="about-text">
+          <h3>Bối cảnh và Mục tiêu</h3>
+          <p>
+            Cây cà chua là một trong những loại cây trồng phổ biến và có giá trị kinh tế cao, tuy nhiên lại rất nhạy cảm với các loại bệnh do nấm, vi khuẩn và virus gây ra. Việc phát hiện bệnh muộn hoặc chẩn đoán sai có thể dẫn đến thiệt hại nghiêm trọng về năng suất và kinh tế cho người nông dân.
+          </p>
+          <p>
+            Dự án <strong>Detecting Diseases on Tomato Leaves</strong> được xây dựng với mục tiêu ứng dụng công nghệ Trí tuệ nhân tạo (AI), cụ thể là các mô hình học sâu (Deep Learning), để tạo ra một công cụ hỗ trợ chẩn đoán sớm các bệnh phổ biến trên lá cà chua. Hệ thống giúp người dùng nhanh chóng nhận diện bệnh thông qua hình ảnh, từ đó có những biện pháp xử lý kịp thời.
+          </p>
+        </div>
+        <div class="about-image" style="display: flex; justify-content: center; align-items: center;">
+          <img src="https://th.bing.com/th/id/OIP.Q5pVriNm5i94VcnLLmSBHQHaEK?w=280&h=180&c=7&r=0&o=7&cb=ucfimgc2&dpr=1.3&pid=1.7&rm=3" alt="Cây cà chua">
+        </div>
+      </div>
+
+      <div class="about-section reverse">
+        <div class="about-text">
+          <h3>Công nghệ sử dụng</h3>
+          <ul>
+            <li><strong>Backend:</strong> Flask (Python) xử lý API và gọi mô hình AI.</li>
+            <li><strong>Frontend:</strong> HTML, CSS, JavaScript - giao diện đơn giản, thân thiện.</li>
+            <li><strong>Deep Learning:</strong> 8 kiến trúc CNN (<strong>VGG19, VGG16, ResNet50, MobileNetV2, InceptionV3, DenseNet, Xception, CNN</strong>) kết hợp 5 pipelines tiền xử lý → <strong>40 model configurations</strong>.</li>
+            <li><strong>Preprocessing:</strong> OpenCV & NumPy - 5 pipelines (Average HSV, Median CMYK/HSI, GaussianBlur + Noise CMYK/HSI).</li>
+            <li><strong>Similarity Check:</strong> MobileNetV2 làm feature extractor, phát hiện ảnh không phải lá cà chua trước khi dự đoán.</li>
+            <li><strong>Chatbot:</strong> RapidFuzz với 605 câu hỏi, hỗ trợ fuzzy matching tiếng Việt.</li>
+            <li><strong>Tối ưu hóa:</strong> LRU cache quản lý models trong RAM, giảm thời gian load.</li>
+          </ul>
+        </div>
+        <div class="about-image" style="display: flex; justify-content: center; align-items: center;">
+          <img src="https://th.bing.com/th/id/OIP.NvShl5D-YWvybMp6kmFYrAHaEK?w=281&h=180&c=7&r=0&o=7&cb=ucfimgc2&dpr=1.3&pid=1.7&rm=3" alt="Công nghệ AI">
+        </div>
+      </div>
+
+      <div class="about-footer">
+        <h3>Tác giả & Lời cảm ơn</h3>
+        <p>Nhóm phát triển: <strong>Nguyễn Thành Trung &amp; Võ Công Đoàn</strong>.</p>
+        <p>Dự án được thực hiện trong khuôn khổ Khóa luận tốt nghiệp, với sự hướng dẫn và hỗ trợ từ các giảng viên và sự đóng góp từ cộng đồng.</p>
+      </div>
+
+      <div class="alert warn" style="margin-top: 20px;">
+        <h4 style="margin-top:0;">Giới hạn và Lưu ý quan trọng</h4>
+        <p style="margin-bottom: 5px;">
+          Đây chỉ là một hệ thống thử nghiệm. Kết quả mang tính tham khảo — luôn kiểm tra thực địa hoặc tham vấn chuyên gia nông nghiệp trước khi sử dụng thuốc hoặc can thiệp mạnh.
+        </p>
+        <p style="margin-bottom: 0;">
+          Độ chính xác của mô hình phụ thuộc rất nhiều vào chất lượng ảnh đầu vào (độ sáng, độ nét, góc chụp) và sự đa dạng của dữ liệu huấn luyện. Các trường hợp bệnh hiếm gặp hoặc triệu chứng không điển hình có thể không được nhận dạng chính xác.
+        </p>
+      </div>
+    </section>
+{% endblock %}

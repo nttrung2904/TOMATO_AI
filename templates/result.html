@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Kết quả dự đoán | Tomato AI{% endblock %}
+
+{% block content %}
+  <h1 style="margin-top:18px">Kết quả dự đoán</h1>
+  <style>
+    /* Layout tweaks for result page */
+    .result-layout{ display:flex; flex-direction:column; gap:24px; align-items:stretch; margin-top:12px; }
+    .result-main{ width:100%; }
+    .result-sidebar{ width:100%; flex-shrink:0; }
+    .result-card{ padding:18px; }
+    .prediction-list{ display:flex; flex-direction:column; gap:10px; margin-top:8px }
+    .pred-item{ display:flex; align-items:center; gap:12px; justify-content:space-between }
+    .pred-left{ flex:1 }
+    .progress{ background:#f1f3f5; height:10px; border-radius:8px; overflow:hidden; margin-top:6px }
+    .bar{ height:100%; background:linear-gradient(90deg,#6cc070,#d9534f); border-radius:8px }
+    .main-bar{ background:linear-gradient(90deg,#2d9bf0,#107bed) }
+    .is-predicted-main .pred-left > div:first-child{ font-weight:700; color:#107bed }
+
+    /* Input + info row inside sidebar: two distinct panels */
+    .input-info-row{ display:flex; gap:24px; align-items:stretch }
+    .input-col{ width:320px; flex:0 0 320px; padding:14px; background:#fff; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.04); border:1px solid #f0f0f0; position:relative }
+    .input-col h3{ margin-bottom:8px }
+    /* subtle vertical divider between the panels */
+    .input-col:after{ content:""; position:absolute; top:12px; right:-12px; width:1px; height:calc(100% - 24px); background:linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02)); border-radius:1px }
+    .info-col{ flex:1; padding:14px; background:#fff; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.04); border:1px solid #f0f0f0 }
+    .input-col .img-preview{ display:block; margin:6px auto 0 auto; max-width:280px; width:100%; height:auto; border-radius:8px }
+
+    /* Aside: separate image card (left) and info card (right) */
+    .aside-columns{ display:flex; gap:18px; align-items:flex-start }
+    .aside-columns .input-card{ flex:0 0 320px }
+    .aside-columns .info-card{ flex:1 }
+
+    /* Warning when possible-not-tomato: high-visibility red text + soft red background */
+    .possible-warning{ color:#b71c1c; background:linear-gradient(180deg,#fff6f6,#fff1f1); border:1px solid #f5c2c7; padding:12px; border-radius:8px; font-weight:600 }
+    .possible-warning strong{ color:inherit }
+
+    /* Back button */
+    .back-btn{ display:inline-block; margin-top:12px; color:var(--muted); text-decoration:none }
+    .back-btn:hover{ text-decoration:underline }
+
+    /* Responsive: stack input + info vertically on small screens */
+    @media (max-width:980px){ 
+      .input-info-row{ flex-direction:column; align-items:center }
+      .input-col{ width:100%; flex:0 0 auto }
+      .input-col:after{ display:none }
+      .input-col .img-preview{ max-width:320px }
+    }
+  </style>
+  
+  <div class="result-layout">
+    <main class="result-main">
+      <div class="card result-card {% if rejected_not_tomato %}rejected{% endif %}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <img src="{{ url_for('static', filename='images/tomato.svg') }}" alt="Tomato" style="width:38px;height:38px;">
+            <h1 style="margin:0;font-size:1.3em;color:var(--tomato-700);">Kết quả dự đoán</h1>
+          </div>
+        </div>
+        <div id="meta-info" {% if show_feedback or possibly_not_tomato or rejected_not_tomato %}style="display:none;"{% endif %}>
+          <div style="width:100%;margin-bottom:8px;"><strong>Model:</strong> <span style="color:#1976d2">{{ model_name }}</span></div>
+          <div style="width:100%;margin-bottom:8px;"><strong>Pipeline:</strong> <span style="color:var(--leaf-600)">{{ pipeline_key }}</span></div>
+        </div>
+        {# possibly_not_tomato warning moved below to avoid duplicate messages #}
+        {% if show_feedback %}
+        <div style="margin-top:8px;" id="confirm-buttons">
+          <button id="fb-not" class="btn small danger feedback-btn">Đây không phải lá cà chua</button>
+          <button id="fb-yes" class="btn small feedback-btn">Đây là lá cà chua</button>
+          <span id="fb-msg" style="margin-left:10px;color:#1976d2;font-weight:600"></span>
+        </div>
+        {% endif %}
+        {% if rejected_not_tomato %}
+        <div class="alert danger" style="margin:14px 0 8px 0;">
+          <strong>⚠️ Ảnh này được xác định không phải là lá cà chua.</strong>
+          <div style="margin-top:10px;color:#333;">
+            Hệ thống từ chối đưa ra dự đoán vì ảnh có độ tương đồng cao với mẫu "không phải lá" hoặc không khớp với đặc điểm lá cà chua.
+          </div>
+          <div style="margin-top:12px;padding:10px;background:#fff3e0;border-radius:6px;">
+            <strong>💡 Gợi ý:</strong>
+            <ul style="margin:8px 0 0 20px;padding:0;">
+              <li>Đảm bảo ảnh chụp rõ toàn bộ lá cà chua với ánh sáng tốt</li>
+              <li>Tránh chụp các đối tượng khác (động vật, người, đồ vật)</li>
+              <li>Nếu chắc chắn đây là lá cà chua, click nút "Đây là lá cà chua" bên dưới để cải thiện hệ thống</li>
+            </ul>
+          </div>
+          {% if sim_info %}
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-weight:600;color:#555;">📊 Chi tiết điểm tương đồng (click để xem)</summary>
+              <div style="margin-top:8px;font-size:0.9rem;color:#555;padding:10px;background:#f9f9f9;border-radius:4px;">
+                <div style="margin-bottom:6px;">
+                  <strong style="color:#4caf50;">✓ Với mẫu lá cà chua:</strong><br>
+                  &nbsp;&nbsp;→ Histogram: {{ sim_info.details.pos.hist|round(3) }}<br>
+                  &nbsp;&nbsp;→ Deep features (MobileNetV2): {{ sim_info.details.pos.deep|round(3) }}<br>
+                  &nbsp;&nbsp;→ <strong>Tổng hợp: {{ sim_info.positive_sim|round(3) }}</strong> (ngưỡng tối thiểu: 0.60)
+                </div>
+                <div>
+                  <strong style="color:#f44336;">✗ Với mẫu không phải cà chua:</strong><br>
+                  &nbsp;&nbsp;→ Histogram: {{ sim_info.details.neg.hist|round(3) }}<br>
+                  &nbsp;&nbsp;→ Deep features (MobileNetV2): {{ sim_info.details.neg.deep|round(3) }}<br>
+                  &nbsp;&nbsp;→ <strong>Tổng hợp: {{ sim_info.negative_sim|round(3) }}</strong> (ngưỡng từ chối: 0.75)
+                </div>
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">
+                  <strong>Kết luận:</strong> Ảnh bị từ chối vì độ tương đồng với "không phải lá" ({{ sim_info.negative_sim|round(3) }}) 
+                  vượt ngưỡng 0.75 và độ tương đồng với lá cà chua ({{ sim_info.positive_sim|round(3) }}) dưới 0.60.
+                </div>
+              </div>
+            </details>
+          {% endif %}
+        </div>
+        {% elif possibly_not_tomato %}
+        <div class="alert warn possible-warning" style="margin:14px 0 8px 0;">
+          <strong>⚠️ Cảnh báo: Ảnh này có thể không phải lá cà chua hoặc chất lượng không rõ ràng.</strong>
+          <div style="margin-top:8px;">
+            Hệ thống phát hiện độ tin cậy thấp hoặc ảnh không khớp với đặc điểm lá cà chua điển hình. Kết quả dự đoán có thể không chính xác.
+          </div>
+          {% if sim_info %}
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-weight:600;color:#555;">📊 Chi tiết điểm tương đồng (click để xem)</summary>
+              <div style="margin-top:8px;font-size:0.9rem;color:#555;padding:10px;background:#f9f9f9;border-radius:4px;">
+                <div style="margin-bottom:6px;">
+                  <strong style="color:#4caf50;">✓ Với mẫu lá cà chua:</strong><br>
+                  &nbsp;&nbsp;→ Histogram: {{ sim_info.details.pos.hist|round(3) }}<br>
+                  &nbsp;&nbsp;→ Deep features (MobileNetV2): {{ sim_info.details.pos.deep|round(3) }}<br>
+                  &nbsp;&nbsp;→ <strong>Tổng hợp: {{ sim_info.positive_sim|round(3) }}</strong> (cần ≥ 0.60)
+                </div>
+                <div>
+                  <strong style="color:#f44336;">✗ Với mẫu không phải cà chua:</strong><br>
+                  &nbsp;&nbsp;→ Histogram: {{ sim_info.details.neg.hist|round(3) }}<br>
+                  &nbsp;&nbsp;→ Deep features (MobileNetV2): {{ sim_info.details.neg.deep|round(3) }}<br>
+                  &nbsp;&nbsp;→ <strong>Tổng hợp: {{ sim_info.negative_sim|round(3) }}</strong> (cần < 0.75)
+                </div>
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;">
+                  <strong>Kết luận:</strong> Ảnh có độ tương đồng với lá cà chua ({{ sim_info.positive_sim|round(3) }}) thấp hơn 0.60 
+                  và/hoặc độ tin cậy model thấp.
+                </div>
+              </div>
+            </details>
+          {% endif %}
+          <div style="margin-top:10px;padding:8px;background:rgba(255,255,255,0.5);border-radius:4px;">
+            <strong>💡 Khuyến nghị:</strong>
+            <ul style="margin:6px 0 0 20px;padding:0;">
+              <li>Xác nhận bên dưới nếu đây là lá cà chua để cải thiện hệ thống</li>
+              <li>Hoặc thử chụp lại với ánh sáng tốt hơn và góc chụp rõ ràng hơn</li>
+              <li>Thử model khác để so sánh kết quả (VGG19, ResNet50, MobileNetV2, v.v.)</li>
+            </ul>
+          </div>
+        </div>
+        {% else %}
+        <div style="margin:14px 0 8px 0;width:100%;">
+          <span class="main-label">Dự đoán chính: {{ predicted_label }}</span>
+          <span class="main-percent" style="color:#555;font-size:1.08em;">({{ (predicted_prob*100)|round(2) }}%)</span>
+        </div>
+        {% endif %}
+
+        <div id="prediction-block" {% if show_feedback or possibly_not_tomato or rejected_not_tomato %}style="display:none"{% endif %}>
+          <div class="prediction-list">
+          {% for cname, p in probs %} 
+            <div class="pred-item {% if cname == predicted_label %}is-predicted-main{% endif %}">
+              <div class="pred-left">
+                <div>
+                  {% if cname == predicted_label %}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 5px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  {% endif %}
+                  {{ cname }}
+                </div>
+                <div class="progress" aria-hidden="true">
+                  <div class="bar {% if cname == predicted_label %}main-bar{% endif %}" style="width:{{ (p*100)|round(2) }}%">
+                  </div>
+                </div>
+              </div>
+              <div style="width:120px;text-align:right">{{ (p*100)|round(2) }}%</div>
+            </div>
+          {% endfor %}
+          </div>
+          <a href="{{ url_for('index') }}" class="back-btn">&#8592; Dự đoán ảnh khác</a>
+        </div>
+      </div>
+    </main>
+
+    <aside id="disease-aside" class="result-sidebar">
+      <div class="aside-columns">
+        <div class="card input-card">
+          <div class="input-col" style="padding:16px;">
+            <h3 style="margin-top:0;">Ảnh đã qua xử lý</h3>
+            <img src="{{ image_path }}" class="img-preview" alt="Ảnh đã xử lý">
+          </div>
+        </div>
+        <div class="card info-card" {% if possibly_not_tomato and not show_feedback %}style="display:none"{% endif %}>
+          <div style="padding:14px;">
+            <div class="collapsible" onclick="toggleCollapse('disease-body')">
+              <h3 style="margin:0; display:flex; align-items:center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                Thông tin bệnh & Phòng ngừa
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon" style="margin-left: auto;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </h3>
+              <div style="font-size:0.9rem;color:var(--muted)">Chi tiết</div>
+            </div>
+            <div id="disease-body" class="collapse-body open"> <!-- Mặc định mở -->
+              <div style="margin-top:8px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fff9f9)">
+                <strong>{{ disease_info.name }}</strong>
+                <p style="color:#444;margin-top:6px;">{{ disease_info.definition }}</p>
+                <h4 style="margin:10px 0 6px 0;">Các biện pháp phòng ngừa</h4>
+                <ul class="prevention-list">
+                  {% for tip in disease_info.prevention %}
+                    <li>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 5px; color: var(--leaf-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                      {{ tip }}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCollapse(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.classList.toggle('open');
+    }
+
+    // Xử lý nút phản hồi
+    document.addEventListener('DOMContentLoaded', function(){
+      const btnNot = document.getElementById('fb-not');
+      const btnYes = document.getElementById('fb-yes');
+      const msg = document.getElementById('fb-msg');
+      async function sendFeedback(action){
+        try{
+          const res = await fetch('{{ url_for('feedback') }}', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({action})
+          });
+          const data = await res.json();
+          return data;
+        }catch(e){
+          return {ok:false, message:'Lỗi kết nối.'};
+        }
+      }
+
+      if(btnYes) btnYes.addEventListener('click', async ()=>{
+        // Người dùng xác nhận ảnh LÀ lá cà chua -> hiển thị dự đoán
+        const status = await sendFeedback('confirm');
+        if(status.ok){
+          msg.textContent = 'Cảm ơn! Hiển thị kết quả...';
+        } else {
+          msg.textContent = status.message || 'Đã xác nhận (không lưu được).';
+        }
+        // Hiển thị khối dự đoán và ẩn nút xác nhận
+        const pb = document.getElementById('prediction-block');
+        const cb = document.getElementById('confirm-buttons');
+        if(pb) pb.style.display = 'block';
+        if(cb) cb.style.display = 'none';
+        
+        // Hiển thị thông tin bệnh nếu đang bị ẩn
+        try{
+          const aside = document.getElementById('disease-aside');
+          if(aside) aside.style.display = 'block';
+          const meta = document.getElementById('meta-info');
+          if(meta) meta.style.display = 'block';
+        }catch(e){}
+        
+        // Ẩn các cảnh báo/thông báo từ chối trong thẻ kết quả
+        try{
+          const alerts = document.querySelectorAll('.card.result-card .alert');
+          alerts.forEach(a => a.style.display = 'none');
+        }catch(e){}
+        
+        // Xóa class "rejected" khỏi thẻ kết quả nếu có
+        try{
+          const card = document.querySelector('.card.result-card');
+          if(card) card.classList.remove('rejected');
+        }catch(e){}
+        
+        // Hiển thị thẻ thông tin nếu đang bị ẩn
+        try{
+          const infoCard = document.querySelector('.card.info-card');
+          if(infoCard) infoCard.style.display = 'block';
+        }catch(e){}
+        
+        setTimeout(()=> msg.textContent = '', 3000);
+      });
+
+      if(btnNot) btnNot.addEventListener('click', async ()=>{
+        // Người dùng nói KHÔNG phải lá cà chua -> lưu phản hồi và hiện thông báo tải lại
+        const status = await sendFeedback('not_tomato');
+        const cb = document.getElementById('confirm-buttons');
+        const card = document.querySelector('.card.result-card');
+        const aside = document.getElementById('disease-aside');
+        if(status.ok){
+          // Thay nội dung thẻ bằng thông báo ngắn yêu cầu chọn ảnh khác
+          if(card){
+            card.innerHTML = '<div style="padding:18px;"><h2>Ảnh không phải lá cà chua</h2><p>Vui lòng chọn lại ảnh khác (chụp rõ hơn hoặc chọn ảnh lá thực sự).</p><a href="{{ url_for('index') }}" class="back-btn">&#8592; Tải ảnh khác</a></div>';
+          }
+          if(aside) aside.style.display = 'none';
+        } else {
+          // Nếu lưu thất bại, vẫn hiện thông báo nhưng có cảnh báo
+          if(card){
+            card.innerHTML = '<div style="padding:18px;"><h2>Ảnh không phải lá cà chua</h2><p>Vui lòng chọn lại ảnh khác (chụp rõ hơn hoặc chọn ảnh lá thực sự).</p><div style="color:red;margin-top:6px;">Lưu feedback không thành công: '+(status.message||'Không xác định')+'</div><a href="{{ url_for('index') }}" class="back-btn">&#8592; Tải ảnh khác</a></div>';
+          }
+          if(aside) aside.style.display = 'none';
+        }
+      });
+      // Đảm bảo khi trang hiển thị nút xác nhận (luồng có-thể-không-phải-cà-chua)
+      // thẻ thông tin bị ẩn và cảnh báo hiển thị dưới các nút.
+      function enforcePossibleUI(){
+        const cb = document.getElementById('confirm-buttons');
+        if(!cb) return;
+        const isVisible = cb.offsetParent !== null; // hiển thị trong layout
+        const infoCard = document.querySelector('.card.info-card');
+        const predBlock = document.getElementById('prediction-block');
+        const mainLabel = document.querySelector('.main-label');
+        const mainPercent = document.querySelector('.main-percent');
+        if(isVisible){
+          if(infoCard) infoCard.style.display = 'none';
+          if(predBlock) predBlock.style.display = 'none';
+          if(mainLabel) mainLabel.style.display = 'none';
+          if(mainPercent) mainPercent.style.display = 'none';
+          // Chèn cảnh báo nếu chưa có
+          if(!document.querySelector('.possible-warning')){
+            const warn = document.createElement('div');
+            warn.className = 'alert danger possible-warning';
+            warn.style.margin = '10px 0 6px 0';
+            warn.innerHTML = '<strong>Cảnh báo:</strong> Ảnh có thể không phải là lá cà chua hoặc mô tả không rõ ràng; hệ thống sẽ không đưa ra dự đoán chắc chắn. Vui lòng thử lại với ảnh lá rõ ràng: chụp gần lá, đủ sáng, nền đơn giản.';
+            cb.parentNode.insertBefore(warn, cb.nextSibling);
+          }
+        } else {
+          if(infoCard) infoCard.style.display = '';
+          if(predBlock) predBlock.style.display = '';
+          if(mainLabel) mainLabel.style.display = '';
+          if(mainPercent) mainPercent.style.display = '';
+          const old = document.querySelector('.possible-warning');
+          if(old) old.remove();
+        }
+      }
+
+      // Chạy khi tải trang và khi người dùng tương tác với nút phản hồi
+      enforcePossibleUI();
+      if(btnYes) btnYes.addEventListener('click', ()=>{
+        const infoCard = document.querySelector('.card.info-card');
+        if(infoCard) infoCard.style.display = '';
+        const old = document.querySelector('.possible-warning'); if(old) old.remove();
+      });
+      if(btnNot) btnNot.addEventListener('click', ()=>{
+        const old = document.querySelector('.possible-warning'); if(old) old.remove();
+      });
+    });
+</script>
+{% endblock %}

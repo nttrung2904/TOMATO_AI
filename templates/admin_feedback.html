@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Feedback | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    margin-bottom: 12px;
+  }
+
+  .action-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  /* Professional button styles inside admin action bar */
+  .action-bar .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.92em;
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.12s ease, background-color 0.12s ease, opacity 0.12s ease;
+    text-decoration: none;
+    color: #1f2937;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+    white-space: nowrap;
+  }
+  .action-bar .btn:hover{ transform: translateY(-1px); box-shadow: 0 6px 16px rgba(15,23,42,0.1); }
+  .action-bar .btn:active{ transform: translateY(0); }
+  .action-bar .btn:focus{ outline: 3px solid rgba(16,123,237,0.12); outline-offset: 2px; }
+
+  .action-bar .btn.small{ padding:6px 10px; font-size:0.86em }
+  .action-bar .btn.warn{ background:linear-gradient(180deg,#fff7ed,#fff1d6); border-color:#f5d0a9; color:#92400e; font-weight:600 }
+  .action-bar .btn.danger{ background:linear-gradient(180deg,#fff1f2,#ffeef0); border-color:#f3c2c9; color:#a11; font-weight:600 }
+  .action-bar .btn.primary{ background: linear-gradient(180deg,#107bed,#0b61c9); color: #fff; border-color: rgba(16,123,237,0.9); box-shadow: 0 6px 16px rgba(16,123,237,0.15); font-weight:600 }
+
+  .feedback-group {
+    margin-bottom: 32px;
+  }
+
+  .feedback-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  .img-card {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+
+  .img-card:hover {
+    border-color: #adb5bd;
+  }
+
+  .img-card.selected {
+    border-color: var(--tomato-600);
+    box-shadow: 0 0 0 3px var(--tomato-200);
+  }
+
+  .img-card img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .img-card .img-name {
+    font-size: 0.8rem;
+    padding: 6px;
+    background-color: #f1f3f5;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+
+
+  /* Make selection buttons visually consistent */
+  .btn.small { border-radius: 8px; }
+</style>
+
+<div class="admin-header">
+  <h1>Quản lý Feedback & Dữ liệu</h1>
+  <a href="{{ url_for('admin_export_chat') }}" class="btn" style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:linear-gradient(180deg,#107bed,#0b61c9); color:#fff; text-decoration:none; box-shadow:0 8px 20px rgba(16,123,237,0.12);">
+    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+    </svg>
+    Xuất Log Chat (CSV)
+  </a>
+</div>
+
+<div class="action-bar">
+  <button class="btn" onclick="performAction('add_to_samples')">
+    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+    Mẫu tích cực
+  </button>
+  <button class="btn warn" onclick="performAction('add_to_negative_samples')">
+    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+    Mẫu tiêu cực
+  </button>
+  <button class="btn" onclick="reloadSamples()">
+    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+    Reload Cache
+  </button>
+  <button class="btn primary" onclick="rebuildSamples()">
+    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+    Rebuild Features
+  </button>
+  <button class="btn danger" onclick="performAction('delete')">
+    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+    Xóa ảnh
+  </button>
+</div>
+<div id="status-msg" style="padding:12px; margin-bottom:12px; border-radius:8px; font-weight:600; color:#1976d2; background-color:#e3f2fd; display:none;"></div>
+
+{% if not images %}
+  <div class="alert info">Chưa có ảnh feedback nào để xử lý.</div>
+{% endif %}
+
+{% for group_name, image_list in images.items() %}
+<section class="feedback-group card">
+  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 16px;">
+    <h2 style="margin:0;">
+      {{ group_name | replace('_', ' ') | title }} ({{ image_list|length }} ảnh)
+    </h2>
+    {% if image_list %}
+    <button class="btn small" onclick="toggleSelectAll(this)">Chọn tất cả</button>
+    {% endif %}
+  </div>
+  {% if image_list %}
+  <div class="feedback-grid">
+    {% for image in image_list %}
+    <div class="img-card"
+         data-name="{{ image.name }}"
+         data-dir="{{ image.dir }}"
+         onclick="toggleSelect(this)">
+      <img src="{{ image.url }}" alt="{{ image.name }}" loading="lazy">
+      <div class="img-name" title="{{ image.name }}">{{ image.name }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>Không có ảnh nào trong mục này.</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+  function toggleSelect(element) {
+    element.classList.toggle('selected');
+    updateSelectAllButton(element.closest('.feedback-group'));
+  }
+
+  function updateSelectAllButton(group) {
+    if (!group) return;
+    const images = group.querySelectorAll('.img-card');
+    const button = group.querySelector('.btn.small');
+    if (!button || images.length === 0) return;
+
+    const allSelected = Array.from(images).every(img => img.classList.contains('selected'));
+    button.textContent = allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả';
+  }
+
+  function toggleSelectAll(button) {
+    const group = button.closest('.feedback-group');
+    if (!group) return;
+
+    const images = group.querySelectorAll('.img-card');
+    const isSelectAll = button.textContent.includes('Chọn tất cả');
+
+    images.forEach(img => {
+      if (isSelectAll) {
+        img.classList.add('selected');
+      } else {
+        img.classList.remove('selected');
+      }
+    });
+    button.textContent = isSelectAll ? 'Bỏ chọn tất cả' : 'Chọn tất cả';
+  }
+
+  async function performAction(action) {
+    const selectedElements = document.querySelectorAll('.img-card.selected');
+    const statusMsg = document.getElementById('status-msg');
+
+    if (selectedElements.length === 0) {
+      statusMsg.textContent = 'Vui lòng chọn ít nhất một ảnh.';
+      statusMsg.style.display = 'block';
+      statusMsg.style.backgroundColor = '#fff3cd';
+      statusMsg.style.color = '#856404';
+      setTimeout(() => statusMsg.style.display = 'none', 3000);
+      return;
+    }
+
+    if (action === 'delete' && !confirm(`Bạn có chắc muốn xóa ${selectedElements.length} ảnh đã chọn? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    const items = Array.from(selectedElements).map(el => ({
+      name: el.dataset.name,
+      dir: el.dataset.dir
+    }));
+
+    statusMsg.textContent = 'Đang xử lý...';
+    statusMsg.style.display = 'block';
+    statusMsg.style.backgroundColor = '#e3f2fd';
+    statusMsg.style.color = '#1976d2';
+
+    try {
+      const res = await fetch('{{ url_for('admin_feedback_action') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, items })
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        statusMsg.textContent = data.message;
+        statusMsg.style.backgroundColor = '#d4edda';
+        statusMsg.style.color = '#155724';
+        // Xóa các card ảnh đã xử lý khỏi giao diện
+        selectedElements.forEach(el => el.remove());
+      } else {
+        statusMsg.textContent = `Lỗi: ${data.message}`;
+        statusMsg.style.backgroundColor = '#f8d7da';
+        statusMsg.style.color = '#721c24';
+      }
+    } catch (e) {
+      statusMsg.textContent = 'Lỗi kết nối mạng.';
+      statusMsg.style.backgroundColor = '#f8d7da';
+      statusMsg.style.color = '#721c24';
+    } finally {
+      setTimeout(() => statusMsg.style.display = 'none', 5000);
+    }
+  }
+
+    async function reloadSamples(){
+      const statusMsg = document.getElementById('status-msg');
+      statusMsg.textContent = 'Đang reload sample cache...';
+      statusMsg.style.display = 'block';
+      statusMsg.style.backgroundColor = '#e3f2fd';
+      statusMsg.style.color = '#1976d2';
+      try{
+        const res = await fetch('{{ url_for('admin_reload_samples') }}', { method: 'POST' });
+        const data = await res.json();
+        if(data.ok){
+          statusMsg.textContent = data.message || 'Reload xong.';
+          statusMsg.style.backgroundColor = '#d4edda';
+          statusMsg.style.color = '#155724';
+        } else {
+          statusMsg.textContent = data.message || 'Không thể reload.';
+          statusMsg.style.backgroundColor = '#f8d7da';
+          statusMsg.style.color = '#721c24';
+        }
+      }catch(e){
+        statusMsg.textContent = 'Lỗi kết nối khi reload.';
+        statusMsg.style.backgroundColor = '#f8d7da';
+        statusMsg.style.color = '#721c24';
+      }
+      setTimeout(()=> statusMsg.style.display = 'none', 5000);
+    }
+
+    async function rebuildSamples(){
+      const statusMsg = document.getElementById('status-msg');
+      if(!confirm('Bạn có chắc muốn bắt đầu rebuild sample features? Quá trình này có thể tốn thời gian.')) return;
+      statusMsg.textContent = 'Đang bắt đầu rebuild sample features...';
+      statusMsg.style.display = 'block';
+      statusMsg.style.backgroundColor = '#e3f2fd';
+      statusMsg.style.color = '#1976d2';
+      try{
+        const res = await fetch('{{ url_for('admin_rebuild_samples') }}', { method: 'POST' });
+        const data = await res.json();
+        if(data.ok){
+          statusMsg.textContent = data.message || 'Đã bắt đầu rebuild (xong sẽ reload cache).';
+          statusMsg.style.backgroundColor = '#d4edda';
+          statusMsg.style.color = '#155724';
+        } else {
+          statusMsg.textContent = data.message || 'Không thể bắt đầu rebuild.';
+          statusMsg.style.backgroundColor = '#f8d7da';
+          statusMsg.style.color = '#721c24';
+        }
+      }catch(e){
+        statusMsg.textContent = 'Lỗi kết nối khi bắt đầu rebuild.';
+        statusMsg.style.backgroundColor = '#f8d7da';
+        statusMsg.style.color = '#721c24';
+      }
+      setTimeout(()=> statusMsg.style.display = 'none', 6000);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,120 @@
+
+:root {
+    --tomato-500: #e63946;
+    --tomato-700: #c62828;
+    --leaf-600: #2e7d32;
+    --accent: #ffcdd2;
+    --muted: #6b6b6b;
+    --glass: rgba(255,255,255,0.85);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: linear-gradient(180deg, #fff9f9 0%, #fff2f2 50%, #fff 100%);
+    margin: 0;
+    color: #222;
+    -webkit-font-smoothing:antialiased;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+.site-header {
+    display:flex;align-items:center;gap:16px;padding:18px;border-radius:14px;background:var(--glass);box-shadow:0 6px 20px rgba(198,0,0,0.06);
+}
+.site-header img.logo { width:56px;height:56px }
+.site-header h1 { margin:0;color:var(--tomato-700);font-size:1.4rem }
+
+.hero {
+    width:100%;height:260px;border-radius:20px;overflow:hidden;margin:20px 0;box-shadow:0 12px 40px rgba(198,0,0,0.06);
+}
+.hero img { width:100%;height:100%;object-fit:cover;display:block }
+
+.layout { display:flex;gap:28px;align-items:flex-start }
+.left-side { width:260px }
+.right-side { flex:1; min-width:320px }
+
+.card { background:var(--glass); padding:18px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,0.06) }
+
+label { display:block;font-weight:600;margin-bottom:6px;color:var(--muted) }
+input[type=file] { width:100%;padding:8px;border-radius:8px;border:1px dashed #f4c1c1;background:transparent }
+select { width:100%;padding:8px;border-radius:8px;border:1px solid #eee }
+
+button[type=submit] {
+    display:inline-block;margin-top:8px;background:linear-gradient(90deg,var(--leaf-600),var(--tomato-700));color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(198,0,0,0.08);
+}
+button[type=submit]:hover { transform:translateY(-2px) }
+
+.desc { color:var(--muted); margin:12px 0 8px 0 }
+
+.preview { max-width:320px;border-radius:12px;display:block;box-shadow:0 8px 30px rgba(198,0,0,0.06) }
+
+.tomato-gallery { display:flex;gap:14px;justify-content:center;margin-top:12px }
+.tomato-gallery img { width:86px;height:86px;border-radius:12px;object-fit:cover;border:3px solid #fff;box-shadow:0 10px 24px rgba(198,0,0,0.06) }
+
+.footer { text-align:center;color:var(--muted);margin-top:36px;font-size:0.95rem }
+
+/* Alert / flash messages */
+.alert { padding:12px 16px;border-radius:10px;margin:14px 0;font-weight:600 }
+.alert--error { background: linear-gradient(90deg,#ffe6e6,#ffdede); color: #8b0000; box-shadow:0 4px 18px rgba(198,0,0,0.05) }
+.alert--success { background: linear-gradient(90deg,#e6fff0,#dfffe8); color: #117a3a }
+
+/* Navigation */
+.nav { display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px }
+.nav .brand { display:flex;align-items:center;gap:12px }
+.nav .brand img { width:48px;height:48px }
+.nav .brand h2 { margin:0;font-size:1.1rem;color:var(--tomato-700) }
+.nav .links a { margin-left:12px;color:var(--muted);text-decoration:none }
+.nav .links a:hover { color:var(--tomato-700) }
+
+/* custom file input */
+.file-input { display:flex;gap:12px;align-items:center }
+.file-input input[type=file] { display:none }
+.file-input label.btn { cursor:pointer;background:#fff;border:1px solid #eee;padding:8px 12px;border-radius:8px }
+.file-input .file-name { color:var(--muted);font-size:0.95rem }
+
+/* prediction list + progress bars */
+.prediction-list { margin-top:12px }
+.pred-item { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #f0f0f0 }
+.pred-item:last-child { border-bottom:none }
+.progress { width:60%;height:12px;background:#f1f1f1;border-radius:10px;overflow:hidden;margin-left:12px }
+.progress .bar { height:100%;background:linear-gradient(90deg,var(--leaf-600),var(--tomato-500));border-radius:10px }
+.pred-left { display:flex;align-items:center;gap:12px;min-width:40% }
+
+/* collapsible disease info */
+.collapsible { cursor:pointer; display:flex;justify-content:space-between;align-items:center }
+.collapsible + .collapse-body { display:none;margin-top:10px }
+.collapse-body.open { display:block }
+
+
+/* Feedback buttons */
+.feedback-btn:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.rejected .prediction-list {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+@media (max-width:980px) {
+    .layout { flex-direction:column }
+    .left-side, .right-side { width:100% }
+}
+
+/* Spinner cho trạng thái chờ */
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border-left-color: #1976d2;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
