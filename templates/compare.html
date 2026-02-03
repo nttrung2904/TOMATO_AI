@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="alert alert--error">
+      {% for msg in messages %}
+        <div>{{ msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<section class="hero card">
+  <div style="display:flex;gap:20px;align-items:center;">
+    <div style="flex:1;">
+      <h1 style="margin:0 0 8px 0;color:var(--tomato-700)">🔬 So sánh Models và Pipelines</h1>
+      <p class="desc">Upload 1 ảnh và chọn nhiều models/pipelines để so sánh kết quả dự đoán. Hệ thống sẽ chạy ảnh qua tất cả tổ hợp và hiển thị kết quả chi tiết.</p>
+      <div style="padding:10px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;font-size:0.9em;margin-top:12px;">
+        <strong>⚡ Lưu ý:</strong> Mỗi tổ hợp model × pipeline sẽ mất 1-3 giây. Hạn chế tối đa 20 tổ hợp (ví dụ: 4 models × 5 pipelines).
+      </div>
+    </div>
+    <div style="width:320px">
+      <img src="https://www.agrodigital.com/wp-content/uploads/2020/02/Tomate.jpg" 
+           style="width:100%;height:200px;object-fit:cover;border-radius:12px;" 
+           alt="Compare models">
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;gap:24px;margin-top:18px;align-items:flex-start;">
+  <div style="flex:1;min-width:400px">
+    <form id="compare-form" action="{{ url_for('compare_predict') }}" method="post" enctype="multipart/form-data">
+      <div class="card">
+        <h3 style="margin-top:0;">1️⃣ Chọn ảnh</h3>
+        <div class="file-drop-area">
+          <span class="file-msg">Kéo và thả ảnh vào đây, hoặc <strong class="btn-like">nhấn để chọn ảnh</strong></span>
+          <input id="file" name="file" type="file" class="file-input" accept="image/*" required onchange="onFileChange(event)">
+        </div>
+        <div id="file-info" style="margin-top:10px; text-align:center; display:none;">
+          <span id="file-name" style="font-weight:600;"></span>
+          <button type="button" id="remove-file-btn" class="btn small danger" style="margin-left:8px;">Xóa</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin-top:0;">2️⃣ Chọn Models để so sánh</h3>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+          {% for model in models %}
+          <label style="display:flex;align-items:center;padding:8px;background:#f5f5f5;border-radius:6px;cursor:pointer;">
+            <input type="checkbox" name="models" value="{{ model }}" 
+                   {% if model == last_model %}checked{% endif %}
+                   onchange="updateCount()"
+                   style="margin-right:8px;">
+            <span>{{ model }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div style="margin-top:8px;">
+          <button type="button" onclick="selectAllModels()" class="btn small" style="margin-right:8px;">Chọn tất cả</button>
+          <button type="button" onclick="deselectAllModels()" class="btn small danger">Bỏ chọn tất cả</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin-top:0;">3️⃣ Chọn Pipelines để so sánh</h3>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+          {% for pipeline in pipelines %}
+          <label style="display:flex;align-items:center;padding:8px;background:#f5f5f5;border-radius:6px;cursor:pointer;">
+            <input type="checkbox" name="pipelines" value="{{ pipeline }}" 
+                   {% if pipeline == last_pipeline %}checked{% endif %}
+                   onchange="updateCount()"
+                   style="margin-right:8px;">
+            <span>{{ pipeline }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div style="margin-top:8px;">
+          <button type="button" onclick="selectAllPipelines()" class="btn small" style="margin-right:8px;">Chọn tất cả</button>
+          <button type="button" onclick="deselectAllPipelines()" class="btn small danger">Bỏ chọn tất cả</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;background:#e3f2fd;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Tổng số tổ hợp sẽ chạy:</div>
+            <div style="font-size:2rem;font-weight:700;color:var(--tomato-700);" id="total-count">0</div>
+            <div style="font-size:0.85rem;color:#666;" id="estimate-time">Ước tính: 0 giây</div>
+          </div>
+          <div>
+            <button type="submit" id="compare-btn" class="btn" style="font-size:1.1rem;padding:12px 24px;">
+              🔍 So sánh ngay
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading" style="display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; margin-top:16px;" class="card">
+        <div class="spinner"></div>
+        <p style="margin-top:10px; font-size:1.2em; color:var(--tomato-700);">Đang chạy so sánh...</p>
+        <p style="color:#666;font-size:0.9rem;">Quá trình này có thể mất vài phút</p>
+      </div>
+    </form>
+  </div>
+
+  <aside style="width:320px">
+    <div class="card">
+      <h3 style="margin-top:0; text-align:center;">Ảnh đầu vào</h3>
+      <div id="preview-container" style="display:flex;justify-content:center;align-items:center;min-height:200px;background-color:#f9f9f9;border-radius:8px;">
+        <img id="preview" class="preview" src="#" alt="Preview" style="display:none;max-width:100%;max-height:250px;border-radius:8px;"/>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3 style="margin-top:0">💡 Mẹo sử dụng</h3>
+      <ul style="font-size:0.9rem;">
+        <li>Chọn 2-3 models tốt nhất để so sánh nhanh</li>
+        <li>So sánh nhiều pipelines giúp tìm cấu hình tối ưu</li>
+        <li>Với ảnh khó, hãy chạy qua nhiều tổ hợp để có kết quả chính xác hơn</li>
+        <li>Kết quả sẽ được sắp xếp theo độ tin cậy</li>
+      </ul>
+    </div>
+  </aside>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const fileInput = document.getElementById('file');
+    const fileNameEl = document.getElementById('file-name');
+    const fileInfoEl = document.getElementById('file-info');
+    const preview = document.getElementById('preview');
+    const previewContainer = document.getElementById('preview-container');
+    const removeBtn = document.getElementById('remove-file-btn');
+    const fileDropArea = document.querySelector('.file-drop-area');
+
+    function handleFile(file) {
+      if (file) {
+        fileNameEl.textContent = file.name;
+        fileInfoEl.style.display = 'block';
+        fileDropArea.classList.add('has-file');
+
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        previewContainer.style.background = 'none';
+      }
+    }
+
+    function resetFile() {
+        fileInput.value = '';
+        fileNameEl.textContent = '';
+        fileInfoEl.style.display = 'none';
+        fileDropArea.classList.remove('has-file');
+
+        preview.src = '#';
+        preview.style.display = 'none';
+        previewContainer.style.background = '#f9f9f9';
+    }
+
+    function onFileChange(e){
+      const file = e.target.files && e.target.files.length ? e.target.files[0] : null;
+      handleFile(file);
+    }
+
+    removeBtn.addEventListener('click', resetFile);
+
+    // Drag and drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      fileDropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, () => fileDropArea.classList.add('highlight'), false);
+    });
+    fileDropArea.addEventListener('dragleave', () => fileDropArea.classList.remove('highlight'), false);
+    fileDropArea.addEventListener('drop', (e) => {
+        fileDropArea.classList.remove('highlight');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFile(files[0]);
+        }
+    }, false);
+
+    // Model/Pipeline selection
+    function selectAllModels() {
+        document.querySelectorAll('input[name="models"]').forEach(cb => cb.checked = true);
+        updateCount();
+    }
+
+    function deselectAllModels() {
+        document.querySelectorAll('input[name="models"]').forEach(cb => cb.checked = false);
+        updateCount();
+    }
+
+    function selectAllPipelines() {
+        document.querySelectorAll('input[name="pipelines"]').forEach(cb => cb.checked = true);
+        updateCount();
+    }
+
+    function deselectAllPipelines() {
+        document.querySelectorAll('input[name="pipelines"]').forEach(cb => cb.checked = false);
+        updateCount();
+    }
+
+    function updateCount() {
+        const modelCount = document.querySelectorAll('input[name="models"]:checked').length;
+        const pipelineCount = document.querySelectorAll('input[name="pipelines"]:checked').length;
+        const total = modelCount * pipelineCount;
+        
+        document.getElementById('total-count').textContent = total;
+        document.getElementById('estimate-time').textContent = `Ước tính: ${Math.round(total * 1.5)} - ${total * 3} giây`;
+        
+        const compareBtn = document.getElementById('compare-btn');
+        if (total > 20) {
+            compareBtn.disabled = true;
+            compareBtn.style.opacity = '0.5';
+            compareBtn.textContent = '❌ Quá nhiều tổ hợp (max: 20)';
+        } else if (total === 0) {
+            compareBtn.disabled = true;
+            compareBtn.style.opacity = '0.5';
+            compareBtn.textContent = '⚠️ Chọn ít nhất 1 tổ hợp';
+        } else {
+            compareBtn.disabled = false;
+            compareBtn.style.opacity = '1';
+            compareBtn.textContent = `🔍 So sánh ${total} tổ hợp`;
+        }
+    }
+
+    // Form submit
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('compare-form');
+        const loading = document.getElementById('loading');
+        const compareBtn = document.getElementById('compare-btn');
+
+        form.addEventListener('submit', function() {
+            loading.style.display = 'flex';
+            compareBtn.disabled = true;
+        });
+
+        // Initial count
+        updateCount();
+    });
+</script>
+{% endblock %}

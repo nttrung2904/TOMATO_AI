@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Chi tiết dự đoán - Tomato Disease Detection{% endblock %}
+
+{% block head %}
+<style>
+    .detail-container {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .back-link {
+        display: inline-block;
+        margin-bottom: 1rem;
+        color: #2d5016;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    
+    .detail-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .detail-image {
+        width: 100%;
+        max-height: 500px;
+        object-fit: contain;
+        background: #f0f0f0;
+    }
+    
+    .detail-content {
+        padding: 2rem;
+    }
+    
+    .detail-header {
+        border-bottom: 2px solid #2d5016;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .detail-title {
+        font-size: 2rem;
+        color: #2d5016;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .detail-meta {
+        display: flex;
+        gap: 2rem;
+        color: #666;
+        font-size: 0.9rem;
+        flex-wrap: wrap;
+    }
+    
+    .info-section {
+        margin-bottom: 2rem;
+    }
+    
+    .info-title {
+        font-size: 1.3rem;
+        color: #2d5016;
+        margin-bottom: 0.75rem;
+        font-weight: bold;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .info-item {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .info-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+    
+    .info-value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .confidence-bar {
+        width: 100%;
+        height: 30px;
+        background: #e9ecef;
+        border-radius: 15px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 0.9rem;
+        transition: width 1s ease;
+    }
+    
+    .confidence-high {
+        background: linear-gradient(90deg, #28a745, #20c997);
+    }
+    
+    .confidence-medium {
+        background: linear-gradient(90deg, #ffc107, #fd7e14);
+    }
+    
+    .confidence-low {
+        background: linear-gradient(90deg, #dc3545, #e83e8c);
+    }
+    
+    .status-alert {
+        padding: 1rem;
+        border-radius: 5px;
+        margin-bottom: 1rem;
+    }
+    
+    .status-rejected {
+        background: #f8d7da;
+        border-left: 4px solid #721c24;
+        color: #721c24;
+    }
+    
+    .status-warning {
+        background: #fff3cd;
+        border-left: 4px solid #856404;
+        color: #856404;
+    }
+    
+    .status-ok {
+        background: #d4edda;
+        border-left: 4px solid #155724;
+        color: #155724;
+    }
+    
+    .disease-definition {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 4px solid #2d5016;
+        margin-bottom: 1rem;
+        line-height: 1.6;
+    }
+    
+    .prevention-list {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .prevention-list li {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 5px;
+        padding-left: 2.5rem;
+        position: relative;
+    }
+    
+    .prevention-list li:before {
+        content: "✓";
+        position: absolute;
+        left: 1rem;
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    @media (max-width: 768px) {
+        .detail-content {
+            padding: 1rem;
+        }
+        
+        .detail-title {
+            font-size: 1.5rem;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <a href="{{ url_for('history') }}" class="back-link">← Quay lại lịch sử</a>
+    
+    <div class="detail-card">
+        {% if prediction.image_path %}
+        <img src="{{ url_for('static', filename=prediction.image_path) }}" 
+             alt="{{ disease_info.name }}" 
+             class="detail-image"
+             onerror="this.style.display='none'">
+        {% endif %}
+        
+        <div class="detail-content">
+            <div class="detail-header">
+                <h1 class="detail-title">{{ disease_info.name }}</h1>
+                <div class="detail-meta">
+                    <span>⏰ {{ prediction.formatted_time }}</span>
+                    <span>🤖 Model: {{ prediction.model_name }}</span>
+                    <span>🔧 Pipeline: {{ prediction.pipeline_key }}</span>
+                    <span>🆔 ID: {{ prediction.id }}</span>
+                </div>
+            </div>
+            
+            <!-- Status Alert -->
+            {% if prediction.rejected %}
+            <div class="status-alert status-rejected">
+                <strong>❌ Dự đoán bị từ chối</strong><br>
+                Hệ thống phát hiện ảnh có thể không phải lá cà chua. Vui lòng kiểm tra lại.
+            </div>
+            {% elif prediction.possibly_not_tomato %}
+            <div class="status-alert status-warning">
+                <strong>⚠️ Cảnh báo</strong><br>
+                Độ tin cậy thấp hoặc ảnh không rõ ràng. Kết quả có thể không chính xác.
+            </div>
+            {% else %}
+            <div class="status-alert status-ok">
+                <strong>✅ Dự đoán thành công</strong><br>
+                Hệ thống đã phân tích ảnh và đưa ra kết quả dự đoán.
+            </div>
+            {% endif %}
+            
+            <!-- Prediction Info -->
+            <div class="info-section">
+                <h2 class="info-title">📊 Thông tin dự đoán</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Bệnh dự đoán</div>
+                        <div class="info-value">{{ disease_info.name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Độ tin cậy</div>
+                        <div class="info-value">{{ "%.2f"|format(prediction.probability * 100) }}%</div>
+                        {% set conf = prediction.probability * 100 %}
+                        <div class="confidence-bar">
+                            {% if conf >= 85 %}
+                            <div class="confidence-fill confidence-high" style="width: {{ conf }}%">
+                                {{ "%.1f"|format(conf) }}%
+                            </div>
+                            {% elif conf >= 70 %}
+                            <div class="confidence-fill confidence-medium" style="width: {{ conf }}%">
+                                {{ "%.1f"|format(conf) }}%
+                            </div>
+                            {% else %}
+                            <div class="confidence-fill confidence-low" style="width: {{ conf }}%">
+                                {{ "%.1f"|format(conf) }}%
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Disease Information -->
+            <div class="info-section">
+                <h2 class="info-title">🔬 Định nghĩa bệnh</h2>
+                <div class="disease-definition">
+                    {{ disease_info.definition }}
+                </div>
+            </div>
+            
+            <!-- Prevention Measures -->
+            {% if disease_info.prevention and disease_info.prevention|length > 0 %}
+            <div class="info-section">
+                <h2 class="info-title">💡 Biện pháp phòng ngừa và xử lý</h2>
+                <ul class="prevention-list">
+                    {% for measure in disease_info.prevention %}
+                    <li>{{ measure }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

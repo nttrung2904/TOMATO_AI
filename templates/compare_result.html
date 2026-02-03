@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card" style="margin-bottom:24px;">
+    <h2 style="margin:0 0 12px 0;color:var(--tomato-700);">📊 Kết quả so sánh Models & Pipelines</h2>
+    <div style="display:flex;gap:20px;align-items:center;">
+        <div style="flex:1;">
+            <div style="display:flex;gap:16px;">
+                <div style="flex:1;padding:12px;background:#f5f5f5;border-radius:8px;">
+                    <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Tổng tổ hợp</div>
+                    <div style="font-size:1.5rem;font-weight:600;">{{ total_combinations }}</div>
+                </div>
+                <div style="flex:1;padding:12px;background:#e8f5e9;border-radius:8px;">
+                    <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Thành công</div>
+                    <div style="font-size:1.5rem;font-weight:600;color:green;">{{ successful }}</div>
+                </div>
+                <div style="flex:1;padding:12px;background:#ffebee;border-radius:8px;">
+                    <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Thất bại</div>
+                    <div style="font-size:1.5rem;font-weight:600;color:red;">{{ failed }}</div>
+                </div>
+            </div>
+        </div>
+        <div style="width:200px;">
+            <img src="{{ image_url }}" style="width:100%;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);" alt="Input image">
+        </div>
+    </div>
+</div>
+
+{% if failed > 0 %}
+<div class="card" style="margin-bottom:24px;background:#fff3cd;border-left:4px solid #ff9800;">
+    <h3 style="margin:0 0 12px 0;color:#f57c00;">⚠️ Một số tổ hợp thất bại</h3>
+    {% for result in results %}
+        {% if not result.success %}
+        <div style="padding:8px;background:white;border-radius:6px;margin-bottom:8px;">
+            <strong>{{ result.model_name }} + {{ result.pipeline_key }}</strong>
+            <span style="color:#d32f2f;font-size:0.9rem;margin-left:12px;">{{ result.error }}</span>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Consensus Analysis -->
+{% set successful_results = results | selectattr('success', 'equalto', true) | list %}
+{% if successful_results %}
+<div class="card" style="margin-bottom:24px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;">
+    <h3 style="margin:0 0 16px 0;">🎯 Phân tích đồng thuận</h3>
+    
+    {% set predictions = {} %}
+    {% for result in successful_results %}
+        {% if result.disease_name in predictions %}
+            {% set _ = predictions.update({result.disease_name: predictions[result.disease_name] + 1}) %}
+        {% else %}
+            {% set _ = predictions.update({result.disease_name: 1}) %}
+        {% endif %}
+    {% endfor %}
+    
+    {% set sorted_predictions = predictions.items() | sort(attribute='1', reverse=true) | list %}
+    {% set most_common = sorted_predictions[0] %}
+    {% set consensus_percent = (most_common[1] / successful_results | length * 100) | round(1) %}
+    
+    <div style="background:rgba(255,255,255,0.2);padding:16px;border-radius:8px;">
+        <div style="font-size:1.1rem;margin-bottom:8px;">Kết quả phổ biến nhất:</div>
+        <div style="font-size:2rem;font-weight:700;margin-bottom:8px;">{{ most_common[0] }}</div>
+        <div style="font-size:1rem;">
+            {{ most_common[1] }}/{{ successful_results | length }} models đồng ý 
+            ({{ consensus_percent }}% đồng thuận)
+        </div>
+        
+        {% if consensus_percent >= 80 %}
+        <div style="margin-top:12px;padding:8px;background:rgba(76,175,80,0.3);border-radius:6px;">
+            ✅ <strong>Độ tin cậy cao</strong> - Hầu hết models đồng ý với kết quả này
+        </div>
+        {% elif consensus_percent >= 50 %}
+        <div style="margin-top:12px;padding:8px;background:rgba(255,152,0,0.3);border-radius:6px;">
+            ⚠️ <strong>Độ tin cậy trung bình</strong> - Có sự đồng thuận nhưng không tuyệt đối
+        </div>
+        {% else %}
+        <div style="margin-top:12px;padding:8px;background:rgba(244,67,54,0.3);border-radius:6px;">
+            ❌ <strong>Kết quả không nhất quán</strong> - Models có nhiều ý kiến khác nhau
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if sorted_predictions | length > 1 %}
+    <div style="margin-top:16px;">
+        <div style="font-size:0.95rem;margin-bottom:8px;">Phân bố dự đoán:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% for disease, count in sorted_predictions %}
+            <div style="background:rgba(255,255,255,0.2);padding:8px 16px;border-radius:20px;">
+                {{ disease }}: <strong>{{ count }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Results sorted by confidence -->
+{% set sorted_results = successful_results | sort(attribute='probability', reverse=true) %}
+
+<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <h3 style="margin:0;">📋 Kết quả chi tiết (sắp xếp theo độ tin cậy)</h3>
+    <div class="view-toggle">
+        <button onclick="toggleView('grid')" id="grid-btn" class="toggle-btn active">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M3,11H11V3H3M3,21H11V13H3M13,21H21V13H13M13,3V11H21V3" />
+            </svg>
+            <span>Lưới</span>
+        </button>
+        <button onclick="toggleView('table')" id="table-btn" class="toggle-btn">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M3,3H21V7H3V3M3,9H21V11H3V9M3,13H21V15H3V13M3,17H21V21H3V17Z" />
+            </svg>
+            <span>Bảng</span>
+        </button>
+    </div>
+</div>
+
+<!-- Grid View -->
+<div id="grid-view" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));">
+    {% for result in sorted_results %}
+    <div class="card" style="position:relative;{% if result.rejected_not_tomato %}opacity:0.7;{% endif %}">
+        {% if result.rejected_not_tomato %}
+        <div style="position:absolute;top:12px;right:12px;background:#d32f2f;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600;z-index:1;">
+            ❌ Từ chối
+        </div>
+        {% elif result.possibly_not_tomato %}
+        <div style="position:absolute;top:12px;right:12px;background:#ff9800;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600;z-index:1;">
+            ⚠️ Cảnh báo
+        </div>
+        {% endif %}
+
+        <div style="padding:12px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border-radius:8px 8px 0 0;color:white;">
+            <div style="font-size:0.85rem;opacity:0.9;margin-bottom:4px;">Model + Pipeline</div>
+            <div style="font-size:1.1rem;font-weight:700;">{{ result.model_name }}</div>
+            <div style="font-size:0.95rem;">{{ result.pipeline_key }}</div>
+        </div>
+
+        <div style="padding:16px;">
+            <div style="margin-bottom:12px;">
+                <div style="font-size:0.85rem;color:#666;margin-bottom:4px;">Dự đoán</div>
+                <div style="font-size:1.3rem;font-weight:700;color:var(--tomato-700);">
+                    {{ result.disease_name }}
+                </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <div style="font-size:0.85rem;color:#666;margin-bottom:4px;">Độ tin cậy</div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="flex:1;background:#e0e0e0;height:20px;border-radius:10px;overflow:hidden;">
+                        <div style="background:{% if result.probability >= 0.9 %}linear-gradient(90deg, #4caf50, #8bc34a){% elif result.probability >= 0.7 %}linear-gradient(90deg, #ff9800, #ffc107){% else %}linear-gradient(90deg, #f44336, #e91e63){% endif %};height:100%;width:{{ result.probability * 100 }}%;transition:width 0.3s;"></div>
+                    </div>
+                    <div style="font-size:1.2rem;font-weight:700;min-width:60px;text-align:right;">
+                        {{ (result.probability * 100) | round(1) }}%
+                    </div>
+                </div>
+            </div>
+
+            <details style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;padding:8px;background:#f5f5f5;border-radius:6px;font-size:0.9rem;">
+                    Top 5 dự đoán
+                </summary>
+                <div style="margin-top:8px;">
+                    {% for class_name, prob in result.all_probs[:5] %}
+                    <div style="margin-bottom:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:2px;">
+                            <span>{{ class_name }}</span>
+                            <span style="font-weight:600;">{{ (prob * 100) | round(1) }}%</span>
+                        </div>
+                        <div style="background:#e0e0e0;height:4px;border-radius:2px;overflow:hidden;">
+                            <div style="background:#667eea;height:100%;width:{{ prob * 100 }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Table View (hidden by default) -->
+<div id="table-view" style="display:none;">
+    <div class="card" style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:#f5f5f5;">
+                    <th style="padding:12px;text-align:left;border-bottom:2px solid #ddd;">#</th>
+                    <th style="padding:12px;text-align:left;border-bottom:2px solid #ddd;">Model</th>
+                    <th style="padding:12px;text-align:left;border-bottom:2px solid #ddd;">Pipeline</th>
+                    <th style="padding:12px;text-align:left;border-bottom:2px solid #ddd;">Dự đoán</th>
+                    <th style="padding:12px;text-align:center;border-bottom:2px solid #ddd;">Độ tin cậy</th>
+                    <th style="padding:12px;text-align:center;border-bottom:2px solid #ddd;">Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in sorted_results %}
+                <tr style="{% if loop.index % 2 == 0 %}background:#f9f9f9;{% endif %}">
+                    <td style="padding:12px;border-bottom:1px solid #eee;">{{ loop.index }}</td>
+                    <td style="padding:12px;border-bottom:1px solid #eee;font-weight:600;">{{ result.model_name }}</td>
+                    <td style="padding:12px;border-bottom:1px solid #eee;">{{ result.pipeline_key }}</td>
+                    <td style="padding:12px;border-bottom:1px solid #eee;color:var(--tomato-700);font-weight:600;">
+                        {{ result.disease_name }}
+                    </td>
+                    <td style="padding:12px;border-bottom:1px solid #eee;text-align:center;">
+                        <span style="padding:4px 12px;border-radius:20px;font-weight:600;background:{% if result.probability >= 0.9 %}#4caf50{% elif result.probability >= 0.7 %}#ff9800{% else %}#f44336{% endif %};color:white;">
+                            {{ (result.probability * 100) | round(1) }}%
+                        </span>
+                    </td>
+                    <td style="padding:12px;border-bottom:1px solid #eee;text-align:center;">
+                        {% if result.rejected_not_tomato %}
+                        <span style="color:#d32f2f;font-weight:600;">❌ Từ chối</span>
+                        {% elif result.possibly_not_tomato %}
+                        <span style="color:#ff9800;font-weight:600;">⚠️ Cảnh báo</span>
+                        {% else %}
+                        <span style="color:#4caf50;font-weight:600;">✅ OK</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px;padding:32px;background:linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+    <h3 style="margin:0 0 20px 0;color:#333;">Tiếp tục khám phá</h3>
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+        <a href="{{ url_for('compare') }}" class="action-btn action-btn-primary">
+            <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z" />
+            </svg>
+            <span>So sánh ảnh khác</span>
+        </a>
+        <a href="{{ url_for('index') }}" class="action-btn action-btn-success">
+            <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+            </svg>
+            <span>Về trang chủ</span>
+        </a>
+        <a href="{{ url_for('history') }}" class="action-btn action-btn-info">
+            <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3" />
+            </svg>
+            <span>Xem lịch sử</span>
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleView(view) {
+        const gridView = document.getElementById('grid-view');
+        const tableView = document.getElementById('table-view');
+        const gridBtn = document.getElementById('grid-btn');
+        const tableBtn = document.getElementById('table-btn');
+        
+        if (view === 'grid') {
+            gridView.style.display = 'grid';
+            tableView.style.display = 'none';
+            gridBtn.classList.add('active');
+            tableBtn.classList.remove('active');
+        } else {
+            gridView.style.display = 'none';
+            tableView.style.display = 'block';
+            gridBtn.classList.remove('active');
+            tableBtn.classList.add('active');
+        }
+    }
+</script>
+{% endblock %}

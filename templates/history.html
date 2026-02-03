@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+
+{% block title %}Lịch sử dự đoán - Tomato Disease Detection{% endblock %}
+
+{% block head %}
+<style>
+    .history-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .history-title {
+        font-size: 2rem;
+        color: #2d5016;
+        margin: 0;
+    }
+    
+    .clear-btn {
+        padding: 0.5rem 1.5rem;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background 0.3s;
+    }
+    
+    .clear-btn:hover {
+        background: #c82333;
+    }    
+    /* Search & Filter Section */
+    .search-filter-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .search-box {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 2.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: #2d5016;
+        box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1);
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #999;
+        font-size: 1.2rem;
+    }
+    
+    .clear-search {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 1.5rem;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background 0.2s, color 0.2s;
+    }
+    
+    .clear-search:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
+    
+    .filter-sort-row {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    
+    .filter-group, .sort-group {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    
+    .filter-label, .sort-label {
+        font-weight: 600;
+        color: #555;
+        font-size: 0.9rem;
+    }
+    
+    .filter-btn, .sort-btn {
+        padding: 0.5rem 1rem;
+        border: 2px solid #e0e0e0;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        color: #666;
+    }
+    
+    .filter-btn:hover, .sort-btn:hover {
+        border-color: #2d5016;
+        color: #2d5016;
+        background: #f8f9fa;
+    }
+    
+    .filter-btn.active {
+        background: #2d5016;
+        color: white;
+        border-color: #2d5016;
+    }
+    
+    .sort-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .results-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .results-count {
+        font-weight: 600;
+        color: #2d5016;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        color: #999;
+    }
+    
+    .no-results-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }    
+    .history-empty {
+        text-align: center;
+        padding: 3rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin-top: 2rem;
+    }
+    
+    .history-empty i {
+        font-size: 4rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .history-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+    
+    .history-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+        transition: transform 0.3s, box-shadow 0.3s;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .history-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .card-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        background: #f0f0f0;
+        display: block;
+    }
+    
+    .card-image-container {
+        width: 100%;
+        height: 200px;
+        background: #f0f0f0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .card-content {
+        padding: 1rem;
+    }
+    
+    .card-disease {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #2d5016;
+        margin-bottom: 0.5rem;
+    }
+    
+    .card-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .card-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .confidence-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+    
+    .confidence-high {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .confidence-medium {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .confidence-low {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    
+    .status-rejected {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-ok {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .card-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid #eee;
+        font-size: 0.8rem;
+        color: #999;
+    }
+    
+    @media (max-width: 768px) {
+        .history-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .history-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <div class="history-header">
+        <h1 class="history-title">📜 Lịch sử dự đoán</h1>
+        {% if history and history|length > 0 %}
+        <form method="POST" action="{{ url_for('clear_history') }}" 
+              onsubmit="return confirm('Bạn có chắc muốn xóa toàn bộ lịch sử?')">
+            <button type="submit" class="clear-btn">
+                🗑️ Xóa toàn bộ lịch sử
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    
+    {% if not history or history|length == 0 %}
+    <div class="history-empty">
+        <i>📭</i>
+        <h2>Chưa có lịch sử dự đoán</h2>
+        <p>Bạn chưa thực hiện dự đoán nào. Hãy thử <a href="{{ url_for('index') }}">dự đoán ngay</a>!</p>
+    </div>
+    {% else %}
+    
+    <!-- Search & Filter Section -->
+    <div class="search-filter-section">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" 
+                   id="searchInput" 
+                   class="search-input" 
+                   placeholder="Tìm kiếm theo tên bệnh, model, pipeline...">
+            <button class="clear-search" id="clearSearch" title="Xóa tìm kiếm">×</button>
+        </div>
+        
+        <div class="filter-sort-row">
+            <div class="filter-group">
+                <span class="filter-label">Lọc:</span>
+                <button class="filter-btn active" data-filter="all">Tất cả</button>
+                <button class="filter-btn" data-filter="high-confidence">Độ tin cậy cao (&gt;90%)</button>
+                <button class="filter-btn" data-filter="low-confidence">Độ tin cậy thấp (&lt;70%)</button>
+                <button class="filter-btn" data-filter="warning">Cảnh báo</button>
+                <button class="filter-btn" data-filter="rejected">Từ chối</button>
+            </div>
+            
+            <div class="sort-group" style="margin-left: auto;">
+                <span class="sort-label">Sắp xếp:</span>
+                <button class="sort-btn active" data-sort="newest">Mới nhất</button>
+                <button class="sort-btn" data-sort="oldest">Cũ nhất</button>
+                <button class="sort-btn" data-sort="highest-conf">Độ tin cậy cao nhất</button>
+                <button class="sort-btn" data-sort="lowest-conf">Độ tin cậy thấp nhất</button>
+            </div>
+        </div>
+        
+        <div class="results-info">
+            <div>
+                Hiển thị <span class="results-count" id="resultsCount">{{ history|length }}</span> / {{ history|length }} kết quả
+            </div>
+        </div>
+    </div>
+    
+    <div id="noResults" class="no-results" style="display: none;">
+        <div class="no-results-icon">🔍</div>
+        <h3>Không tìm thấy kết quả</h3>
+        <p>Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm</p>
+    </div>
+    
+    <p style="color: #666; margin-bottom: 1rem;">
+        Tổng số: <strong>{{ history|length }}</strong> dự đoán
+    </p>
+    
+    <div class="history-grid">
+        {% for pred in history %}
+        <div class="history-card" 
+             data-disease="{{ pred.disease_name|lower }}"
+             data-model="{{ pred.model_name|lower }}"
+             data-pipeline="{{ pred.pipeline_name|lower }}"
+             data-confidence="{{ pred.confidence }}"
+             data-timestamp="{{ pred.timestamp }}"
+             data-has-warning="{{ 'true' if pred.confidence < 0.7 else 'false' }}"
+             data-rejected="{{ 'true' if pred.disease_name == 'Không phải cà chua' else 'false' }}">
+            <a href="{{ url_for('view_prediction', prediction_id=pred.id) }}" style="text-decoration: none; color: inherit; display: block;">
+                <div class="card-image-container">
+                    {% if pred.image_path %}
+                    <img src="{{ pred.image_path }}" 
+                         alt="{{ pred.disease_name }}" 
+                         class="card-image"
+                         loading="lazy"
+                         onerror="this.src='{{ url_for('static', filename='images/placeholder.png') }}'">
+                    {% else %}
+                    <div class="card-image" style="display: flex; align-items: center; justify-content: center; background: #e9ecef;">
+                        <span style="font-size: 3rem;">🍅</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-content">
+                    <div class="card-disease">
+                        {{ pred.disease_name }}
+                    </div>
+                    
+                    <div class="card-info">
+                        <div class="card-info-row">
+                            <span>Độ tin cậy:</span>
+                            {% set conf = pred.probability * 100 %}
+                            {% if conf >= 85 %}
+                            <span class="confidence-badge confidence-high">{{ "%.1f"|format(conf) }}%</span>
+                            {% elif conf >= 70 %}
+                            <span class="confidence-badge confidence-medium">{{ "%.1f"|format(conf) }}%</span>
+                            {% else %}
+                            <span class="confidence-badge confidence-low">{{ "%.1f"|format(conf) }}%</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="card-info-row">
+                            <span>Trạng thái:</span>
+                            {% if pred.rejected %}
+                            <span class="status-badge status-rejected">❌ Bị từ chối</span>
+                            {% elif pred.possibly_not_tomato %}
+                            <span class="status-badge status-warning">⚠️ Cảnh báo</span>
+                            {% else %}
+                            <span class="status-badge status-ok">✅ OK</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="card-meta">
+                        <span>⏰ {{ pred.formatted_time }}</span>
+                        <span>🤖 {{ pred.model_name }}</span>
+                    </div>
+                </div>
+            </a>
+            <div style="padding: 0 1rem 1rem; display: flex; justify-content: center;">
+                <button onclick="exportHistoryPDF('{{ pred.id }}'); event.stopPropagation();" 
+                        class="btn" 
+                        style="width: 100%; padding: 0.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                    </svg>
+                    Xuất PDF
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Search & Filter functionality
+const searchInput = document.getElementById('searchInput');
+const clearSearchBtn = document.getElementById('clearSearch');
+const filterBtns = document.querySelectorAll('.filter-btn');
+const sortBtns = document.querySelectorAll('.sort-btn');
+const historyCards = document.querySelectorAll('.history-card');
+const resultsCount = document.getElementById('resultsCount');
+const noResults = document.getElementById('noResults');
+const historyGrid = document.querySelector('.history-grid');
+
+let currentFilter = 'all';
+let currentSort = 'newest';
+let currentSearch = '';
+
+// Parse card data
+const cardsData = Array.from(historyCards).map(card => ({
+    element: card,
+    disease: card.dataset.disease || '',
+    model: card.dataset.model || '',
+    pipeline: card.dataset.pipeline || '',
+    confidence: parseFloat(card.dataset.confidence) || 0,
+    timestamp: card.dataset.timestamp || '',
+    hasWarning: card.dataset.hasWarning === 'true',
+    rejected: card.dataset.rejected === 'true'
+}));
+
+// Search input handler
+searchInput.addEventListener('input', (e) => {
+    currentSearch = e.target.value.toLowerCase();
+    clearSearchBtn.style.display = currentSearch ? 'flex' : 'none';
+    applyFilters();
+});
+
+// Clear search
+clearSearchBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    currentSearch = '';
+    clearSearchBtn.style.display = 'none';
+    applyFilters();
+});
+
+// Filter buttons
+filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        applyFilters();
+    });
+});
+
+// Sort buttons
+sortBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        sortBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentSort = btn.dataset.sort;
+        applyFilters();
+    });
+});
+
+function applyFilters() {
+    // Filter cards
+    let filteredCards = cardsData.filter(card => {
+        // Search filter
+        if (currentSearch) {
+            const searchMatch = 
+                card.disease.includes(currentSearch) ||
+                card.model.includes(currentSearch) ||
+                card.pipeline.includes(currentSearch);
+            if (!searchMatch) return false;
+        }
+        
+        // Category filter
+        switch(currentFilter) {
+            case 'high-confidence':
+                return card.confidence > 0.9;
+            case 'low-confidence':
+                return card.confidence < 0.7;
+            case 'warning':
+                return card.hasWarning;
+            case 'rejected':
+                return card.rejected;
+            case 'all':
+            default:
+                return true;
+        }
+    });
+    
+    // Sort cards
+    switch(currentSort) {
+        case 'oldest':
+            filteredCards.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            break;
+        case 'highest-conf':
+            filteredCards.sort((a, b) => b.confidence - a.confidence);
+            break;
+        case 'lowest-conf':
+            filteredCards.sort((a, b) => a.confidence - b.confidence);
+            break;
+        case 'newest':
+        default:
+            filteredCards.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+            break;
+    }
+    
+    // Hide all cards first
+    cardsData.forEach(card => {
+        card.element.style.display = 'none';
+    });
+    
+    // Show filtered and sorted cards
+    if (filteredCards.length > 0) {
+        filteredCards.forEach((card, index) => {
+            card.element.style.display = 'block';
+            card.element.style.order = index;
+        });
+        historyGrid.style.display = 'grid';
+        noResults.style.display = 'none';
+    } else {
+        historyGrid.style.display = 'none';
+        noResults.style.display = 'block';
+    }
+    
+    // Update results count
+    resultsCount.textContent = filteredCards.length;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    applyFilters();
+});
+
+// Export PDF function
+function exportHistoryPDF(predictionId) {
+    if (!predictionId) {
+        if (window.toast) {
+            window.toast.error('Không thể xuất báo cáo');
+        }
+        return;
+    }
+    
+    // Show loading toast
+    if (window.toast) {
+        window.toast.info('Đang tạo báo cáo PDF...', 3000);
+    }
+    
+    // Navigate to export URL
+    window.location.href = `/export/${predictionId}`;
+    
+    // Show success after delay
+    setTimeout(() => {
+        if (window.toast) {
+            window.toast.success('Báo cáo đã được tải xuống!');
+        }
+    }, 1500);
+}
+</script>
+{% endblock %}

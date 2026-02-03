@@ -32,6 +32,17 @@
     <section style="display:flex;gap:24px;margin-top:18px;align-items:flex-start;">
       <div style="flex:1;min-width:360px">
         <div class="card"> 
+          <!-- Toggle giữa Single và Batch mode -->
+          <div style="margin-bottom:16px;display:flex;gap:8px;background:#f5f5f5;padding:4px;border-radius:8px;">
+            <button type="button" id="single-mode-btn" class="mode-toggle-btn active" onclick="switchMode('single')">
+              📷 Một ảnh
+            </button>
+            <button type="button" id="batch-mode-btn" class="mode-toggle-btn" onclick="switchMode('batch')">
+              📚 Nhiều ảnh (tối đa 10)
+            </button>
+          </div>
+
+          <!-- Form Single Prediction -->
           <form id="upload-form" action="{{ url_for('predict') }}" method="post" enctype="multipart/form-data" style="margin-bottom: 0;">
             <!-- Cải tiến vùng upload ảnh, hỗ trợ kéo thả -->
             <div class="file-drop-area">
@@ -47,7 +58,7 @@
             <div style="margin-top:12px;display:flex;gap:12px;">
               <div style="flex:1">
                 <label>Chọn model:</label>
-                <select name="model_select" required id="model-select">
+                <select name="model" required id="model-select">
                   {% for m in models %}
                     <option value="{{m}}" {% if m == last_model %}selected{% endif %}>{{m}}</option>
                   {% endfor %}
@@ -55,7 +66,7 @@
               </div>
               <div style="width:220px">
                 <label>Pipeline:</label>
-                <select name="pipeline_select" required>
+                <select name="pipeline" required>
                   {% for p in pipelines %}
                     <option value="{{p}}" {% if p == last_pipeline %}selected{% endif %}>{{p}}</option>
                   {% endfor %}
@@ -75,8 +86,56 @@
             <div style="margin-top:14px;display:flex;gap:12px;align-items:center">
               <button type="submit" id="predict-btn" class="btn" style="width: 120px;">Dự đoán</button>
               <div style="flex:1;text-align:right"><small class="desc">Chọn ảnh lá rõ để kết quả chính xác hơn.</small></div>
-        </div>
+            </div>
           </form>
+
+          <!-- Form Batch Prediction -->
+          <form id="batch-form" action="{{ url_for('batch_predict') }}" method="post" enctype="multipart/form-data" style="margin-bottom: 0; display:none;">
+            <div class="file-drop-area" id="batch-drop-area">
+              <span class="file-msg">Kéo và thả nhiều ảnh vào đây, hoặc <strong class="btn-like">nhấn để chọn ảnh</strong></span>
+              <input id="batch-files" name="images" type="file" class="file-input" accept="image/*" multiple onchange="onBatchFileChange(event)">
+            </div>
+            <div id="batch-file-info" style="margin-top:10px; display:none;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:600;">Đã chọn: <span id="batch-count">0</span> ảnh</span>
+                <button type="button" id="remove-batch-btn" class="btn small danger">Xóa tất cả</button>
+              </div>
+              <div id="batch-preview-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;max-height:200px;overflow-y:auto;"></div>
+            </div>
+            
+            <div style="margin-top:12px;display:flex;gap:12px;">
+              <div style="flex:1">
+                <label>Chọn model:</label>
+                <select name="model" required>
+                  {% for m in models %}
+                    <option value="{{m}}" {% if m == last_model %}selected{% endif %}>{{m}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="width:220px">
+                <label>Pipeline:</label>
+                <select name="pipeline" required>
+                  {% for p in pipelines %}
+                    <option value="{{p}}" {% if p == last_pipeline %}selected{% endif %}>{{p}}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            
+            <div style="margin-top:10px;padding:10px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;font-size:0.9em;">
+              <strong>⚡ Lưu ý Batch Mode:</strong> 
+              <ul style="margin:5px 0 0 20px;padding:0;">
+                <li>Có thể upload tối đa 10 ảnh cùng lúc</li>
+                <li>Tất cả ảnh sẽ dùng cùng model và pipeline</li>
+                <li>Quá trình xử lý có thể mất vài phút</li>
+              </ul>
+            </div>
+            
+            <div style="margin-top:14px;">
+              <button type="submit" id="batch-predict-btn" class="btn" style="width: 100%;">Dự đoán tất cả</button>
+            </div>
+          </form>
+
           <div id="loading" style="display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
             <div class="spinner"></div>
             <p style="margin-top:10px; font-size:1.2em; color:var(--tomato-700);">Xin vui lòng chờ trong giây lát...</p>
@@ -117,13 +176,47 @@
 {% block scripts %}
 <script>
     const fileInput = document.getElementById('file');
+    const batchFilesInput = document.getElementById('batch-files');
     const fileNameEl = document.getElementById('file-name');
     const fileInfoEl = document.getElementById('file-info');
     const preview = document.getElementById('preview');
     const previewContainer = document.getElementById('preview-container');
     const removeBtn = document.getElementById('remove-file-btn');
     const fileDropArea = document.querySelector('.file-drop-area');
+    
+    // Batch elements
+    const batchFileInfo = document.getElementById('batch-file-info');
+    const batchCount = document.getElementById('batch-count');
+    const batchPreviewList = document.getElementById('batch-preview-list');
+    const removeBatchBtn = document.getElementById('remove-batch-btn');
+    const batchDropArea = document.getElementById('batch-drop-area');
+    
+    let currentMode = 'single';
 
+    // Switch between single and batch mode
+    function switchMode(mode) {
+        currentMode = mode;
+        const singleBtn = document.getElementById('single-mode-btn');
+        const batchBtn = document.getElementById('batch-mode-btn');
+        const singleForm = document.getElementById('upload-form');
+        const batchForm = document.getElementById('batch-form');
+        
+        if (mode === 'single') {
+            singleBtn.classList.add('active');
+            batchBtn.classList.remove('active');
+            singleForm.style.display = 'block';
+            batchForm.style.display = 'none';
+            resetFile();
+        } else {
+            batchBtn.classList.add('active');
+            singleBtn.classList.remove('active');
+            singleForm.style.display = 'none';
+            batchForm.style.display = 'block';
+            resetBatchFiles();
+        }
+    }
+
+    // Single file handling
     function handleFile(file) {
       if (file) {
         fileNameEl.textContent = file.name;
@@ -137,7 +230,7 @@
     }
 
     function resetFile() {
-        fileInput.value = ''; // Quan trọng để có thể chọn lại cùng 1 file
+        fileInput.value = '';
         fileNameEl.textContent = '';
         fileInfoEl.style.display = 'none';
         fileDropArea.classList.remove('has-file');
@@ -154,7 +247,54 @@
 
     removeBtn.addEventListener('click', resetFile);
 
-    // Sự kiện kéo thả (drag and drop)
+    // Batch file handling
+    function onBatchFileChange(e) {
+        const files = Array.from(e.target.files);
+        if (files.length > 10) {
+            alert('Chỉ được chọn tối đa 10 ảnh');
+            batchFilesInput.value = '';
+            return;
+        }
+        displayBatchFiles(files);
+    }
+
+    function displayBatchFiles(files) {
+        if (files.length === 0) {
+            batchFileInfo.style.display = 'none';
+            return;
+        }
+        
+        batchFileInfo.style.display = 'block';
+        batchCount.textContent = files.length;
+        batchPreviewList.innerHTML = '';
+        
+        files.forEach((file, idx) => {
+            const imgContainer = document.createElement('div');
+            imgContainer.style.cssText = 'position:relative;aspect-ratio:1;';
+            
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:4px;';
+            img.title = file.name;
+            
+            imgContainer.appendChild(img);
+            batchPreviewList.appendChild(imgContainer);
+        });
+        
+        batchDropArea.classList.add('has-file');
+    }
+
+    function resetBatchFiles() {
+        batchFilesInput.value = '';
+        batchFileInfo.style.display = 'none';
+        batchPreviewList.innerHTML = '';
+        batchCount.textContent = '0';
+        batchDropArea.classList.remove('has-file');
+    }
+
+    removeBatchBtn.addEventListener('click', resetBatchFiles);
+
+    // Drag and drop for single file
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       fileDropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
     });
@@ -164,17 +304,48 @@
     fileDropArea.addEventListener('dragleave', () => fileDropArea.classList.remove('highlight'), false);
     fileDropArea.addEventListener('drop', (e) => {
         fileDropArea.classList.remove('highlight');
-        handleFile(e.dataTransfer.files[0]);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFile(files[0]);
+        }
     }, false);
 
+    // Drag and drop for batch files
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      batchDropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        batchDropArea.addEventListener(eventName, () => batchDropArea.classList.add('highlight'), false);
+    });
+    batchDropArea.addEventListener('dragleave', () => batchDropArea.classList.remove('highlight'), false);
+    batchDropArea.addEventListener('drop', (e) => {
+        batchDropArea.classList.remove('highlight');
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 10) {
+            alert('Chỉ được chọn tối đa 10 ảnh');
+            return;
+        }
+        batchFilesInput.files = e.dataTransfer.files;
+        displayBatchFiles(files);
+    }, false);
+
+    // Form submit handling
     document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('upload-form');
+        const singleForm = document.getElementById('upload-form');
+        const batchForm = document.getElementById('batch-form');
         const loading = document.getElementById('loading');
         const predictBtn = document.getElementById('predict-btn');
+        const batchPredictBtn = document.getElementById('batch-predict-btn');
 
-        form.addEventListener('submit', function() {
-            loading.style.display = 'flex'; // Hiển thị thông báo chờ
-            predictBtn.disabled = true; // Vô hiệu hóa nút Dự đoán
+        singleForm.addEventListener('submit', function() {
+            loading.style.display = 'flex';
+            predictBtn.disabled = true;
+        });
+
+        batchForm.addEventListener('submit', function() {
+            loading.style.display = 'flex';
+            batchPredictBtn.disabled = true;
         });
     });
 </script>

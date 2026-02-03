@@ -101,6 +101,46 @@
   .suggestion-bubble:hover {
     background-color: #dcdfe6;
   }
+  
+  /* Typing indicator */
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    background-color: #e9e9eb;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+  }
+  
+  .typing-indicator span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #8e8e93;
+    display: inline-block;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+  }
+  
+  .typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+  
+  .typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+  
+  @keyframes typing-bounce {
+    0%, 80%, 100% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    40% {
+      transform: scale(1.2);
+      opacity: 1;
+    }
+  }
+  
   @media (max-width: 640px) {
     .chat-container { margin: 12px; }
     .btn-export { padding: 7px 10px; font-size: 0.9em; }
@@ -138,7 +178,7 @@
   const BOT_AVATAR = "{{ url_for('static', filename='images/bot.png') }}";
   const USER_AVATAR = "{{ url_for('static', filename='images/avatar.jpg') }}";
 
-  function append(msg, who='user'){
+  function append(msg, who='user', isTyping=false){
     const el = document.createElement('div');
     el.classList.add('message', `${who}-msg`);
 
@@ -153,16 +193,26 @@
       content.textContent = msg;
     } else {
       avatar.src = BOT_AVATAR;
-      // Sử dụng textContent để tránh XSS từ nội dung trả về. Nếu muốn cho phép
-      // một lượng HTML an toàn, hãy xử lý / sanitize phía server hoặc dùng thư viện
-      // như DOMPurify phía client.
-      content.textContent = msg;
+      if(isTyping) {
+        // Tạo typing indicator với 3 dấu chấm nhấp nháy
+        content.className = 'typing-indicator';
+        for(let i = 0; i < 3; i++) {
+          const dot = document.createElement('span');
+          content.appendChild(dot);
+        }
+      } else {
+        // Sử dụng textContent để tránh XSS từ nội dung trả về. Nếu muốn cho phép
+        // một lượng HTML an toàn, hãy xử lý / sanitize phía server hoặc dùng thư viện
+        // như DOMPurify phía client.
+        content.textContent = msg;
+      }
     }
 
     el.appendChild(avatar);
     el.appendChild(content);
     chatWindow.appendChild(el);
     chatWindow.scrollTop = chatWindow.scrollHeight;
+    return el;
   }
 
   async function send(){
@@ -181,9 +231,7 @@
     }
 
     // For non-greeting: show a thinking indicator and ensure it's visible for at least 2s
-    append('Đang suy nghĩ...', 'bot');
-    const thinkingEl = chatWindow.querySelectorAll('.message.bot-msg');
-    const thinking = thinkingEl.length ? thinkingEl[thinkingEl.length-1] : null;
+    const thinking = append('', 'bot', true);
 
     const minimumDelay = sleep(2000); // 2 seconds minimum
     const fetchPromise = fetch('{{ url_for('api_chat') }}', {

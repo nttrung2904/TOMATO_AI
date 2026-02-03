@@ -65,8 +65,65 @@ button[type=submit]:hover { transform:translateY(-2px) }
 .nav .brand { display:flex;align-items:center;gap:12px }
 .nav .brand img { width:48px;height:48px }
 .nav .brand h2 { margin:0;font-size:1.1rem;color:var(--tomato-700) }
-.nav .links a { margin-left:12px;color:var(--muted);text-decoration:none }
-.nav .links a:hover { color:var(--tomato-700) }
+.nav .links { display:flex;gap:8px;align-items:center;flex-wrap:wrap }
+
+/* Navigation Links with Icons */
+.nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    color: var(--tomato-700);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(230, 57, 70, 0.1), rgba(198, 40, 40, 0.1));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.nav-link:hover {
+    color: white;
+    background: linear-gradient(135deg, var(--tomato-500), var(--tomato-700));
+    box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+    transform: translateY(-2px);
+}
+
+.nav-link:hover::before {
+    opacity: 0;
+}
+
+.nav-link svg {
+    transition: transform 0.3s ease;
+}
+
+.nav-link:hover svg {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.nav-link:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 980px) {
+    .nav { flex-direction: column; align-items: flex-start }
+    .nav .links { width: 100%; justify-content: flex-start }
+    .nav-link span { display: none }
+    .nav-link { padding: 10px }
+}
 
 /* custom file input */
 .file-input { display:flex;gap:12px;align-items:center }
@@ -117,4 +174,205 @@ button[type=submit]:hover { transform:translateY(-2px) }
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Mode toggle buttons */
+.mode-toggle-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: #666;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.mode-toggle-btn:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.mode-toggle-btn.active {
+    background: white;
+    color: var(--tomato-700);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.btn.small {
+    padding: 4px 10px;
+    font-size: 0.85rem;
+}
+
+.btn.danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn.danger:hover {
+    background: #c82333;
+}
+
+/* Action buttons - Professional style */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.action-btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.action-btn:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.action-btn svg {
+    z-index: 1;
+}
+
+.action-btn span {
+    z-index: 1;
+}
+
+.action-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.action-btn-success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.action-btn-info {
+    background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+    color: white;
+}
+
+.action-btn-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .action-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+}
+
+/* View Toggle Buttons */
+.view-toggle {
+    display: inline-flex;
+    gap: 0;
+    background: #f0f0f0;
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: #666;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.toggle-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.toggle-btn:hover {
+    color: #333;
+}
+
+.toggle-btn:hover svg {
+    transform: scale(1.1);
+}
+
+.toggle-btn.active {
+    background: white;
+    color: #667eea;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.toggle-btn.active::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40%;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 2px 2px 0 0;
+}
+
+.toggle-btn:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+    .toggle-btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    
+    .toggle-btn span {
+        display: none;
+    }
+    
+    .toggle-btn svg {
+        width: 20px;
+        height: 20px;
+    }
 }

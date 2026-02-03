@@ -22,6 +22,26 @@
     border-radius: 12px;
     margin-bottom: 20px;
   }
+  
+  .stats-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+  }
+  
+  .stats-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+    color: white;
+  }
   /* Professional button styles inside admin action bar */
   .action-bar .btn {
     display: inline-flex;
@@ -103,13 +123,18 @@
 
 <div class="admin-header">
   <h1>Quản lý Feedback & Dữ liệu</h1>
-  <a href="{{ url_for('admin_export_chat') }}" class="btn" style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:linear-gradient(180deg,#107bed,#0b61c9); color:#fff; text-decoration:none; box-shadow:0 8px 20px rgba(16,123,237,0.12);">
-    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-    </svg>
-    Xuất Log Chat (CSV)
-  </a>
+  <div style="display: flex; gap: 10px;">
+    <a href="{{ url_for('admin_stats') }}" class="stats-link">
+      📊 Xem thống kê
+    </a>
+    <a href="{{ url_for('admin_export_chat') }}" class="btn" style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:linear-gradient(180deg,#107bed,#0b61c9); color:#fff; text-decoration:none; box-shadow:0 8px 20px rgba(16,123,237,0.12);">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+      </svg>
+      Xuất Log Chat (CSV)
+    </a>
+  </div>
 </div>
 
 <div class="action-bar">

@@ -3,8 +3,6 @@ import numpy as np
 import pickle
 import os
 import cv2
-import pandas as pd
-from rapidfuzz import fuzz
 import json
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response
@@ -13,16 +11,41 @@ import tensorflow as tf
 import shutil 
 from PIL import Image
 from utils import compute_hist, compute_embedding as _compute_embedding
-from datetime import datetime
+from datetime import datetime, timedelta
 import threading
 from uuid import uuid4
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
 from dotenv import load_dotenv
+import google.generativeai as genai
+from collections import Counter
 
 # Load biến môi trường từ file .env
 load_dotenv()
+
+# Cấu hình Gemini API
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    # Thử các model theo thứ tự: model miễn phí ổn định nhất trước
+    model_names = [
+        'models/gemini-2.5-flash',      # Model ổn định, miễn phí tốt
+        'models/gemini-flash-latest',    # Luôn dùng phiên bản mới nhất
+        'models/gemini-2.0-flash',       # Backup
+    ]
+    for model_name in model_names:
+        try:
+            GEMINI_MODEL = genai.GenerativeModel(model_name)
+            print(f"✓ Gemini API configured with model: {model_name}")
+            break
+        except Exception as e:
+            print(f"✗ Model {model_name} failed: {e}")
+            continue
+    
+    if not GEMINI_MODEL:
+        print("✗ Failed to configure any Gemini model")
 
 # Lưu ý: Các tiện ích trích xuất đặc trưng sâu được cung cấp bởi `utils.py` (get_feature_extractor,
 # compute_embedding). Tránh duplicate MobileNetV2/preprocess_input ở đây để ngăn
@@ -136,7 +159,13 @@ CLASS_NAMES = [
     "Tomato_Early_blight",
     "Tomato_Septoria_leaf_spot",
     "Tomato__Tomato_YellowLeaf__Curl_Virus",
-    "Tomato_healthy"
+    "Tomato_healthy",
+    "Tomato_Bacterial_spot",
+    "Tomato_Late_blight",
+    "Tomato_Leaf_Mold",
+    "Tomato_Spider_mites_Two_spotted_spider_mite",
+    "Tomato__Target_Spot",
+    "Tomato__Tomato_mosaic_virus"
 ]
 
 # Thông tin bệnh (tên hiển thị, định nghĩa ngắn, và các biện pháp phòng ngừa)
@@ -189,6 +218,101 @@ DISEASE_INFO = {
             "Duy trì thói quen chăm sóc tốt: tưới nước đều, bón phân cân đối và kiểm soát sâu bệnh định kỳ.",
             "Đảm bảo cây trồng có đủ ánh sáng và thông thoáng để phát triển khỏe mạnh.",
             "Thường xuyên kiểm tra cây để phát hiện sớm các dấu hiệu bất thường.",
+        ]
+    },
+    "Tomato_Bacterial_spot": {
+        "name": "Bệnh đốm vi khuẩn (Bacterial spot)",
+        "definition": (
+            "Do vi khuẩn Xanthomonas gây ra, xuất hiện các đốm nhỏ màu đen hoặc nâu trên lá, thân và quả. "
+            "Bệnh phát triển mạnh trong điều kiện ẩm ướt, gây giảm năng suất và chất lượng quả."
+        ),
+        "prevention": [
+            "Sử dụng giống kháng bệnh và hạt giống không nhiễm bệnh.",
+            "Tránh tưới phun lên lá, sử dụng hệ thống tưới nhỏ giọt.",
+            "Loại bỏ và tiêu hủy cây bệnh để giảm nguồn lây nhiễm.",
+            "Luân canh cây trồng với các loại cây không thuộc họ cà.",
+            "Phun thuốc chứa đồng (copper-based) theo khuyến cáo khi bệnh xuất hiện.",
+            "Đảm bảo thông thoáng và giảm độ ẩm trong vườn trồng.",
+        ]
+    },
+    "Tomato_Late_blight": {
+        "name": "Bệnh cháy muộn (Late blight)",
+        "definition": (
+            "Do nấm mốc Phytophthora infestans gây ra, là bệnh nguy hiểm nhất trên cà chua. "
+            "Triệu chứng gồm các vết đốm màu nâu đen lan nhanh trên lá, thân và quả, có thể phá hủy toàn bộ vườn trong vài ngày."
+        ),
+        "prevention": [
+            "Sử dụng giống kháng bệnh nếu có.",
+            "Tránh trồng gần khoai tây vì cùng bị bệnh này.",
+            "Đảm bảo khoảng cách trồng hợp lý để thoáng khí.",
+            "Tránh tưới nước vào buổi tối, không để lá ướt qua đêm.",
+            "Phun thuốc phòng ngừa (fungicide hệ thống) khi điều kiện thuận lợi cho bệnh.",
+            "Loại bỏ và tiêu hủy cây bệnh ngay khi phát hiện.",
+            "Theo dõi dự báo thời tiết và cảnh báo dịch bệnh trong vùng.",
+        ]
+    },
+    "Tomato_Leaf_Mold": {
+        "name": "Bệnh mốc lá (Leaf Mold)",
+        "definition": (
+            "Do nấm Passalora fulva (trước gọi là Cladosporium fulvum) gây ra, thường xảy ra trong nhà kính. "
+            "Triệu chứng là các đốm màu vàng trên mặt trên của lá và lớp nấm mốc màu xanh lục hoặc xám trên mặt dưới."
+        ),
+        "prevention": [
+            "Đảm bảo thông gió tốt trong nhà kính hoặc vườn trồng.",
+            "Kiểm soát độ ẩm, tránh độ ẩm quá cao (trên 85%).",
+            "Tưới vào gốc, không tưới phun lên lá.",
+            "Giữ khoảng cách trồng hợp lý để cây được thoáng.",
+            "Sử dụng giống kháng bệnh nếu có.",
+            "Loại bỏ lá bị nhiễm và tiêu hủy.",
+            "Phun thuốc bảo vệ thực vật khi cần thiết.",
+        ]
+    },
+    "Tomato_Spider_mites_Two_spotted_spider_mite": {
+        "name": "Nhện đỏ hai chấm (Two-spotted spider mite)",
+        "definition": (
+            "Nhện đỏ là loại sâu hại nhỏ bé hút dịch lá, gây ra các đốm nhỏ màu vàng trên lá. "
+            "Khi nhiễm nặng, lá sẽ khô, vàng và rụng. Thường xuất hiện trong điều kiện khô hạn và nóng."
+        ),
+        "prevention": [
+            "Tưới nước đầy đủ, duy trì độ ẩm thích hợp vì nhện đỏ thích môi trường khô.",
+            "Phun nước lên mặt dưới của lá để loại bỏ nhện.",
+            "Sử dụng thiên địch tự nhiên như rệp khướng (predatory mites) để kiểm soát.",
+            "Tránh sử dụng thuốc trừ sâu phổ rộng có thể giết thiên địch.",
+            "Loại bỏ lá bị nhiễm nặng.",
+            "Sử dụng xà phòng diệt côn trùng hoặc dầu neem khi cần.",
+            "Theo dõi thường xuyên, đặc biệt trong mùa khô.",
+        ]
+    },
+    "Tomato__Target_Spot": {
+        "name": "Bệnh đốm bia (Target Spot)",
+        "definition": (
+            "Do nấm Corynespora cassiicola gây ra, tạo các vết đốm hình tròn đồng tâm giống bia bắn. "
+            "Bệnh ảnh hưởng đến lá, thân và quả, làm giảm năng suất và chất lượng."
+        ),
+        "prevention": [
+            "Sử dụng giống có khả năng chống chịu tốt.",
+            "Luân canh cây trồng để giảm nguồn bệnh trong đất.",
+            "Loại bỏ tàn dư cây sau thu hoạch.",
+            "Đảm bảo thoát nước tốt và tránh úng nước.",
+            "Tưới vào gốc cây, tránh làm ướt lá.",
+            "Giữ khoảng cách trồng hợp lý để thông thoáng.",
+            "Phun thuốc bảo vệ thực vật khi phát hiện bệnh.",
+        ]
+    },
+    "Tomato__Tomato_mosaic_virus": {
+        "name": "Bệnh vi rút khảm lá (Tomato mosaic virus)",
+        "definition": (
+            "Do virus ToMV gây ra, lây lan qua tiếp xúc cơ học, dụng cụ, tay người làm vườn. "
+            "Triệu chứng gồm lá có vệt khảm màu vàng xanh, lá biến dạng, quả có vệt và phát triển không đều."
+        ),
+        "prevention": [
+            "Sử dụng giống kháng virus nếu có.",
+            "Rửa tay và khử trùng dụng cụ trước khi làm việc với cây.",
+            "Tránh hút thuốc gần cây cà chua vì thuốc lá có thể mang virus.",
+            "Loại bỏ và tiêu hủy cây bị nhiễm ngay lập tức.",
+            "Kiểm soát sâu hút dịch có thể truyền bệnh.",
+            "Sử dụng hạt giống sạch bệnh hoặc xử lý nhiệt hạt giống.",
+            "Tránh trồng cà chua gần các loại cây cùng họ đã bị nhiễm.",
         ]
     }
 }
@@ -407,7 +531,7 @@ app.logger.info('  MAX_LOADED_MODELS: %s', MAX_LOADED_MODELS)
 FULL_MODEL_MAP = discover_models(MODELS_DIR, ARCHITECTURES, app.logger)
 app.logger.info('Discovered %d model configurations', len(FULL_MODEL_MAP))
 # Cache cho chatbot
-CHAT_DATASET = None
+# Không cần CHAT_DATASET nữa vì dùng Gemini API
 
 # Model LRU Cache với tự động dọn dẹp
 class ModelLRUCache:
@@ -527,28 +651,89 @@ class ModelLRUCache:
 LOADED_MODELS = ModelLRUCache(max_size=MAX_LOADED_MODELS)
 MODEL_LOAD_LOCK = threading.Lock()
 
-def load_chat_dataset():
-    """Tải và cache dữ liệu chat từ file Excel."""
-    global CHAT_DATASET
-    if CHAT_DATASET is not None:
-        return
+def get_gemini_response(user_question: str) -> str:
+    """Gọi API Gemini để trả lời câu hỏi về cà chua.
     
-    dataset_path = BASE_DIR / 'data' / 'tomato_answer_question.xlsx'
-    if not dataset_path.exists():
-        app.logger.warning("Không tìm thấy file dữ liệu chat: %s", dataset_path)
-        CHAT_DATASET = pd.DataFrame() # Trả về dataframe rỗng để tránh lỗi
-        return
-
+    Args:
+        user_question: Câu hỏi của người dùng
+        
+    Returns:
+        Câu trả lời từ Gemini hoặc thông báo lỗi
+    """
+    if not GEMINI_MODEL:
+        return "Hệ thống chatbot chưa được cấu hình. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+    
     try:
-        df = pd.read_excel(dataset_path)
-        df = df.dropna(subset=['question', 'answer'])
-        # Chuẩn hóa câu hỏi về chữ thường một lần
-        df['question_lower'] = df['question'].str.strip().str.lower()
-        CHAT_DATASET = df
-        app.logger.info("Đã tải và cache dữ liệu chat thành công.")
+        # Tạo prompt tự nhiên, yêu cầu câu trả lời hoàn chỉnh
+        system_prompt = """Bạn là chuyên gia cà chua. Trả lời HOÀN CHỈNH, TỰ NHIÊN bằng tiếng Việt.
+
+Nếu hỏi về cà chua: Giải thích rõ ràng, cụ thể, đầy đủ (3-5 câu).
+Nếu KHÔNG về cà chua: "Xin lỗi, tôi chỉ trả lời về cà chua."
+
+QUAN TRỌNG: 
+- Trả lời ĐẦY ĐỦ, KHÔNG bỏ dở giữa chừng
+- Dùng ngôn ngữ đời thường, dễ hiểu
+- Đi thẳng vào nội dung
+- Kết thúc câu trả lời một cách hoàn chỉnh"""
+        
+        # Gọi API Gemini với cấu hình tối ưu
+        full_prompt = f"{system_prompt}\n\nCâu hỏi: {user_question}\n\nTrả lời:"
+        response = GEMINI_MODEL.generate_content(
+            full_prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=800,  # Tăng lên 800 để đảm bảo đủ cho câu trả lời hoàn chỉnh
+                top_p=0.9,
+                candidate_count=1,  # Chỉ lấy 1 candidate để tránh nhầm lẫn
+            )
+        )
+        
+        if response and response.candidates:
+            candidate = response.candidates[0]
+            
+            # Kiểm tra lý do kết thúc để phát hiện câu trả lời bị cắt
+            finish_reason = candidate.finish_reason
+            app.logger.info(f"Gemini finish_reason: {finish_reason}")
+            
+            # finish_reason có thể là: STOP (hoàn thành), MAX_TOKENS (bị cắt), SAFETY, OTHER
+            if finish_reason and finish_reason.name != 'STOP':
+                app.logger.warning(f"Response may be truncated. Finish reason: {finish_reason.name}")
+                if finish_reason.name == 'MAX_TOKENS':
+                    # Nếu bị cắt do MAX_TOKENS, gọi lại với token cao hơn
+                    app.logger.info("Retrying with higher token limit...")
+                    response = GEMINI_MODEL.generate_content(
+                        full_prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=0.7,
+                            max_output_tokens=1500,
+                            top_p=0.9,
+                            candidate_count=1,
+                        )
+                    )
+            
+            if response and response.text:
+                answer = response.text.strip()
+                # Kiểm tra xem câu trả lời có bị cắt giữa chừng không
+                if len(answer) < 20:
+                    app.logger.warning(f"Response too short: {answer}")
+                    return "Câu trả lời chưa đầy đủ. Vui lòng hỏi lại câu hỏi của bạn."
+                return answer
+        
+        app.logger.warning(f"Gemini response empty or blocked. Response: {response}")
+        return "Xin lỗi, tôi không thể tạo câu trả lời lúc này. Vui lòng thử lại."
+            
     except Exception as e:
-        app.logger.error("Lỗi khi tải dữ liệu chat: %s", e)
-        CHAT_DATASET = pd.DataFrame()
+        error_msg = str(e)
+        app.logger.error(f"Lỗi khi gọi Gemini API: {error_msg}", exc_info=True)
+        
+        # Xử lý các lỗi cụ thể
+        if "429" in error_msg or "quota" in error_msg.lower():
+            return ("⚠️ Hệ thống chatbot tạm thời quá tải (đã hết quota miễn phí trong ngày). "
+                   "Vui lòng thử lại sau hoặc liên hệ quản trị viên để nâng cấp API key.")
+        elif "401" in error_msg or "API key" in error_msg:
+            return "🔒 API key không hợp lệ. Vui lòng liên hệ quản trị viên."
+        else:
+            return "Đã xảy ra lỗi khi xử lý câu hỏi của bạn. Vui lòng thử lại sau."
 
 # Hàm giả để xử lý lỗi "Could not locate function '_input_preprocess_layer'"
 # Lỗi này xảy ra khi model được lưu có chứa custom object (ví dụ: Lambda layer)
@@ -1099,6 +1284,269 @@ def about_page():
     """Render about page"""
     return render_template('about.html')
 
+def _read_history_file():
+    """Helper function to read and parse history file"""
+    history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+    history_list = []
+    
+    if not history_file.exists():
+        return history_list
+    
+    with open(history_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                entry = json.loads(line.strip())
+                # Parse timestamp
+                try:
+                    ts = datetime.fromisoformat(entry.get('timestamp', ''))
+                    entry['formatted_time'] = ts.strftime('%d/%m/%Y %H:%M:%S')
+                    entry['timestamp_obj'] = ts
+                except:
+                    entry['formatted_time'] = entry.get('timestamp', 'N/A')
+                    entry['timestamp_obj'] = None
+                
+                # Get disease info
+                label = entry.get('predicted_label', '')
+                if label in DISEASE_INFO:
+                    entry['disease_name'] = DISEASE_INFO[label]['name']
+                else:
+                    entry['disease_name'] = label
+                
+                # Thêm confidence field từ probability nếu chưa có
+                if 'confidence' not in entry and 'probability' in entry:
+                    entry['confidence'] = entry['probability']
+                elif 'confidence' not in entry:
+                    entry['confidence'] = 0.0
+                
+                history_list.append(entry)
+            except json.JSONDecodeError:
+                continue
+    
+    return history_list
+
+@app.route('/history')
+def history():
+    """Hiển thị lịch sử dự đoán"""
+    try:
+        history_list = _read_history_file()
+        # Sắp xếp theo thời gian mới nhất trước
+        history_list.reverse()
+        return render_template('history.html', history=history_list)
+    except Exception as e:
+        app.logger.exception('Error loading history')
+        flash('Không thể tải lịch sử dự đoán')
+        return redirect(url_for('index'))
+
+@app.route('/history/clear', methods=['POST'])
+def clear_history():
+    """Xóa toàn bộ lịch sử dự đoán"""
+    try:
+        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        if history_file.exists():
+            history_file.unlink()
+            app.logger.info('Cleared prediction history')
+            flash('Đã xóa toàn bộ lịch sử dự đoán', 'success')
+        return redirect(url_for('history'))
+    except Exception as e:
+        app.logger.exception('Error clearing history')
+        flash('Không thể xóa lịch sử', 'error')
+        return redirect(url_for('history'))
+
+@app.route('/history/<prediction_id>')
+def view_prediction(prediction_id):
+    """Xem chi tiết một dự đoán cụ thể"""
+    try:
+        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        
+        if not history_file.exists():
+            flash('Không tìm thấy lịch sử dự đoán')
+            return redirect(url_for('history'))
+        
+        # Tìm prediction theo ID
+        with open(history_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line.strip())
+                    if entry.get('id') == prediction_id:
+                        # Format timestamp
+                        try:
+                            ts = datetime.fromisoformat(entry.get('timestamp', ''))
+                            entry['formatted_time'] = ts.strftime('%d/%m/%Y %H:%M:%S')
+                        except:
+                            entry['formatted_time'] = entry.get('timestamp', 'N/A')
+                        
+                        # Get disease info
+                        label = entry.get('predicted_label', '')
+                        disease_info = DISEASE_INFO.get(label, {
+                            'name': label,
+                            'definition': 'Không có thông tin',
+                            'prevention': []
+                        })
+                        
+                        return render_template('prediction_detail.html',
+                                             prediction=entry,
+                                             disease_info=disease_info)
+                except json.JSONDecodeError:
+                    continue
+        
+        flash('Không tìm thấy dự đoán này')
+        return redirect(url_for('history'))
+    except Exception as e:
+        app.logger.exception('Error viewing prediction')
+        flash('Không thể xem chi tiết dự đoán')
+        return redirect(url_for('history'))
+
+@app.route('/export/<prediction_id>')
+def export_prediction(prediction_id):
+    """Export prediction report as PDF"""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        
+        # Find prediction
+        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        if not history_file.exists():
+            flash('Không tìm thấy lịch sử dự đoán', 'error')
+            return redirect(url_for('history'))
+        
+        prediction = None
+        with open(history_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line.strip())
+                    if entry.get('id') == prediction_id:
+                        prediction = entry
+                        break
+                except json.JSONDecodeError:
+                    continue
+        
+        if not prediction:
+            flash('Không tìm thấy dự đoán này', 'error')
+            return redirect(url_for('history'))
+        
+        # Get disease info
+        label = prediction.get('predicted_label', '')
+        disease_info = DISEASE_INFO.get(label, {
+            'name': label,
+            'definition': 'Không có thông tin',
+            'prevention': []
+        })
+        
+        # Create PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm,
+                               topMargin=20*mm, bottomMargin=20*mm)
+        
+        # Container for PDF elements
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=20,
+            textColor=colors.HexColor('#2d5016'),
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+        elements.append(Paragraph('BAO CAO DU DOAN BENH CA CHUA', title_style))
+        elements.append(Spacer(1, 10*mm))
+        
+        # Prediction info table
+        try:
+            ts = datetime.fromisoformat(prediction.get('timestamp', ''))
+            formatted_time = ts.strftime('%d/%m/%Y %H:%M:%S')
+        except:
+            formatted_time = prediction.get('timestamp', 'N/A')
+        
+        info_data = [
+            ['Ma du doan:', prediction.get('id', 'N/A')],
+            ['Thoi gian:', formatted_time],
+            ['Model:', prediction.get('model_name', 'N/A')],
+            ['Pipeline:', prediction.get('pipeline_key', 'N/A')],
+            ['Benh phat hien:', disease_info['name']],
+            ['Do tin cay:', f"{prediction.get('probability', 0) * 100:.1f}%"],
+        ]
+        
+        info_table = Table(info_data, colWidths=[50*mm, 100*mm])
+        info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 10*mm))
+        
+        # Disease definition
+        elements.append(Paragraph('THONG TIN BENH:', styles['Heading2']))
+        elements.append(Spacer(1, 3*mm))
+        elements.append(Paragraph(disease_info['definition'], styles['BodyText']))
+        elements.append(Spacer(1, 5*mm))
+        
+        # Prevention measures
+        if disease_info.get('prevention'):
+            elements.append(Paragraph('BIEN PHAP PHONG NGUA:', styles['Heading2']))
+            elements.append(Spacer(1, 3*mm))
+            for i, measure in enumerate(disease_info['prevention'], 1):
+                elements.append(Paragraph(f"{i}. {measure}", styles['BodyText']))
+                elements.append(Spacer(1, 2*mm))
+        
+        # Add image if available
+        image_path_str = prediction.get('image_path', '')
+        if image_path_str:
+            # Remove /static/ prefix if present
+            if image_path_str.startswith('/static/'):
+                image_path_str = image_path_str[8:]
+            
+            img_file = BASE_DIR / 'static' / image_path_str
+            if img_file.exists():
+                elements.append(Spacer(1, 5*mm))
+                elements.append(Paragraph('ANH DA XU LY:', styles['Heading2']))
+                elements.append(Spacer(1, 3*mm))
+                img = RLImage(str(img_file), width=100*mm, height=100*mm)
+                elements.append(img)
+        
+        # Footer
+        elements.append(Spacer(1, 10*mm))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.grey,
+            alignment=1
+        )
+        elements.append(Paragraph('Bao cao duoc tao tu dong boi Tomato AI System', footer_style))
+        elements.append(Paragraph(f'Ngay xuat: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', footer_style))
+        
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        filename = f"tomato_report_{prediction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        app.logger.info(f"Exported PDF report for prediction {prediction_id}")
+        return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+        
+    except ImportError:
+        app.logger.error('ReportLab not installed')
+        flash('Chức năng xuất PDF chưa được cài đặt. Vui lòng cài reportlab: pip install reportlab', 'error')
+        return redirect(url_for('history'))
+    except Exception as e:
+        app.logger.exception('Error exporting PDF')
+        flash(f'Không thể xuất báo cáo: {str(e)}', 'error')
+        return redirect(url_for('history'))
+
 @app.route('/feedback', methods=['POST'])
 def feedback():
     """Receive simple JSON feedback actions from the result page.
@@ -1159,6 +1607,105 @@ def admin_feedback():
                 if items:
                     groups[child.name] = items
     return render_template('admin_feedback.html', images=groups)
+
+@app.route('/admin/stats', methods=['GET'])
+@requires_admin_auth
+def admin_stats():
+    """Statistics dashboard for admin"""
+    try:
+        history = _read_history_file()
+        
+        if not history:
+            return render_template('admin_stats.html', stats=None)
+        
+        # Basic stats
+        total_predictions = len(history)
+        
+        # Disease distribution
+        disease_counts = Counter([h.get('predicted_label', 'Unknown') for h in history])
+        disease_stats = [
+            {
+                'label': label,
+                'name': DISEASE_INFO.get(label, {}).get('name', label),
+                'count': count,
+                'percentage': (count / total_predictions * 100)
+            }
+            for label, count in disease_counts.most_common()
+        ]
+        
+        # Model distribution
+        model_counts = Counter([h.get('model_name', 'Unknown') for h in history])
+        model_stats = [
+            {'name': name, 'count': count, 'percentage': (count / total_predictions * 100)}
+            for name, count in model_counts.most_common()
+        ]
+        
+        # Pipeline distribution
+        pipeline_counts = Counter([h.get('pipeline_key', 'Unknown') for h in history])
+        pipeline_stats = [
+            {'name': name, 'count': count, 'percentage': (count / total_predictions * 100)}
+            for name, count in pipeline_counts.most_common()
+        ]
+        
+        # Confidence stats
+        confidences = [h.get('probability', 0) for h in history]
+        avg_confidence = np.mean(confidences) if confidences else 0
+        min_confidence = np.min(confidences) if confidences else 0
+        max_confidence = np.max(confidences) if confidences else 0
+        
+        # Warning/rejection stats
+        warnings = sum(1 for h in history if h.get('possibly_not_tomato', False))
+        rejections = sum(1 for h in history if h.get('rejected', False))
+        
+        # Time-based stats (last 30 days)
+        now = datetime.utcnow()
+        daily_counts = {}
+        for i in range(30):
+            date = (now - timedelta(days=i)).strftime('%Y-%m-%d')
+            daily_counts[date] = 0
+        
+        for h in history:
+            ts_obj = h.get('timestamp_obj')
+            if ts_obj and (now - ts_obj).days < 30:
+                date_key = ts_obj.strftime('%Y-%m-%d')
+                if date_key in daily_counts:
+                    daily_counts[date_key] += 1
+        
+        # Sort by date
+        daily_data = sorted(
+            [{'date': k, 'count': v} for k, v in daily_counts.items()],
+            key=lambda x: x['date']
+        )
+        
+        # Recent predictions (last 10)
+        recent = sorted(
+            history,
+            key=lambda x: x.get('timestamp', ''),
+            reverse=True
+        )[:10]
+        
+        stats = {
+            'total_predictions': total_predictions,
+            'disease_stats': disease_stats,
+            'model_stats': model_stats,
+            'pipeline_stats': pipeline_stats,
+            'avg_confidence': avg_confidence * 100,
+            'min_confidence': min_confidence * 100,
+            'max_confidence': max_confidence * 100,
+            'warnings': warnings,
+            'rejections': rejections,
+            'warning_rate': (warnings / total_predictions * 100) if total_predictions > 0 else 0,
+            'rejection_rate': (rejections / total_predictions * 100) if total_predictions > 0 else 0,
+            'daily_data': daily_data,
+            'recent_predictions': recent
+        }
+        
+        return render_template('admin_stats.html', stats=stats)
+    
+    except Exception as e:
+        app.logger.exception('Error loading statistics')
+        flash('Không thể tải thống kê', 'error')
+        return redirect(url_for('admin_feedback'))
 
 @app.route('/admin/export_chat', methods=['GET'])
 @requires_admin_auth
@@ -1322,72 +1869,22 @@ def chat():
 
 @app.route('/api/chat', methods=['POST'])
 def api_chat():
-    """Chatbot với fuzzy matching thông minh cho tiếng Việt."""
+    """Chatbot sử dụng Gemini API để trả lời câu hỏi về cà chua."""
     try:
         data = request.get_json(force=True)
         user_q_raw = (data.get('q') or '').strip()
-        user_q = user_q_raw.lower()
     except Exception:
         return {"answer": "Không nhận được câu hỏi."}
 
-    if not user_q:
+    if not user_q_raw:
         return {"answer": "Vui lòng nhập câu hỏi."}
 
-    # Sử dụng dữ liệu đã được cache
-    if CHAT_DATASET is None or CHAT_DATASET.empty:
-        return {"answer": "Dữ liệu chat chưa sẵn sàng hoặc bị lỗi. Vui lòng thử lại sau."}
+    # Gọi Gemini API để lấy câu trả lời
+    app.logger.info(f"Chatbot received question: '{user_q_raw}'")
+    answer = get_gemini_response(user_q_raw)
+    app.logger.info(f"Gemini response generated successfully")
 
-    # Fuzzy matching với rapidfuzz
-    best_match = None
-    best_score = 0.0
-    suggestions = []
-    
-    # Sử dụng rapidfuzz cho partial matching (tốt với tiếng Việt có dấu)
-    for index, row in CHAT_DATASET.iterrows():
-        question_db = row['question_lower']
-        
-        # Kết hợp 3 loại matching:
-        # 1. Token sort ratio (không quan trọng thứ tự từ)
-        token_score = fuzz.token_sort_ratio(user_q, question_db) / 100.0
-        # 2. Partial ratio (tìm substring giống nhất)
-        partial_score = fuzz.partial_ratio(user_q, question_db) / 100.0
-        # 3. Simple ratio (so khớp toàn bộ)
-        simple_score = fuzz.ratio(user_q, question_db) / 100.0
-        
-        # Trọng số: token_sort quan trọng nhất, sau đó là partial
-        combined_score = 0.5 * token_score + 0.3 * partial_score + 0.2 * simple_score
-        
-        if combined_score > best_score:
-            best_score = combined_score
-            best_match = row
-        
-        # Thu thập gợi ý (score >= 0.4 nhưng < threshold)
-        if 0.4 <= combined_score < 0.5 and len(suggestions) < 3:
-            suggestions.append({
-                'question': row['question'],
-                'score': combined_score
-            })
-
-    # Ngưỡng chấp nhận: 0.5 (thấp hơn trước để linh hoạt hơn)
-    if best_match is not None and best_score >= 0.5:
-        answer = str(best_match['answer'])
-        matched_question = best_match['question']
-        app.logger.info(f"Chatbot match: '{user_q}' -> '{matched_question}' (score: {best_score:.3f})")
-    else:
-        # Không tìm thấy câu trả lời phù hợp
-        answer = "Xin lỗi, tôi không có câu trả lời chính xác cho câu hỏi này."
-        
-        # Thêm gợi ý câu hỏi tương tự nếu có
-        if suggestions:
-            answer += "\n\n💡 Có thể bạn muốn hỏi:\n"
-            for i, sug in enumerate(sorted(suggestions, key=lambda x: x['score'], reverse=True)[:3], 1):
-                answer += f"{i}. {sug['question']}\n"
-        else:
-            answer += "\n\nBạn có thể tham khảo thêm trên các nền tảng uy tín hoặc hỏi ý kiến từ các chuyên gia."
-        
-        app.logger.info(f"Chatbot no match: '{user_q}' (best score: {best_score:.3f})")
-
-    # Ghi log (nếu cần)
+    # Ghi log
     try:
         logs_dir = BASE_DIR / 'data'
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -1752,17 +2249,25 @@ def process_prediction_results(preds, class_names):
         'all_probs': pairs_sorted
     }
 
-def save_display_image(preprocessed_img, pipeline_key):
+def save_display_image(preprocessed_img, pipeline_key, filename=None):
     """
     Revert preprocessing and save image for display.
+    Args:
+        preprocessed_img: Preprocessed image array
+        pipeline_key: Pipeline key for reverting preprocessing
+        filename: Optional custom filename (default: "last_input.png")
     Returns: URL path to saved image
     """
     display_img = revert_for_display(preprocessed_img[0], pipeline_key)
     uploaded_dir = BASE_DIR / "static" / "uploaded"
     uploaded_dir.mkdir(parents=True, exist_ok=True)
-    out_path = uploaded_dir / "last_input.png"
+    
+    if filename is None:
+        filename = "last_input.png"
+    
+    out_path = uploaded_dir / filename
     cv2.imwrite(str(out_path), cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR))
-    return url_for('static', filename='uploaded/last_input.png')
+    return url_for('static', filename=f'uploaded/{filename}')
 
 def get_disease_information(predicted_label):
     """
@@ -1894,6 +2399,312 @@ def assess_prediction_quality(img_bgr, predicted_prob):
     }
 
 # ============= MAIN PREDICTION ENDPOINT =============
+
+@app.route('/batch_predict', methods=['POST'])
+def batch_predict():
+    """
+    Batch prediction endpoint - handles multiple images at once.
+    """
+    request_id = str(uuid4())[:8]
+    app.logger.info("=" * 50)
+    app.logger.info("New BATCH prediction request [ID: %s]", request_id)
+    
+    try:
+        # Get model and pipeline parameters
+        model_name = request.form.get('model', 'VGG19')
+        pipeline_key = request.form.get('pipeline', 'average_hsv')
+        
+        # Save to session
+        session['last_model'] = model_name
+        session['last_pipeline'] = pipeline_key
+        
+        # Get all uploaded files
+        files = request.files.getlist('images')
+        
+        if not files or len(files) == 0:
+            raise ValidationError(
+                "No files uploaded",
+                user_message="Vui lòng chọn ít nhất một ảnh để dự đoán"
+            )
+        
+        if len(files) > 10:
+            raise ValidationError(
+                f"Too many files: {len(files)}",
+                user_message="Chỉ được upload tối đa 10 ảnh cùng lúc"
+            )
+        
+        app.logger.info("[%s] Processing %d images", request_id, len(files))
+        
+        results = []
+        failed_images = []
+        
+        for idx, file in enumerate(files):
+            try:
+                app.logger.info("[%s] Processing image %d/%d: %s", 
+                              request_id, idx + 1, len(files), file.filename)
+                
+                # Validate and decode image
+                img_bgr = validate_and_decode_image(file)
+                
+                # Prepare image
+                img_bgr = prepare_image_for_prediction(img_bgr)
+                
+                # Run prediction
+                prediction_result = run_model_prediction(
+                    img_bgr, model_name, pipeline_key
+                )
+                
+                # Process results
+                pred_results = process_prediction_results(
+                    prediction_result['predictions'],
+                    prediction_result['class_names']
+                )
+                
+                # Save image with unique name
+                image_filename = f"batch_{request_id}_{idx}_{file.filename}"
+                image_path = save_display_image(
+                    prediction_result['preprocessed'],
+                    pipeline_key,
+                    filename=image_filename
+                )
+                
+                # Get disease info
+                disease_info = get_disease_information(pred_results['label'])
+                
+                # Assess quality
+                quality = assess_prediction_quality(img_bgr, pred_results['probability'])
+                
+                # Save to history
+                prediction_id = save_prediction_history({
+                    'model_name': model_name,
+                    'pipeline_key': pipeline_key,
+                    'predicted_label': pred_results['label'],
+                    'probability': pred_results['probability'],
+                    'possibly_not_tomato': quality['possibly_not_tomato'],
+                    'rejected': quality['rejected_not_tomato'],
+                    'image_path': image_path
+                })
+                
+                results.append({
+                    'filename': file.filename,
+                    'success': True,
+                    'predicted_label': pred_results['label'],
+                    'disease_name': disease_info['name'],
+                    'probability': pred_results['probability'],
+                    'image_path': image_path,
+                    'possibly_not_tomato': quality['possibly_not_tomato'],
+                    'rejected_not_tomato': quality['rejected_not_tomato'],
+                    'prediction_id': prediction_id,
+                    'all_probs': pred_results['all_probs']
+                })
+                
+                app.logger.info(
+                    "[%s] Image %d/%d completed: %s (%.2f%%)",
+                    request_id, idx + 1, len(files),
+                    pred_results['label'], pred_results['probability'] * 100
+                )
+                
+            except Exception as e:
+                app.logger.error(
+                    "[%s] Error processing image %d (%s): %s",
+                    request_id, idx + 1, file.filename, str(e)
+                )
+                failed_images.append({
+                    'filename': file.filename,
+                    'error': str(e)
+                })
+        
+        app.logger.info(
+            "[%s] Batch prediction completed: %d successful, %d failed",
+            request_id, len(results), len(failed_images)
+        )
+        app.logger.info("=" * 50)
+        
+        return render_template(
+            'batch_result.html',
+            results=results,
+            failed_images=failed_images,
+            model_name=model_name,
+            pipeline_key=pipeline_key,
+            total_images=len(files),
+            successful=len(results),
+            failed=len(failed_images)
+        )
+        
+    except AppException as e:
+        app.logger.error(
+            "[%s] Application error in batch_predict: %s - %s",
+            request_id, type(e).__name__, e.message
+        )
+        flash(e.user_message)
+        return redirect(url_for('index'))
+    
+    except Exception as e:
+        app.logger.exception(
+            "[%s] Unexpected error in batch_predict: %s",
+            request_id, str(e)
+        )
+        flash("Lỗi không mong muốn khi xử lý batch. Vui lòng thử lại.")
+        return redirect(url_for('index'))
+
+# ============= MODEL COMPARISON ENDPOINTS =============
+
+@app.route('/compare')
+def compare():
+    """Trang so sánh models"""
+    return render_template(
+        'compare.html',
+        models=ARCHITECTURES,
+        pipelines=list(PIPELINES.keys()),
+        last_model=session.get('last_model', 'VGG19'),
+        last_pipeline=session.get('last_pipeline', 'average_hsv')
+    )
+
+@app.route('/compare_predict', methods=['POST'])
+def compare_predict():
+    """
+    Compare prediction endpoint - run same image through multiple models/pipelines.
+    """
+    request_id = str(uuid4())[:8]
+    app.logger.info("=" * 50)
+    app.logger.info("New COMPARE prediction request [ID: %s]", request_id)
+    
+    try:
+        # Get image
+        file = request.files.get('file')
+        if not file:
+            raise ValidationError(
+                "No file uploaded",
+                user_message="Vui lòng chọn ảnh để so sánh"
+            )
+        
+        # Get selected models and pipelines
+        selected_models = request.form.getlist('models')
+        selected_pipelines = request.form.getlist('pipelines')
+        
+        if not selected_models:
+            raise ValidationError(
+                "No models selected",
+                user_message="Vui lòng chọn ít nhất một model"
+            )
+        
+        if not selected_pipelines:
+            raise ValidationError(
+                "No pipelines selected",
+                user_message="Vui lòng chọn ít nhất một pipeline"
+            )
+        
+        # Limit combinations
+        total_combinations = len(selected_models) * len(selected_pipelines)
+        if total_combinations > 20:
+            raise ValidationError(
+                f"Too many combinations: {total_combinations}",
+                user_message=f"Quá nhiều tổ hợp ({total_combinations}). Tối đa 20 tổ hợp (vd: 4 models × 5 pipelines)"
+            )
+        
+        app.logger.info(
+            "[%s] Comparing %d models × %d pipelines = %d combinations",
+            request_id, len(selected_models), len(selected_pipelines), total_combinations
+        )
+        
+        # Validate and decode image once
+        img_bgr = validate_and_decode_image(file)
+        img_bgr = prepare_image_for_prediction(img_bgr)
+        
+        # Save original image for display
+        uploaded_dir = BASE_DIR / "static" / "uploaded"
+        uploaded_dir.mkdir(parents=True, exist_ok=True)
+        compare_img_path = uploaded_dir / f"compare_{request_id}.png"
+        cv2.imwrite(str(compare_img_path), img_bgr)
+        image_url = url_for('static', filename=f'uploaded/compare_{request_id}.png')
+        
+        results = []
+        
+        for model_name in selected_models:
+            for pipeline_key in selected_pipelines:
+                try:
+                    app.logger.info(
+                        "[%s] Testing: %s + %s",
+                        request_id, model_name, pipeline_key
+                    )
+                    
+                    # Run prediction
+                    prediction_result = run_model_prediction(
+                        img_bgr.copy(), model_name, pipeline_key
+                    )
+                    
+                    # Process results
+                    pred_results = process_prediction_results(
+                        prediction_result['predictions'],
+                        prediction_result['class_names']
+                    )
+                    
+                    # Get disease info
+                    disease_info = get_disease_information(pred_results['label'])
+                    
+                    # Assess quality
+                    quality = assess_prediction_quality(img_bgr, pred_results['probability'])
+                    
+                    results.append({
+                        'model_name': model_name,
+                        'pipeline_key': pipeline_key,
+                        'predicted_label': pred_results['label'],
+                        'disease_name': disease_info['name'],
+                        'probability': pred_results['probability'],
+                        'possibly_not_tomato': quality['possibly_not_tomato'],
+                        'rejected_not_tomato': quality['rejected_not_tomato'],
+                        'all_probs': pred_results['all_probs'][:5],  # Top 5 only
+                        'success': True
+                    })
+                    
+                    app.logger.info(
+                        "[%s] %s + %s: %s (%.2f%%)",
+                        request_id, model_name, pipeline_key,
+                        pred_results['label'], pred_results['probability'] * 100
+                    )
+                    
+                except Exception as e:
+                    app.logger.error(
+                        "[%s] Error with %s + %s: %s",
+                        request_id, model_name, pipeline_key, str(e)
+                    )
+                    results.append({
+                        'model_name': model_name,
+                        'pipeline_key': pipeline_key,
+                        'success': False,
+                        'error': str(e)
+                    })
+        
+        app.logger.info(
+            "[%s] Comparison completed: %d/%d successful",
+            request_id, sum(1 for r in results if r.get('success')), len(results)
+        )
+        app.logger.info("=" * 50)
+        
+        return render_template(
+            'compare_result.html',
+            results=results,
+            image_url=image_url,
+            total_combinations=total_combinations,
+            successful=sum(1 for r in results if r.get('success')),
+            failed=sum(1 for r in results if not r.get('success'))
+        )
+        
+    except AppException as e:
+        app.logger.error(
+            "[%s] Application error in compare_predict: %s",
+            request_id, e.message
+        )
+        flash(e.user_message)
+        return redirect(url_for('compare'))
+    
+    except Exception as e:
+        app.logger.exception(
+            "[%s] Unexpected error in compare_predict: %s",
+            request_id, str(e)
+        )
+        flash("Lỗi không mong muốn. Vui lòng thử lại.")
+        return redirect(url_for('compare'))
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -2149,13 +2960,12 @@ def preload():
         else:
             app.logger.warning("No sample features found")
         
-        # Load chat dataset
-        app.logger.info("Loading chat dataset...")
-        load_chat_dataset()
-        if CHAT_DATASET is not None and not CHAT_DATASET.empty:
-            app.logger.info("Chat dataset loaded - %s questions", len(CHAT_DATASET))
+        # Kiểm tra Gemini API
+        app.logger.info("Checking Gemini API configuration...")
+        if GEMINI_MODEL:
+            app.logger.info("Gemini API configured successfully for chatbot")
         else:
-            app.logger.warning("Chat dataset is empty or not loaded")
+            app.logger.warning("Gemini API key not found - chatbot will not work. Set GEMINI_API_KEY in .env file")
         
         # Preload default model
         app.logger.info("Preloading default model (VGG19 + average_hsv)...")
@@ -2180,6 +2990,41 @@ if __name__ == "__main__":
     try:
         preload()
         
+        # HTTPS Configuration
+        use_https = os.environ.get('USE_HTTPS', 'false').lower() == 'true'
+        ssl_context = None
+        protocol = 'http'
+        
+        if use_https:
+            # Kiểm tra xem có certificate files không
+            cert_path = os.environ.get('SSL_CERT_PATH', 'certs/cert.pem')
+            key_path = os.environ.get('SSL_KEY_PATH', 'certs/key.pem')
+            
+            cert_file = BASE_DIR / cert_path
+            key_file = BASE_DIR / key_path
+            
+            if cert_file.exists() and key_file.exists():
+                ssl_context = (str(cert_file), str(key_file))
+                protocol = 'https'
+                app.logger.info("✓ HTTPS enabled with certificates:")
+                app.logger.info(f"  Certificate: {cert_file}")
+                app.logger.info(f"  Private Key: {key_file}")
+            else:
+                # Fallback: Sử dụng adhoc SSL (tự động tạo self-signed cert)
+                try:
+                    ssl_context = 'adhoc'
+                    protocol = 'https'
+                    app.logger.warning("Certificate files not found. Using adhoc SSL (auto-generated self-signed certificate)")
+                    app.logger.warning("⚠️  For production, please use proper SSL certificates!")
+                    app.logger.info("To generate certificate files, run:")
+                    app.logger.info("  mkdir certs")
+                    app.logger.info("  openssl req -x509 -newkey rsa:4096 -nodes -out certs/cert.pem -keyout certs/key.pem -days 365 -subj '/CN=localhost'")
+                except Exception as e:
+                    app.logger.error(f"Failed to create adhoc SSL context: {e}")
+                    app.logger.info("Falling back to HTTP mode")
+                    use_https = False
+                    ssl_context = None
+        
         # Auto-open browser after server starts (can be disabled via env var)
         # Only open on the reloader process (not on the parent process)
         auto_open = os.environ.get('AUTO_OPEN_BROWSER', 'true').lower() == 'true'
@@ -2191,7 +3036,7 @@ if __name__ == "__main__":
             
             def open_browser():
                 """Open browser after a short delay to ensure server is ready"""
-                url = "http://localhost:5000"
+                url = f"{protocol}://localhost:5000"
                 app.logger.info(f"Opening browser at {url}")
                 try:
                     webbrowser.open(url)
@@ -2204,9 +3049,17 @@ if __name__ == "__main__":
             app.logger.info("(To disable: set AUTO_OPEN_BROWSER=false in .env)")
         
         app.logger.info("Starting Flask development server...")
-        app.logger.info("Server running at http://0.0.0.0:5000")
+        app.logger.info(f"Server running at {protocol}://0.0.0.0:5000")
         
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        if use_https:
+            app.logger.info("=" * 60)
+            app.logger.info("🔒 HTTPS MODE ENABLED")
+            app.logger.info("=" * 60)
+            if ssl_context == 'adhoc':
+                app.logger.warning("⚠️  Using self-signed certificate - browsers will show security warning")
+                app.logger.info("Click 'Advanced' → 'Proceed to localhost' to continue")
+        
+        app.run(host='0.0.0.0', port=5000, debug=True, ssl_context=ssl_context)
     except KeyboardInterrupt:
         app.logger.info("Server stopped by user")
     except Exception as e:

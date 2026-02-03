@@ -173,7 +173,19 @@
             </div>
           {% endfor %}
           </div>
-          <a href="{{ url_for('index') }}" class="back-btn">&#8592; Dự đoán ảnh khác</a>
+          <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
+            <a href="{{ url_for('index') }}" class="back-btn">&#8592; Dự đoán ảnh khác</a>
+            {% if prediction_id %}
+            <button onclick="exportPDF()" class="btn small" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+              Xuất báo cáo PDF
+            </button>
+            {% endif %}
+            <a href="{{ url_for('history') }}" class="back-btn" style="margin-left: auto;">📜 Xem lịch sử dự đoán &#8594;</a>
+          </div>
         </div>
       </div>
     </main>
@@ -250,8 +262,15 @@
         const status = await sendFeedback('confirm');
         if(status.ok){
           msg.textContent = 'Cảm ơn! Hiển thị kết quả...';
+          // Show toast notification
+          if(window.toast) {
+            window.toast.success('Cảm ơn phản hồi của bạn! Hệ thống sẽ học từ dữ liệu này.');
+          }
         } else {
           msg.textContent = status.message || 'Đã xác nhận (không lưu được).';
+          if(window.toast) {
+            window.toast.warning('Đã xác nhận nhưng không lưu được phản hồi');
+          }
         }
         // Hiển thị khối dự đoán và ẩn nút xác nhận
         const pb = document.getElementById('prediction-block');
@@ -295,6 +314,10 @@
         const card = document.querySelector('.card.result-card');
         const aside = document.getElementById('disease-aside');
         if(status.ok){
+          // Show toast notification
+          if(window.toast) {
+            window.toast.info('Cảm ơn phản hồi! Hệ thống đã ghi nhận ảnh này không phải lá cà chua.');
+          }
           // Thay nội dung thẻ bằng thông báo ngắn yêu cầu chọn ảnh khác
           if(card){
             card.innerHTML = '<div style="padding:18px;"><h2>Ảnh không phải lá cà chua</h2><p>Vui lòng chọn lại ảnh khác (chụp rõ hơn hoặc chọn ảnh lá thực sự).</p><a href="{{ url_for('index') }}" class="back-btn">&#8592; Tải ảnh khác</a></div>';
@@ -351,6 +374,34 @@
       if(btnNot) btnNot.addEventListener('click', ()=>{
         const old = document.querySelector('.possible-warning'); if(old) old.remove();
       });
+      
+      // Export PDF function
+      window.exportPDF = function() {
+        const predictionId = '{{ prediction_id }}';
+        if (!predictionId) {
+          if (window.toast) {
+            window.toast.error('Không thể xuất báo cáo: Thiếu ID dự đoán');
+          } else {
+            alert('Không thể xuất báo cáo');
+          }
+          return;
+        }
+        
+        // Show loading toast
+        if (window.toast) {
+          window.toast.info('Đang tạo báo cáo PDF...', 3000);
+        }
+        
+        // Navigate to export URL
+        window.location.href = `/export/${predictionId}`;
+        
+        // Show success after delay
+        setTimeout(() => {
+          if (window.toast) {
+            window.toast.success('Báo cáo đã được tải xuống!');
+          }
+        }, 1500);
+      };
     });
 </script>
 {% endblock %}

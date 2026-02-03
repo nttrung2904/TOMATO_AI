@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card" style="margin-bottom:24px;">
+    <h2 style="margin:0 0 12px 0;color:var(--tomato-700);">📊 Kết quả dự đoán hàng loạt</h2>
+    <div style="display:flex;gap:16px;padding:12px;background:#f5f5f5;border-radius:8px;">
+        <div style="flex:1;">
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Model sử dụng</div>
+            <div style="font-size:1.1rem;font-weight:600;">{{ model_name }}</div>
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Pipeline</div>
+            <div style="font-size:1.1rem;font-weight:600;">{{ pipeline_key }}</div>
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Tổng số ảnh</div>
+            <div style="font-size:1.1rem;font-weight:600;">{{ total_images }}</div>
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Thành công</div>
+            <div style="font-size:1.1rem;font-weight:600;color:green;">{{ successful }}</div>
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:0.9rem;color:#666;margin-bottom:4px;">Thất bại</div>
+            <div style="font-size:1.1rem;font-weight:600;color:red;">{{ failed }}</div>
+        </div>
+    </div>
+</div>
+
+{% if failed_images %}
+<div class="card" style="margin-bottom:24px;background:#fff3cd;border-left:4px solid #ff9800;">
+    <h3 style="margin:0 0 12px 0;color:#f57c00;">⚠️ Ảnh xử lý thất bại</h3>
+    <div style="display:grid;gap:8px;">
+        {% for fail in failed_images %}
+        <div style="padding:8px;background:white;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <strong>{{ fail.filename }}</strong>
+            <span style="color:#d32f2f;font-size:0.9rem;">{{ fail.error }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if results %}
+<div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));">
+    {% for result in results %}
+    <div class="card" style="position:relative;">
+        {% if result.rejected_not_tomato %}
+        <div style="position:absolute;top:12px;right:12px;background:#d32f2f;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600;">
+            ❌ Không phải cà chua
+        </div>
+        {% elif result.possibly_not_tomato %}
+        <div style="position:absolute;top:12px;right:12px;background:#ff9800;color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600;">
+            ⚠️ Cảnh báo
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom:12px;">
+            <img src="{{ result.image_path }}" alt="{{ result.filename }}" 
+                 style="width:100%;height:220px;object-fit:cover;border-radius:8px;">
+        </div>
+
+        <h4 style="margin:0 0 8px 0;font-size:0.95rem;color:#666;">{{ result.filename }}</h4>
+
+        <div style="padding:12px;background:#f5f5f5;border-radius:8px;margin-bottom:12px;">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--tomato-700);margin-bottom:4px;">
+                {{ result.disease_name }}
+            </div>
+            <div style="font-size:0.9rem;color:#666;">
+                Độ tin cậy: 
+                <span style="font-weight:600;color:{% if result.probability >= 0.9 %}green{% elif result.probability >= 0.7 %}orange{% else %}red{% endif %};">
+                    {{ (result.probability * 100)|round(2) }}%
+                </span>
+            </div>
+        </div>
+
+        <details style="margin-bottom:12px;">
+            <summary style="cursor:pointer;font-weight:600;padding:8px;background:#e3f2fd;border-radius:6px;">
+                Xem chi tiết dự đoán
+            </summary>
+            <div style="margin-top:12px;max-height:200px;overflow-y:auto;">
+                {% for class_name, prob in result.all_probs %}
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:0.9rem;">
+                        <span>{{ class_name }}</span>
+                        <span style="font-weight:600;">{{ (prob * 100)|round(2) }}%</span>
+                    </div>
+                    <div style="background:#e0e0e0;height:6px;border-radius:3px;overflow:hidden;">
+                        <div style="background:linear-gradient(90deg,var(--leaf-600),var(--tomato-500));height:100%;width:{{ prob * 100 }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+
+        <a href="{{ url_for('view_prediction', prediction_id=result.prediction_id) }}" 
+           class="btn" style="display:block;text-align:center;text-decoration:none;padding:8px;">
+            📝 Xem chi tiết đầy đủ
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card" style="margin-top:24px;text-align:center;">
+    <h3 style="margin-top:0;">🎯 Tóm tắt kết quả</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+        {% set disease_counts = {} %}
+        {% for result in results %}
+            {% if result.disease_name in disease_counts %}
+                {% set _ = disease_counts.update({result.disease_name: disease_counts[result.disease_name] + 1}) %}
+            {% else %}
+                {% set _ = disease_counts.update({result.disease_name: 1}) %}
+            {% endif %}
+        {% endfor %}
+        
+        {% for disease, count in disease_counts.items() %}
+        <div style="padding:16px;background:#f5f5f5;border-radius:8px;">
+            <div style="font-size:2rem;font-weight:700;color:var(--tomato-700);">{{ count }}</div>
+            <div style="font-size:0.9rem;color:#666;">{{ disease }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+        <a href="{{ url_for('index') }}" class="action-btn action-btn-success">
+            <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M17,13H13V17H11V13H7V11H11V7H13V11H17M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+            </svg>
+            <span>Dự đoán mới</span>
+        </a>
+        <a href="{{ url_for('history') }}" class="action-btn action-btn-info">
+            <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+                <path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3" />
+            </svg>
+            <span>Xem lịch sử</span>
+        </a>
+    </div>
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:40px;">
+    <h3 style="color:#d32f2f;">❌ Không có kết quả nào</h3>
+    <p>Tất cả các ảnh đều xử lý thất bại. Vui lòng kiểm tra và thử lại.</p>
+    <a href="{{ url_for('index') }}" class="action-btn action-btn-primary" style="margin-top:20px;">
+        <svg style="width:24px;height:24px;fill:currentColor;" viewBox="0 0 24 24">
+            <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+        </svg>
+        <span>Quay lại trang chủ</span>
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -4,6 +4,14 @@ __pycache__/
 venv/
 .env
 
+# --- SSL CERTIFICATES ---
+certs/
+*.pem
+*.pfx
+*.key
+*.crt
+*.csr
+
 # --- CHẶN MODEL NẶNG (THỦ PHẠM SỐ 1) ---
 *.keras
 *.h5
