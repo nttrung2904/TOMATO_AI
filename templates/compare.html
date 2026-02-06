@@ -167,6 +167,11 @@
 
     removeBtn.addEventListener('click', resetFile);
 
+    // Click on drop area to trigger file input
+    fileDropArea.addEventListener('click', () => {
+      fileInput.click();
+    });
+
     // Drag and drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       fileDropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);

@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}Hỏi đáp | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .chat-container {
+    max-width: 800px;
+    margin: 18px auto 0 auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+  }
+
+  #chat-window {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: #f9fafb;
+    min-height: 400px;
+    max-height: 60vh;
+    scroll-behavior: smooth;
+  }
+
+  .message {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 15px;
+    max-width: 85%;
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 10px;
+    flex-shrink: 0;
+  }
+
+  .message-content {
+    padding: 10px 15px;
+    border-radius: 18px;
+    line-height: 1.6;
+    position: relative;
+  }
+
+  /* Markdown styling */
+  .message-content strong {
+    font-weight: 600;
+  }
+  .message-content em {
+    font-style: italic;
+  }
+  .message-content code {
+    background-color: rgba(0,0,0,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+  .message-content ul, .message-content ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .message-content li {
+    margin: 4px 0;
+  }
+
+  /* Timestamp */
+  .message-timestamp {
+    font-size: 0.75em;
+    color: #8e8e93;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Bot messages */
+  .bot-msg {
+    align-self: flex-start;
+    margin-right: auto;
+  }
+  .bot-msg .message-content {
+    background-color: #e9e9eb;
+    color: #1c1c1e;
+    border-bottom-left-radius: 4px;
+  }
+  .bot-msg .message-content code {
+    background-color: rgba(0,0,0,0.15);
+  }
+
+  /* User messages */
+  .user-msg {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+    margin-left: auto;
+  }
+  .user-msg .message-content {
+    background-color: #107bedff;
+    color: white;
+    border-bottom-right-radius: 4px;
+    text-align: right;
+  }
+  .user-msg .avatar {
+    background-color: #107bedff;
+  }
+
+  /* Copy button */
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,255,255,0.8);
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .bot-msg:hover .copy-btn {
+    opacity: 1;
+  }
+  .copy-btn:hover {
+    background: rgba(255,255,255,1);
+  }
+  .copy-btn.copied {
+    background: #4caf50;
+    color: white;
+  }
+
+  #chat-input-area {
+    display: flex;
+    padding: 12px;
+    gap: 8px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #ffffffff;
+  }
+
+
+
+  .suggestion-bubbles {
+    padding: 10px 20px;
+    background-color: #f9fafb;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .suggestion-bubble {
+    padding: 6px 12px;
+    border-radius: 16px;
+    background-color: #e9e9eb;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s;
+  }
+  .suggestion-bubble:hover {
+    background-color: #dcdfe6;
+  }
+  
+  /* Typing indicator */
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    background-color: #e9e9eb;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+  }
+  
+  .typing-indicator span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #8e8e93;
+    display: inline-block;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+  }
+  
+  .typing-indicator span:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+  
+  .typing-indicator span:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+  
+  @keyframes typing-bounce {
+    0%, 80%, 100% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    40% {
+      transform: scale(1.2);
+      opacity: 1;
+    }
+  }
+  
+  /* Mobile optimization */
+  @media (max-width: 768px) {
+    .chat-container { 
+      margin: 12px; 
+      max-height: calc(100vh - 100px);
+    }
+    #chat-window {
+      max-height: calc(100vh - 250px);
+      padding: 15px;
+    }
+    .message {
+      max-width: 90%;
+    }
+    .suggestion-bubble {
+      font-size: 0.85em;
+      padding: 5px 10px;
+    }
+    #chat-input {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+  }
+</style>
+
+  <h1 style="margin-top:18px;">Hỏi đáp các thông tin về cà chua và bệnh trên lá cà chua</h1>
+
+  <main style="margin-top:18px">
+    <div class="chat-container">
+      <div id="chat-window">
+        <!-- Tin nhắn sẽ được thêm vào đây bằng JavaScript -->
+      </div>
+
+      <div class="suggestion-bubbles">
+        <div class="suggestion-bubble" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Triệu chứng bệnh sớm?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Cách phòng ngừa virus xoắn lá?')">Phòng ngừa virus xoắn lá?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Lá khỏe mạnh?</div>
+      </div>
+
+      <div id="chat-input-area">
+        <input id="chat-input" type="text" placeholder="Nhập câu hỏi (ví dụ: 'Triệu chứng Tomato_Early_blight là gì?')" style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
+        <button id="chat-send" class="btn">Gửi</button>
+      </div>
+    </div>
+  </main>
+{% endblock %}
+
+{% block scripts %}
+<!-- Marked.js for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+<script>
+  const chatWindow = document.getElementById('chat-window');
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send');
+
+  const BOT_AVATAR = "{{ url_for('static', filename='images/bot.png') }}";
+  const USER_AVATAR = "{{ url_for('static', filename='images/avatar.jpg') }}";
+
+  // Check if marked is loaded, otherwise use fallback
+  const hasMarked = typeof marked !== 'undefined';
+  if (hasMarked) {
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+  }
+
+  /**
+   * Simple markdown parser fallback (if marked.js fails to load)
+   */
+  function simpleMarkdown(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+
+  /**
+   * Format timestamp to HH:MM
+   */
+  function formatTime() {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Create copy button for bot messages
+   */
+  function createCopyButton(text) {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.onclick = function() {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    };
+    return btn;
+  }
+
+  /**
+  /**
+   * Send message and handle response
+   */
+  async function send(){
+    const q = input.value.trim();
+    if(!q) return;
+    
+    // Disable input while processing
+    input.disabled = true;
+    btn.disabled = true;
+    
+    append(q,'user');
+    input.value = '';
+    
+    // Handle greetings locally
+    if (isGreeting(q)) {
+      const greetingReplies = [
+        'Chào bạn! 👋 Tôi có thể giúp bạn:\n\n- **Triệu chứng** bệnh cà chua\n- **Nguyên nhân** và cách phòng tránh\n- **Chăm sóc** và thu hoạch\n\nHãy hỏi tôi nhé!'
+      ];
+      const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
+      setTimeout(() => {
+        append(reply, 'bot');
+        updateDynamicSuggestions(['Triệu chứng bệnh cháy sớm?', 'Cách chăm sóc cà chua', 'Khi nào thu hoạch?']);
+        input.disabled = false;
+        btn.disabled = false;
+        input.focus();
+      }, 500);
+      return;
+    }
+
+    // Show typing indicator
+    const thinking = append('', 'bot', true);
+
+    try {
+      const startTime = Date.now();
+      const response = await fetch('{{ url_for('api_chat') }}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({q})
+      });
+
+      const data = await response.json();
+      const elapsed = Date.now() - startTime;
+      
+      // Ensure minimum display time for typing indicator
+      const minDelay = Math.max(0, 1500 - elapsed);
+      await sleep(minDelay);
+
+      // Remove typing indicator
+      if (thinking) thinking.remove();
+
+      if (!data || data.error) {
+        const errorMsg = data.error === 'rate_limit' 
+          ? '⚠️ Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.' 
+          : '⚠️ Lỗi kết nối. Vui lòng thử lại.';
+        append(errorMsg, 'bot');
+      } else {
+        const answer = data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín.';
+        append(answer, 'bot');
+        
+        // Update dynamic suggestions based on answer
+        updateDynamicSuggestions(generateSuggestions(q, answer));
+      }
+    } catch (error) {
+      if (thinking) thinking.remove();
+      append('⚠️ Không thể kết nối với server. Vui lòng thử lại sau.', 'bot');
+    } finally {
+      input.disabled = false;
+      btn.disabled = false;
+      input.focus();
+    }
+  }
+
+  /**
+   * Generate dynamic suggestions based on context
+   */
+  function generateSuggestions(question, answer) {
+    const q = question.toLowerCase();
+    
+    // Context-aware suggestions
+    if (q.includes('triệu chứng')) {
+      return ['Cách phòng tránh?', 'Nguyên nhân gây bệnh?', 'Bệnh khác tương tự?'];
+    } else if (q.includes('phòng') || q.includes('ngừa')) {
+      return ['Thuốc trị bệnh?', 'Cách chăm sóc?', 'Triệu chứng khác?'];
+    } else if (q.includes('bệnh')) {
+      return ['Triệu chứng là gì?', 'Cách điều trị?', 'Phòng ngừa thế nào?'];
+    } else if (q.includes('chăm sóc')) {
+      return ['Bón phân như thế nào?', 'Tưới nước ra sao?', 'Khi nào thu hoạch?'];
+    } else {
+      // Default suggestions
+      return ['Triệu chứng bệnh sớm?', 'Phòng ngừa virus?', 'Chăm sóc cà chua?'];
+    }
+  }
+
+  /**
+   * Update suggestion bubbles dynamically
+   */
+  function updateDynamicSuggestions(suggestions) {
+    const container = document.querySelector('.suggestion-bubbles');
+    container.innerHTML = '';
+    suggestions.forEach(s => {
+      const bubble = document.createElement('div');
+      bubble.className = 'suggestion-bubble';
+      bubble.textContent = s;
+      bubble.onclick = () => askSuggestion(s);
+      container.appendChild(bubble);
+    });   const rendered = marked.parse(msg);
+        content.innerHTML = rendered;
+        
+        // Add copy button
+        const copyBtn = createCopyButton(msg);
+        content.appendChild(copyBtn);
+        
+        // Add timestamp
+        const timestamp = document.createElement('span');
+        timestamp.className = 'message-timestamp';
+        timestamp.textContent = formatTime();
+        content.appendChild(timestamp);
+      }
+    }
+
+    el.appendChild(avatar);
+    el.appendChild(content);
+    chatWindow.appendChild(el);
+    
+    // Smooth scroll to bottom
+    smoothScrollToBottom();
+    return el;
+  }
+
+  /**
+   * Smooth scroll to bottom of chat
+   */
+  function smoothScrollToBottom() {
+    chatWindow.scrollTo({
+      top: chatWindow.scrollHeight,
+      behavior: 'smooth'
+    });
+  }
+
+  async function send(){
+    const q = input.value.trim();
+    if(!q) return;
+    append(q,'user');
+    input.value = '';
+    // Phát hiện lời chào và trả lời ngay với câu trả lời có sẵn
+    if (isGreeting(q)) {
+      const greetingReplies = [
+        'Chào bạn 👋 Hãy hỏi tôi về triệu chứng, nguyên nhân, khái niệm hoặc phòng ngừa.'
+      ];
+      const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
+      append(reply, 'bot');
+      return;
+    }
+
+    // For non-greeting: show a thinking indicator and ensure it's visible for at least 2s
+    const thinking = append('', 'bot', true);
+
+    const minimumDelay = sleep(2000); // 2 seconds minimum
+    const fetchPromise = fetch('{{ url_for('api_chat') }}', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q})
+    }).then(r => r.json()).catch(e => ({ error: true }));
+
+    const [data] = await Promise.all([fetchPromise, minimumDelay]).then(results => [results[0]]).catch(() => [{ error: true }]);
+
+    // Xóa biểu tượng đang suy nghĩ
+    if (thinking) thinking.remove();
+
+    if (!data || data.error) {
+      append('Lỗi kết nối.', 'bot');
+    } else {
+      append(data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín hoặc hỏi ý kiến từ các chuyên gia.', 'bot');
+    }
+  }
+
+  function isGreeting(text) {
+    if (!text) return false;
+    const t = text.trim().toLowerCase();
+    // Các lời chào phổ biến tiếng Việt và tiếng Anh
+    const greetings = ['chào', 'xin chào', 'chào bạn', 'chào anh', 'chào em', 'hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
+    // Kiểm tra xem toàn bộ tin nhắn có phải là lời chào ngắn hay bắt đầu bằng lời chào
+    for (const g of greetings) {
+      if (t === g) return true;
+      if (t.startsWith(g + ' ') || t.startsWith(g + '!') || t.startsWith(g + ',')) return true;
+    }
+    // Cũng coi các tin nhắn rất ngắn như 'hi' hoặc 'hey' là lời chào
+    if (t.length <= 4 && greetings.includes(t)) return true;
+    return false;
+  }
+
+  function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  function askSuggestion(question) {
+    const input = document.getElementById('chat-input');
+    input.value = question;
+    send();
+  }
+
+  btn.addEventListener('click', send);
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
+
+  // Initialize chat with welcome message
+  window.addEventListener('DOMContentLoaded', function() {
+    console.log('Chat initialized');
+    setTimeout(() => {
+      append('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua. 🍅', 'bot');
+    }, 100);
+  });
+</script>
+{% endblock %}

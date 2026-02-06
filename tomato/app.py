@@ -19,7 +19,10 @@ from logging.handlers import RotatingFileHandler
 import sys
 from dotenv import load_dotenv
 import google.generativeai as genai
-from collections import Counter
+from collections import Counter, defaultdict
+import time
+import hashlib
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 # Load biến môi trường từ file .env
 load_dotenv()
@@ -27,25 +30,34 @@ load_dotenv()
 # Cấu hình Gemini API
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_MODEL = None
+LAST_WORKING_MODEL = None  # Cache model đã thành công
+
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Thử các model theo thứ tự: model miễn phí ổn định nhất trước
-    model_names = [
-        'models/gemini-2.5-flash',      # Model ổn định, miễn phí tốt
-        'models/gemini-flash-latest',    # Luôn dùng phiên bản mới nhất
-        'models/gemini-2.0-flash',       # Backup
-    ]
-    for model_name in model_names:
-        try:
-            GEMINI_MODEL = genai.GenerativeModel(model_name)
-            print(f"✓ Gemini API configured with model: {model_name}")
-            break
-        except Exception as e:
-            print(f"✗ Model {model_name} failed: {e}")
-            continue
-    
-    if not GEMINI_MODEL:
-        print("✗ Failed to configure any Gemini model")
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # Security: Chỉ hiển thị 8 ký tự đầu của API key
+        masked_key = f"{GEMINI_API_KEY[:8]}***{GEMINI_API_KEY[-4:]}" if len(GEMINI_API_KEY) > 12 else "***"
+        print(f"✓ Gemini API key configured: {masked_key}")
+        
+        # Khởi tạo model - không test ngay để tránh waste quota
+        # Thử các model theo thứ tự: model miễn phí ổn định nhất trước
+        model_names = [
+            'models/gemini-flash-latest',       # Luôn dùng phiên bản mới nhất
+            'models/gemini-2.5-flash',          # Model ổn định, miễn phí
+            'models/gemini-2.0-flash',          # Backup ổn định
+        ]
+        
+        # Khởi tạo model đầu tiên, sẽ test khi user gửi câu hỏi thật
+        GEMINI_MODEL = genai.GenerativeModel(model_names[0])
+        LAST_WORKING_MODEL = model_names[0]
+        print(f"✓ Gemini model initialized: {model_names[0]}")
+        print(f"✓ Chatbot ready to answer questions")
+        
+    except Exception as e:
+        print(f"✗ Failed to configure Gemini API: {e}")
+        GEMINI_MODEL = None
+else:
+    print("⚠ GEMINI_API_KEY not found - chatbot will not work")
 
 # Lưu ý: Các tiện ích trích xuất đặc trưng sâu được cung cấp bởi `utils.py` (get_feature_extractor,
 # compute_embedding). Tránh duplicate MobileNetV2/preprocess_input ở đây để ngăn
@@ -320,6 +332,11 @@ DISEASE_INFO = {
 ARCHITECTURES = [
     'VGG19', 'MobileNetV2', 'ResNet50', 'CNN', 'InceptionV3', 'DenseNet', 'Xception', 'VGG16'
 ]
+
+# Constants for model selection
+MODELS = ARCHITECTURES  # Alias for compatibility
+DEFAULT_MODEL = 'VGG19'
+DEFAULT_PIPELINE = 'average_hsv'
 
 def discover_models(base_dir: Path, architectures: list, logger=None) -> dict:
     """
@@ -647,9 +664,157 @@ class ModelLRUCache:
         with self.lock:
             return len(self.cache)
 
+# ============= CHATBOT CONFIGURATION =============
+# Constants
+CHAT_MAX_QUESTION_LENGTH = 500
+CHAT_MIN_ANSWER_LENGTH = 20
+CHAT_MAX_TOKENS = 800
+CHAT_API_TIMEOUT = 30  # seconds
+CHAT_RATE_LIMIT_PER_MINUTE = 10
+CHAT_RETRY_ATTEMPTS = 3
+CHAT_RETRY_DELAY = 2  # seconds
+
+# Rate limiting storage
+CHAT_RATE_LIMITER = defaultdict(list)  # IP -> [timestamps]
+
+# FAQ Cache - Câu hỏi thường gặp (fallback khi API fail)
+FAQ_RESPONSES = {
+    "cà chua là gì": "Cà chua (Solanum lycopersicum) là loại cây trồng thuộc họ Cà (Solanaceae), có nguồn gốc từ Nam Mỹ. Quả cà chua giàu vitamin C, lycopene và các chất chống oxi hóa, rất tốt cho sức khỏe. 🍅",
+    "bệnh cháy sớm": "Bệnh cháy sớm (Early blight) do nấm Alternaria solani gây ra, xuất hiện các đốm màu nâu đậm trên lá, có thể làm lá vàng và rụng, giảm năng suất. Phòng ngừa bằng cách luân canh, loại bỏ lá bệnh và phun thuốc fungicide đúng liều.",
+    "bệnh cháy muộn": "Bệnh cháy muộn (Late blight) do nấm Phytophthora infestans, là bệnh nguy hiểm nhất. Triệu chứng: đốm nâu đen lan nhanh trên lá, thân và quả. Phòng ngừa: dùng giống kháng, tránh trồng gần khoai tây, phun thuốc đúng lúc.",
+    "bệnh đốm lá septoria": "Bệnh đốm lá Septoria do nấm Septoria lycopersici, xuất hiện nhiều đốm nhỏ tròn có tâm sáng và viền đậm. Phòng ngừa: loại bỏ lá bệnh, tưới nhỏ giọt, luân canh và dùng thuốc bảo vệ thực vật.",
+    "bệnh virus xoăn vàng lá": "Bệnh xoăn vàng lá (TYLCV) do virus, truyền qua rầy tàu. Triệu chứng: lá vàng, cuộn quăn, cây lùn. Phòng ngừa: kiểm soát rầy bằng bẫy dính, thuốc trừ sâu, dùng giống kháng và lưới che.",
+    "bệnh đốm vi khuẩn": "Bệnh đốm vi khuẩn do Xanthomonas, xuất hiện đốm đen/nâu trên lá, thân, quả. Phòng ngừa: dùng giống kháng, tránh tưới phun lá, loại bỏ cây bệnh, luân canh và phun thuốc chứa đồng.",
+    "triệu chứng": "Các triệu chứng bệnh cà chua phổ biến: đốm lá (nâu, đen, vàng), lá xoăn, héo, vàng rụng, quả thối, đốm trên thân. Mỗi bệnh có triệu chứng đặc trưng riêng. Bạn muốn hỏi về bệnh nào cụ thể?",
+    "phòng ngừa": "Các biện pháp phòng bệnh: (1) Luân canh cây trồng, (2) Dùng giống kháng bệnh, (3) Tưới nhỏ giọt thay vì phun lên lá, (4) Loại bỏ và tiêu hủy cây bệnh, (5) Bón phân cân đối, (6) Phun thuốc đúng loại đúng lúc, (7) Giữ vườn sạch và thông thoáng.",
+    "cách chăm sóc": "Chăm sóc cà chua: (1) Tưới đều, tránh úng, (2) Bón phân NPK cân đối, (3) Tỉa cành, cắt lá già, (4) Kiểm tra sâu bệnh thường xuyên, (5) Đảm bảo ánh sáng đủ 6-8 giờ/ngày, (6) Giữ độ ẩm đất 60-70%, (7) Che phủ gốc để giữ ẩm.",
+    "khi nào thu hoạch": "Thu hoạch cà chua khi quả chín từ 70-90% (màu đỏ/vàng tùy giống), còn hơi cứng. Quả quá chín dễ hỏng khi vận chuyển. Thu hoạch buổi sáng sớm hoặc chiều mát để quả tươi lâu hơn. 🍅"
+}
+
+# Response cache (hash-based)
+RESPONSE_CACHE = {}  # question_hash -> (answer, timestamp)
+CACHE_TTL = 3600  # 1 hour
+
 # Khởi tạo model cache
 LOADED_MODELS = ModelLRUCache(max_size=MAX_LOADED_MODELS)
 MODEL_LOAD_LOCK = threading.Lock()
+
+def check_faq_response(question: str) -> Optional[str]:
+    """Kiểm tra xem câu hỏi có match với FAQ không.
+    
+    Args:
+        question: Câu hỏi người dùng
+        
+    Returns:
+        Câu trả lời từ FAQ hoặc None nếu không match
+        
+    Example:
+        >>> check_faq_response("cà chua là gì")
+        "Cà chua (Solanum lycopersicum) là loại cây trồng..."
+    """
+    q_lower = question.lower().strip()
+    
+    # Exact match hoặc contains
+    for key, answer in FAQ_RESPONSES.items():
+        if key in q_lower or q_lower in key:
+            return answer
+    return None
+
+
+def get_cached_response(question: str) -> Optional[str]:
+    """Lấy response từ cache nếu có và chưa expired.
+    
+    Args:
+        question: Câu hỏi người dùng
+        
+    Returns:
+        Cached answer hoặc None nếu không có hoặc đã expired
+    """
+    q_hash = hashlib.md5(question.lower().encode()).hexdigest()
+    
+    if q_hash in RESPONSE_CACHE:
+        cached_answer, timestamp = RESPONSE_CACHE[q_hash]
+        # Kiểm tra TTL
+        if time.time() - timestamp < CACHE_TTL:
+            return cached_answer
+        else:
+            # Xóa cache cũ
+            del RESPONSE_CACHE[q_hash]
+    return None
+
+
+def cache_response(question: str, answer: str) -> None:
+    """Lưu response vào cache với timestamp hiện tại.
+    
+    Args:
+        question: Câu hỏi người dùng
+        answer: Câu trả lời cần cache
+    """
+    q_hash = hashlib.md5(question.lower().encode()).hexdigest()
+    RESPONSE_CACHE[q_hash] = (answer, time.time())
+
+
+def estimate_tokens(text: str) -> int:
+    """Ước tính số token trong text (rough estimate: 1 token ≈ 4 chars).
+    
+    Args:
+        text: Text cần ước tính
+        
+    Returns:
+        Số token ước tính
+    """
+    return len(text) // 4
+
+
+def call_gemini_with_retry(
+    model: Any, 
+    prompt: str, 
+    config: Any, 
+    max_attempts: int = 3
+) -> Any:
+    """Gọi Gemini API với retry logic (exponential backoff).
+    
+    Args:
+        model: Gemini model instance
+        prompt: Prompt string để gửi tới API
+        config: GenerationConfig object
+        max_attempts: Số lần thử tối đa (default: 3)
+        
+    Returns:
+        Response object từ Gemini API
+        
+    Raises:
+        Exception: Khi tất cả attempts đều fail
+    """
+    last_error = None
+    
+    for attempt in range(max_attempts):
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config=config,
+                request_options={'timeout': CHAT_API_TIMEOUT}
+            )
+            return response
+            
+        except Exception as e:
+            last_error = e
+            error_msg = str(e)
+            
+            # Không retry cho auth errors
+            if "401" in error_msg or "403" in error_msg or "API key" in error_msg:
+                raise
+            
+            # Retry với exponential backoff
+            if attempt < max_attempts - 1:
+                wait_time = CHAT_RETRY_DELAY * (2 ** attempt)  # 2, 4, 8 seconds
+                app.logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {error_msg[:100]}")
+                time.sleep(wait_time)
+            else:
+                app.logger.error(f"All {max_attempts} attempts failed")
+    
+    raise last_error
+
 
 def get_gemini_response(user_question: str) -> str:
     """Gọi API Gemini để trả lời câu hỏi về cà chua.
@@ -660,12 +825,40 @@ def get_gemini_response(user_question: str) -> str:
     Returns:
         Câu trả lời từ Gemini hoặc thông báo lỗi
     """
-    if not GEMINI_MODEL:
-        return "Hệ thống chatbot chưa được cấu hình. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+    global LAST_WORKING_MODEL
     
-    try:
-        # Tạo prompt tự nhiên, yêu cầu câu trả lời hoàn chỉnh
-        system_prompt = """Bạn là chuyên gia cà chua. Trả lời HOÀN CHỈNH, TỰ NHIÊN bằng tiếng Việt.
+    if not GEMINI_API_KEY:
+        return "⚠️ Hệ thống chatbot chưa được cấu hình. Vui lòng liên hệ quản trị viên."
+    
+    if not GEMINI_MODEL:
+        return "⚠️ Không thể khởi tạo model AI. Vui lòng liên hệ quản trị viên."
+    
+    # Check FAQ first (nhanh và không tốn quota)
+    faq_answer = check_faq_response(user_question)
+    if faq_answer:
+        app.logger.info("✓ Answer from FAQ")
+        return faq_answer
+    
+    # Check cache
+    cached = get_cached_response(user_question)
+    if cached:
+        app.logger.info("✓ Answer from cache")
+        return cached
+    
+    # Danh sách model để thử (ưu tiên model đã thành công)
+    model_names = [
+        'models/gemini-flash-latest',
+        'models/gemini-2.5-flash',
+        'models/gemini-2.0-flash',
+    ]
+    
+    # Đưa last working model lên đầu
+    if LAST_WORKING_MODEL and LAST_WORKING_MODEL in model_names:
+        model_names.remove(LAST_WORKING_MODEL)
+        model_names.insert(0, LAST_WORKING_MODEL)
+    
+    # Tạo prompt
+    system_prompt = """Bạn là chuyên gia cà chua. Trả lời HOÀN CHỈNH, TỰ NHIÊN bằng tiếng Việt.
 
 Nếu hỏi về cà chua: Giải thích rõ ràng, cụ thể, đầy đủ (3-5 câu).
 Nếu KHÔNG về cà chua: "Xin lỗi, tôi chỉ trả lời về cà chua."
@@ -675,65 +868,86 @@ QUAN TRỌNG:
 - Dùng ngôn ngữ đời thường, dễ hiểu
 - Đi thẳng vào nội dung
 - Kết thúc câu trả lời một cách hoàn chỉnh"""
-        
-        # Gọi API Gemini với cấu hình tối ưu
-        full_prompt = f"{system_prompt}\n\nCâu hỏi: {user_question}\n\nTrả lời:"
-        response = GEMINI_MODEL.generate_content(
-            full_prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=800,  # Tăng lên 800 để đảm bảo đủ cho câu trả lời hoàn chỉnh
-                top_p=0.9,
-                candidate_count=1,  # Chỉ lấy 1 candidate để tránh nhầm lẫn
+    
+    full_prompt = f"{system_prompt}\n\nCâu hỏi: {user_question}\n\nTrả lời:"
+    
+    # Thử từng model với retry logic
+    last_error = None
+    for model_name in model_names:
+        try:
+            app.logger.info(f"Trying model: {model_name}")
+            model = genai.GenerativeModel(model_name)
+            
+            # Gọi API với retry
+            response = call_gemini_with_retry(
+                model,
+                full_prompt,
+                genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=CHAT_MAX_TOKENS,
+                    top_p=0.9,
+                    candidate_count=1,
+                ),
+                max_attempts=CHAT_RETRY_ATTEMPTS
             )
-        )
-        
-        if response and response.candidates:
-            candidate = response.candidates[0]
             
-            # Kiểm tra lý do kết thúc để phát hiện câu trả lời bị cắt
-            finish_reason = candidate.finish_reason
-            app.logger.info(f"Gemini finish_reason: {finish_reason}")
+            if response and response.candidates:
+                candidate = response.candidates[0]
+                finish_reason = candidate.finish_reason
+                
+                # Lấy text từ response
+                answer = None
+                if hasattr(response, 'text') and response.text:
+                    answer = response.text.strip()
+                elif candidate.content and candidate.content.parts:
+                    answer = ''.join(part.text for part in candidate.content.parts if hasattr(part, 'text')).strip()
+                
+                if answer and len(answer) >= CHAT_MIN_ANSWER_LENGTH:
+                    app.logger.info(f"✓ Success with {model_name} (finish: {finish_reason})")
+                    LAST_WORKING_MODEL = model_name
+                    # Cache response
+                    cache_response(user_question, answer)
+                    return answer
+                else:
+                    app.logger.warning(f"Response too short from {model_name}: {len(answer) if answer else 0} chars")
             
-            # finish_reason có thể là: STOP (hoàn thành), MAX_TOKENS (bị cắt), SAFETY, OTHER
-            if finish_reason and finish_reason.name != 'STOP':
-                app.logger.warning(f"Response may be truncated. Finish reason: {finish_reason.name}")
-                if finish_reason.name == 'MAX_TOKENS':
-                    # Nếu bị cắt do MAX_TOKENS, gọi lại với token cao hơn
-                    app.logger.info("Retrying with higher token limit...")
-                    response = GEMINI_MODEL.generate_content(
-                        full_prompt,
-                        generation_config=genai.types.GenerationConfig(
-                            temperature=0.7,
-                            max_output_tokens=1500,
-                            top_p=0.9,
-                            candidate_count=1,
-                        )
-                    )
+        except Exception as e:
+            error_msg = str(e)
+            app.logger.warning(f"{model_name} failed: {error_msg[:100]}")
+            last_error = error_msg
             
-            if response and response.text:
-                answer = response.text.strip()
-                # Kiểm tra xem câu trả lời có bị cắt giữa chừng không
-                if len(answer) < 20:
-                    app.logger.warning(f"Response too short: {answer}")
-                    return "Câu trả lời chưa đầy đủ. Vui lòng hỏi lại câu hỏi của bạn."
-                return answer
-        
-        app.logger.warning(f"Gemini response empty or blocked. Response: {response}")
-        return "Xin lỗi, tôi không thể tạo câu trả lời lúc này. Vui lòng thử lại."
+            # Auth errors - dừng ngay
+            if "401" in error_msg or "403" in error_msg or "API key" in error_msg:
+                return "🔒 API key không hợp lệ. Vui lòng liên hệ quản trị viên."
             
-    except Exception as e:
-        error_msg = str(e)
-        app.logger.error(f"Lỗi khi gọi Gemini API: {error_msg}", exc_info=True)
-        
-        # Xử lý các lỗi cụ thể
-        if "429" in error_msg or "quota" in error_msg.lower():
-            return ("⚠️ Hệ thống chatbot tạm thời quá tải (đã hết quota miễn phí trong ngày). "
-                   "Vui lòng thử lại sau hoặc liên hệ quản trị viên để nâng cấp API key.")
-        elif "401" in error_msg or "API key" in error_msg:
-            return "🔒 API key không hợp lệ. Vui lòng liên hệ quản trị viên."
-        else:
-            return "Đã xảy ra lỗi khi xử lý câu hỏi của bạn. Vui lòng thử lại sau."
+            # Quota errors - thử model khác
+            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
+                continue
+            
+            # Timeout errors
+            if "timeout" in error_msg.lower():
+                continue
+            
+            # Các lỗi khác - thử model tiếp theo
+            continue
+    
+    # Tất cả model đều thất bại - fallback FAQ
+    app.logger.error(f"All models failed. Last error: {last_error}")
+    
+    # Thử tìm FAQ gần đúng
+    faq_fuzzy = check_faq_response(user_question)
+    if faq_fuzzy:
+        return faq_fuzzy + "\n\n(Lưu ý: Hệ thống AI tạm thời không khả dụng, câu trả lời trên từ FAQ)"
+    
+    # Error messages
+    if last_error:
+        if "429" in last_error or "quota" in last_error.lower() or "RESOURCE_EXHAUSTED" in last_error:
+            return ("⚠️ Hệ thống chatbot tạm thời quá tải (đã hết quota miễn phí). "
+                   "Vui lòng thử lại sau hoặc liên hệ quản trị viên.")
+        elif "timeout" in last_error.lower():
+            return "⚠️ Hệ thống phản hồi quá chậm. Vui lòng thử lại với câu hỏi ngắn gọn hơn."
+    
+    return "⚠️ Không thể kết nối với chatbot. Vui lòng thử lại sau hoặc tham khảo mục Giới thiệu."
 
 # Hàm giả để xử lý lỗi "Could not locate function '_input_preprocess_layer'"
 # Lỗi này xảy ra khi model được lưu có chứa custom object (ví dụ: Lambda layer)
@@ -1870,36 +2084,90 @@ def chat():
 @app.route('/api/chat', methods=['POST'])
 def api_chat():
     """Chatbot sử dụng Gemini API để trả lời câu hỏi về cà chua."""
+    start_time = time.time()
+    user_ip = request.remote_addr or 'unknown'
+    session_id = session.get('id', 'no-session')
+    
+    # Rate limiting
+    current_time = time.time()
+    CHAT_RATE_LIMITER[user_ip] = [
+        ts for ts in CHAT_RATE_LIMITER[user_ip] 
+        if current_time - ts < 60  # Chỉ giữ timestamps trong 1 phút
+    ]
+    
+    if len(CHAT_RATE_LIMITER[user_ip]) >= CHAT_RATE_LIMIT_PER_MINUTE:
+        app.logger.warning(f"Rate limit exceeded for IP: {user_ip}")
+        return {
+            "answer": "⚠️ Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.",
+            "error": "rate_limit"
+        }, 429
+    
+    CHAT_RATE_LIMITER[user_ip].append(current_time)
+    
+    # Parse request
     try:
         data = request.get_json(force=True)
         user_q_raw = (data.get('q') or '').strip()
-    except Exception:
+    except Exception as e:
+        app.logger.error(f"Failed to parse chat request: {e}")
         return {"answer": "Không nhận được câu hỏi."}
 
+    # Input validation
     if not user_q_raw:
         return {"answer": "Vui lòng nhập câu hỏi."}
-
-    # Gọi Gemini API để lấy câu trả lời
-    app.logger.info(f"Chatbot received question: '{user_q_raw}'")
-    answer = get_gemini_response(user_q_raw)
-    app.logger.info(f"Gemini response generated successfully")
-
-    # Ghi log
-    try:
-        logs_dir = BASE_DIR / 'data'
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        log_file = logs_dir / 'chat_logs.jsonl'
-        entry = {
-            'ts': datetime.utcnow().isoformat(),
-            'question': user_q_raw,
-            'answer': answer
+    
+    if len(user_q_raw) > CHAT_MAX_QUESTION_LENGTH:
+        return {
+            "answer": f"⚠️ Câu hỏi quá dài. Vui lòng giới hạn trong {CHAT_MAX_QUESTION_LENGTH} ký tự.",
+            "error": "question_too_long"
         }
-        with open(log_file, 'a', encoding='utf-8') as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + '\n')
-    except Exception:
-        app.logger.exception('Không thể ghi log chat')
+    
+    # Sanitize input (remove excessive whitespace)
+    user_q_clean = ' '.join(user_q_raw.split())
 
-    return {"answer": answer}
+    # Log request
+    app.logger.info(f"[CHAT] IP={user_ip} Session={session_id} Q='{user_q_clean[:100]}...'")
+    
+    # Get response
+    try:
+        answer = get_gemini_response(user_q_clean)
+        response_time = time.time() - start_time
+        tokens_used = estimate_tokens(answer)
+        
+        app.logger.info(f"[CHAT] Response generated in {response_time:.2f}s (~{tokens_used} tokens)")
+        
+        # Rich logging
+        try:
+            logs_dir = BASE_DIR / 'data'
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            log_file = logs_dir / 'chat_logs.jsonl'
+            
+            entry = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'question': user_q_clean,
+                'answer': answer,
+                'user_ip': user_ip,
+                'session_id': session_id,
+                'response_time_ms': int(response_time * 1000),
+                'tokens_estimated': tokens_used,
+                'model_used': LAST_WORKING_MODEL or 'unknown',
+                'cached': 'FAQ' in answer or 'cache' in answer.lower()
+            }
+            
+            with open(log_file, 'a', encoding='utf-8') as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                
+        except Exception as e:
+            app.logger.exception(f'Không thể ghi log chat: {e}')
+        
+        return {"answer": answer}
+        
+    except Exception as e:
+        app.logger.exception(f"Error in api_chat: {e}")
+        return {
+            "answer": "⚠️ Đã xảy ra lỗi. Vui lòng thử lại sau.",
+            "error": "internal_error"
+        }, 500
 
 # ============= PREDICTION HELPER FUNCTIONS =============
 
@@ -1944,8 +2212,8 @@ def validate_request_parameters(request):
                 user_message="Bạn chưa chọn file."
             )
         
-        model_name = request.form.get('model_select')
-        pipeline_key = request.form.get('pipeline_select')
+        model_name = request.form.get('model')
+        pipeline_key = request.form.get('pipeline')
         
         if model_name is None or pipeline_key is None:
             app.logger.warning(
@@ -2865,6 +3133,284 @@ def api_clear_cache():
     except Exception as e:
         app.logger.exception("Error clearing cache")
         return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== COMPUTER VISION ENHANCEMENT ENDPOINTS ====================
+
+# Grad-CAM feature temporarily disabled due to model compatibility issues
+# @app.route('/api/gradcam', methods=['POST'])
+# def api_gradcam():
+#     """Generate Grad-CAM heatmap for disease localization."""
+#     try:
+#         # Check if file is uploaded or if we should use image_path
+#         if 'file' in request.files:
+#             file = request.files['file']
+#             raw_bytes = file.read()
+#             arr = np.frombuffer(raw_bytes, np.uint8)
+#             img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+#         elif 'image_path' in request.form:
+#             # Read from saved image path
+#             image_path = request.form.get('image_path')
+#             full_path = BASE_DIR / image_path.lstrip('/')
+#             if not full_path.exists():
+#                 return {'ok': False, 'error': f'Image file not found: {image_path}'}, 404
+#             img_bgr = cv2.imread(str(full_path))
+#         else:
+#             return {'ok': False, 'error': 'No file uploaded or image_path provided'}, 400
+#         
+#         if img_bgr is None:
+#             return {'ok': False, 'error': 'Invalid image file'}, 400
+#         
+#         model_name = request.form.get('model', DEFAULT_MODEL)
+#         pipeline_key = request.form.get('pipeline', DEFAULT_PIPELINE)
+#         
+#         # Load model
+#         model, model_class_names = load_model_by_name(model_name, pipeline_key)
+#         
+#         # Preprocess image
+#         pipeline_fn = PIPELINES[pipeline_key][0]  # Extract function from tuple
+#         img_processed = pipeline_fn(img_bgr)
+#         img_processed = cv2.resize(img_processed, (224, 224))
+#         img_array = np.expand_dims(img_processed.astype('float32'), axis=0)  # Already normalized by pipeline
+#         
+#         # Get prediction
+#         preds = model.predict(img_array, verbose=0)
+#         pred_class_idx = int(np.argmax(preds[0]))
+#         confidence = float(preds[0][pred_class_idx])
+#         pred_class = model_class_names[pred_class_idx]
+#         
+#         # Generate Grad-CAM
+#         from utils import generate_gradcam, overlay_heatmap_on_image
+#         heatmap = generate_gradcam(model, img_array, pred_class_idx)
+#         
+#         if heatmap is None:
+#             return {'ok': False, 'error': 'Failed to generate Grad-CAM'}, 500
+#         
+#         # Overlay heatmap on original image
+#         overlayed = overlay_heatmap_on_image(img_bgr, heatmap)
+#         
+#         # Encode to base64
+#         import base64
+#         _, buffer = cv2.imencode('.jpg', overlayed)
+#         img_base64 = base64.b64encode(buffer).decode('utf-8')
+#         
+#         return {
+#             'ok': True,
+#             'prediction': {
+#                 'class': pred_class,
+#                 'confidence': confidence,
+#                 'model': model_name,
+#                 'pipeline': pipeline_key
+#             },
+#             'heatmap_image': f'data:image/jpeg;base64,{img_base64}'
+#         }
+#         
+#     except Exception as e:
+#         app.logger.exception("Error generating Grad-CAM")
+#         return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/enhance_image', methods=['POST'])
+def api_enhance_image():
+    """Enhance image quality before prediction."""
+    try:
+        if 'file' not in request.files:
+            return {'ok': False, 'error': 'No file uploaded'}, 400
+        
+        file = request.files['file']
+        denoise = request.form.get('denoise', 'true').lower() == 'true'
+        sharpen = request.form.get('sharpen', 'true').lower() == 'true'
+        adjust_brightness = request.form.get('adjust_brightness', 'true').lower() == 'true'
+        
+        # Read image
+        raw_bytes = file.read()
+        arr = np.frombuffer(raw_bytes, np.uint8)
+        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        
+        if img_bgr is None:
+            return {'ok': False, 'error': 'Invalid image file'}, 400
+        
+        # Enhance image
+        from utils import enhance_image_quality
+        enhanced = enhance_image_quality(img_bgr, denoise, sharpen, adjust_brightness)
+        
+        # Encode to base64
+        import base64
+        _, buffer = cv2.imencode('.jpg', enhanced)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return {
+            'ok': True,
+            'enhanced_image': f'data:image/jpeg;base64,{img_base64}',
+            'enhancements': {
+                'denoise': denoise,
+                'sharpen': sharpen,
+                'adjust_brightness': adjust_brightness
+            }
+        }
+        
+    except Exception as e:
+        app.logger.exception("Error enhancing image")
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/check_quality', methods=['POST'])
+def api_check_quality():
+    """Check image quality before prediction."""
+    try:
+        if 'file' not in request.files:
+            return {'ok': False, 'error': 'No file uploaded'}, 400
+        
+        file = request.files['file']
+        
+        # Read image
+        raw_bytes = file.read()
+        arr = np.frombuffer(raw_bytes, np.uint8)
+        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        
+        if img_bgr is None:
+            return {'ok': False, 'error': 'Invalid image file'}, 400
+        
+        # Check quality
+        from utils import check_image_quality
+        is_good, quality_score, issues = check_image_quality(img_bgr)
+        
+        return {
+            'ok': True,
+            'quality': {
+                'is_good': is_good,
+                'score': round(quality_score, 1),
+                'issues': issues,
+                'recommendation': 'Image quality is good' if is_good else 'Please use a clearer image'
+            },
+            'image_info': {
+                'width': img_bgr.shape[1],
+                'height': img_bgr.shape[0],
+                'size_kb': len(raw_bytes) / 1024
+            }
+        }
+        
+    except Exception as e:
+        app.logger.exception("Error checking image quality")
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/detect_leaf', methods=['POST'])
+def api_detect_leaf():
+    """Detect and extract leaf region from image."""
+    try:
+        if 'file' not in request.files:
+            return {'ok': False, 'error': 'No file uploaded'}, 400
+        
+        file = request.files['file']
+        
+        # Read image
+        raw_bytes = file.read()
+        arr = np.frombuffer(raw_bytes, np.uint8)
+        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        
+        if img_bgr is None:
+            return {'ok': False, 'error': 'Invalid image file'}, 400
+        
+        # Detect leaf
+        from utils import detect_leaf_region
+        mask, bbox, leaf_img = detect_leaf_region(img_bgr)
+        
+        if bbox is None:
+            return {
+                'ok': True,
+                'leaf_detected': False,
+                'message': 'No leaf region detected'
+            }
+        
+        # Draw bounding box on original image
+        x, y, w, h = bbox
+        img_with_bbox = img_bgr.copy()
+        cv2.rectangle(img_with_bbox, (x, y), (x + w, y + h), (0, 255, 0), 3)
+        
+        # Encode images to base64
+        import base64
+        _, buffer_bbox = cv2.imencode('.jpg', img_with_bbox)
+        _, buffer_leaf = cv2.imencode('.jpg', leaf_img)
+        
+        img_bbox_base64 = base64.b64encode(buffer_bbox).decode('utf-8')
+        img_leaf_base64 = base64.b64encode(buffer_leaf).decode('utf-8')
+        
+        return {
+            'ok': True,
+            'leaf_detected': True,
+            'bbox': {'x': int(x), 'y': int(y), 'width': int(w), 'height': int(h)},
+            'image_with_bbox': f'data:image/jpeg;base64,{img_bbox_base64}',
+            'leaf_image': f'data:image/jpeg;base64,{img_leaf_base64}'
+        }
+        
+    except Exception as e:
+        app.logger.exception("Error detecting leaf")
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/webcam')
+def webcam():
+    """Real-time webcam disease detection page."""
+    return render_template('webcam.html', 
+                         models=MODELS, 
+                         pipelines=PIPELINES.keys(),
+                         default_model=DEFAULT_MODEL,
+                         default_pipeline=DEFAULT_PIPELINE)
+
+
+@app.route('/api/webcam_predict', methods=['POST'])
+def api_webcam_predict():
+    """Real-time prediction endpoint for webcam frames."""
+    try:
+        # Get base64 image from request
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return {'ok': False, 'error': 'No image data'}, 400
+        
+        import base64
+        img_base64 = data['image'].split(',')[1] if ',' in data['image'] else data['image']
+        img_bytes = base64.b64decode(img_base64)
+        
+        arr = np.frombuffer(img_bytes, np.uint8)
+        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        
+        if img_bgr is None:
+            return {'ok': False, 'error': 'Invalid image'}, 400
+        
+        model_name = data.get('model', DEFAULT_MODEL)
+        pipeline_key = data.get('pipeline', DEFAULT_PIPELINE)
+        
+        # Load model
+        model, model_class_names = load_model_by_name(model_name, pipeline_key)
+        
+        # Preprocess and predict
+        pipeline_fn = PIPELINES[pipeline_key][0]  # Extract function from tuple
+        img_processed = pipeline_fn(img_bgr)
+        img_processed = cv2.resize(img_processed, (224, 224))
+        img_array = np.expand_dims(img_processed.astype('float32'), axis=0)  # Already normalized by pipeline
+        
+        preds = model.predict(img_array, verbose=0)
+        pred_class_idx = int(np.argmax(preds[0]))
+        confidence = float(preds[0][pred_class_idx])
+        pred_class = model_class_names[pred_class_idx]
+        
+        # Get all class probabilities
+        all_probs = {model_class_names[i]: float(preds[0][i]) for i in range(len(model_class_names))}
+        
+        return {
+            'ok': True,
+            'prediction': {
+                'class': pred_class,
+                'confidence': confidence,
+                'all_probabilities': all_probs
+            }
+        }
+        
+    except Exception as e:
+        app.logger.exception("Error in webcam prediction")
+        return {'ok': False, 'error': str(e)}, 500
+
 
 @app.route('/debug_preprocess', methods=['POST'])
 def debug_preprocess():

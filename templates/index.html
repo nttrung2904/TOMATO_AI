@@ -54,6 +54,11 @@
               <button type="button" id="remove-file-btn" class="btn small danger" style="margin-left:8px;">Xóa</button>
             </div>
             
+            <!-- Image Preview Container for Single Image -->
+            <div id="single-preview-container" class="image-preview-container">
+              <img id="single-preview-img" class="single-preview" src="" alt="Preview">
+            </div>
+            
             <!-- Phần chọn model và pipeline -->
             <div style="margin-top:12px;display:flex;gap:12px;">
               <div style="flex:1">
@@ -136,9 +141,16 @@
             </div>
           </form>
 
-          <div id="loading" style="display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;">
-            <div class="spinner"></div>
-            <p style="margin-top:10px; font-size:1.2em; color:var(--tomato-700);">Xin vui lòng chờ trong giây lát...</p>
+          <!-- Enhanced Loading Overlay -->
+          <div id="loading" class="loading-overlay-enhanced">
+            <div class="loading-content">
+              <div class="loading-spinner-large"></div>
+              <div class="loading-text" id="loading-text">Đang xử lý...</div>
+              <div class="loading-subtext" id="loading-subtext">Vui lòng chờ trong giây lát</div>
+              <div class="loading-progress-bar" id="loading-progress-bar" style="display: none;">
+                <div class="loading-progress-fill" id="loading-progress-fill" style="width: 0%"></div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -243,9 +255,36 @@
     function onFileChange(e){
       const file = e.target.files && e.target.files.length ? e.target.files[0] : null;
       handleFile(file);
+      
+      // Show image preview
+      if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        const previewContainer = document.getElementById('single-preview-container');
+        const previewImg = document.getElementById('single-preview-img');
+        
+        reader.onload = function(e) {
+          previewImg.src = e.target.result;
+          previewContainer.classList.add('active');
+        };
+        
+        reader.readAsDataURL(file);
+      }
     }
 
-    removeBtn.addEventListener('click', resetFile);
+    removeBtn.addEventListener('click', () => {
+      resetFile();
+      // Hide preview
+      document.getElementById('single-preview-container').classList.remove('active');
+    });
+
+    // Click on drop area to trigger file input
+    fileDropArea.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    batchDropArea.addEventListener('click', () => {
+      batchFilesInput.click();
+    });
 
     // Batch file handling
     function onBatchFileChange(e) {
@@ -270,14 +309,34 @@
         
         files.forEach((file, idx) => {
             const imgContainer = document.createElement('div');
-            imgContainer.style.cssText = 'position:relative;aspect-ratio:1;';
+            imgContainer.className = 'preview-item';
             
             const img = document.createElement('img');
             img.src = URL.createObjectURL(file);
-            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:4px;';
             img.title = file.name;
+            img.alt = `Preview ${idx + 1}`;
+            
+            // Add remove button for individual images
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'preview-item-remove';
+            removeBtn.innerHTML = '×';
+            removeBtn.title = 'Remove image';
+            removeBtn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              imgContainer.remove();
+              
+              // Update count
+              const remainingCount = batchPreviewList.children.length;
+              batchCount.textContent = remainingCount;
+              
+              if (remainingCount === 0) {
+                resetBatchFiles();
+              }
+            };
             
             imgContainer.appendChild(img);
+            imgContainer.appendChild(removeBtn);
             batchPreviewList.appendChild(imgContainer);
         });
         
@@ -335,16 +394,46 @@
         const singleForm = document.getElementById('upload-form');
         const batchForm = document.getElementById('batch-form');
         const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const loadingSubtext = document.getElementById('loading-subtext');
+        const progressBar = document.getElementById('loading-progress-bar');
+        const progressFill = document.getElementById('loading-progress-fill');
         const predictBtn = document.getElementById('predict-btn');
         const batchPredictBtn = document.getElementById('batch-predict-btn');
 
+        // Enhanced loading animation
+        function showLoading(type = 'single') {
+            loading.classList.add('active');
+            
+            if (type === 'batch') {
+                loadingText.textContent = 'Đang xử lý nhiều ảnh...';
+                loadingSubtext.textContent = 'Có thể mất vài phút';
+                progressBar.style.display = 'block';
+                
+                // Simulate progress for batch
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress >= 90) {
+                        clearInterval(interval);
+                        progress = 90;
+                    }
+                    progressFill.style.width = progress + '%';
+                }, 500);
+            } else {
+                loadingText.textContent = 'Đang phân tích ảnh...';
+                loadingSubtext.textContent = 'AI đang nhận diện bệnh';
+                progressBar.style.display = 'none';
+            }
+        }
+
         singleForm.addEventListener('submit', function() {
-            loading.style.display = 'flex';
+            showLoading('single');
             predictBtn.disabled = true;
         });
 
         batchForm.addEventListener('submit', function() {
-            loading.style.display = 'flex';
+            showLoading('batch');
             batchPredictBtn.disabled = true;
         });
     });

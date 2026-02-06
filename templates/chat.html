@@ -22,65 +22,204 @@
     background-color: #f9fafb;
     min-height: 400px;
     max-height: 60vh;
+    scroll-behavior: smooth;
   }
 
   .message {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     margin-bottom: 15px;
-    max-width: 85%;
+    max-width: 70%;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    margin: 0 10px;
+    margin-right: 10px;
     flex-shrink: 0;
   }
 
-  .message-content {
+  .content {
     padding: 10px 15px;
     border-radius: 18px;
-    line-height: 1.5;
+    line-height: 1.6;
+    position: relative;
+    word-wrap: break-word;
   }
 
-  /* Bot messages */
-  .bot-msg {
-    align-self: flex-start;
-    margin-right: auto;
+  /* Markdown styling */
+  .content strong {
+    font-weight: 600;
   }
-  .bot-msg .message-content {
+  .content em {
+    font-style: italic;
+  }
+  .content code {
+    background-color: rgba(0,0,0,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+  .content ul, .content ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .content li {
+    margin: 4px 0;
+  }
+
+  /* Timestamp */
+  .message-timestamp {
+    font-size: 0.75em;
+    color: #8e8e93;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Bot messages - left side, default color */
+  .message.bot {
+    align-self: flex-start;
+  }
+  .message.bot .content {
     background-color: #e9e9eb;
     color: #1c1c1e;
     border-bottom-left-radius: 4px;
   }
 
-  /* User messages */
-  .user-msg {
+  /* User messages - right side, blue color */
+  .message.user {
     align-self: flex-end;
     flex-direction: row-reverse;
-    /* push the whole message container to the right */
     margin-left: auto;
   }
-  .user-msg .message-content {
-    background-color: #107bedff; /* Màu xanh dương cho tin nhắn người dùng */
-    color: white; /* Đổi màu chữ thành trắng */
-    border-bottom-right-radius: 4px;
-    text-align: right; /* căn phải nội dung tin nhắn */
+  .message.user .avatar {
+    margin-left: 10px;
+    margin-right: 0;
   }
-  .user-msg .avatar {
-    background-color: #107bedff; /* A light blue background for user avatar */
+  .message.user .content {
+    background-color: #007aff;
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  /* Copy button */
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .message.bot:hover .copy-btn {
+    opacity: 1;
+  }
+  .copy-btn:hover {
+    background: rgba(255,255,255,1);
+  }
+  .copy-btn.copied {
+    background: #4caf50;
+    color: white;
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+  }
+  .typing-indicator span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #8e8e93;
+    margin: 0 3px;
+    animation: typingBounce 1.4s infinite;
+  }
+  .typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes typingBounce {
+    0%, 60%, 100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-10px);
+    }
   }
 
   #chat-input-area {
     display: flex;
     padding: 12px;
+    gap: 8px;
     border-top: 1px solid #e0e0e0;
     background-color: #ffffffff;
   }
 
-
+  /* Voice and action buttons */
+  .voice-btn, .speaker-btn {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+  }
+  
+  .voice-btn:hover, .speaker-btn:hover {
+    background-color: #f0f0f0;
+    border-color: #007aff;
+  }
+  
+  .voice-btn.recording {
+    background-color: #ff3b30;
+    border-color: #ff3b30;
+    color: white;
+    animation: pulse 1.5s infinite;
+  }
+  
+  .speaker-btn.speaking {
+    background-color: #34c759;
+    border-color: #34c759;
+    color: white;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.8;
+    }
+  }
 
   .suggestion-bubbles {
     padding: 10px 20px;
@@ -141,9 +280,26 @@
     }
   }
   
-  @media (max-width: 640px) {
-    .chat-container { margin: 12px; }
-    .btn-export { padding: 7px 10px; font-size: 0.9em; }
+  /* Mobile optimization */
+  @media (max-width: 768px) {
+    .chat-container { 
+      margin: 12px; 
+      max-height: calc(100vh - 100px);
+    }
+    #chat-window {
+      max-height: calc(100vh - 250px);
+      padding: 15px;
+    }
+    .message {
+      max-width: 90%;
+    }
+    .suggestion-bubble {
+      font-size: 0.85em;
+      padding: 5px 10px;
+    }
+    #chat-input {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
   }
 </style>
 
@@ -155,14 +311,18 @@
         <!-- Tin nhắn sẽ được thêm vào đây bằng JavaScript -->
       </div>
 
-      <div class="suggestion-bubbles">
+      <div class="suggestion-bubbles" id="suggestion-bubbles">
         <div class="suggestion-bubble" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Triệu chứng bệnh sớm?</div>
         <div class="suggestion-bubble" onclick="askSuggestion('Cách phòng ngừa virus xoắn lá?')">Phòng ngừa virus xoắn lá?</div>
         <div class="suggestion-bubble" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Lá khỏe mạnh?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Sâu bệnh thường gặp?')">Sâu bệnh thường gặp?</div>
+        <div class="suggestion-bubble" onclick="askSuggestion('Cách bón phân cho cà chua?')">Cách bón phân?</div>
       </div>
 
       <div id="chat-input-area">
-        <input id="chat-input" type="text" placeholder="Nhập câu hỏi (ví dụ: 'Triệu chứng Tomato_Early_blight là gì?')" style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
+        <button id="voice-btn" class="voice-btn" title="Nhấn để nói (hoặc giữ phím Space)">🎤</button>
+        <input id="chat-input" type="text" placeholder="Nhập câu hỏi hoặc nhấn 🎤 để nói..." style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
+        <button id="speaker-btn" class="speaker-btn" title="Bật/tắt đọc câu trả lời">🔊</button>
         <button id="chat-send" class="btn">Gửi</button>
       </div>
     </div>
@@ -170,86 +330,515 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Marked.js for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
 <script>
   const chatWindow = document.getElementById('chat-window');
   const input = document.getElementById('chat-input');
   const btn = document.getElementById('chat-send');
+  const voiceBtn = document.getElementById('voice-btn');
+  const speakerBtn = document.getElementById('speaker-btn');
 
   const BOT_AVATAR = "{{ url_for('static', filename='images/bot.png') }}";
   const USER_AVATAR = "{{ url_for('static', filename='images/avatar.jpg') }}";
 
-  function append(msg, who='user', isTyping=false){
+  // Voice recognition setup
+  let recognition = null;
+  let isRecording = false;
+  let autoSpeakEnabled = localStorage.getItem('autoSpeak') !== 'false'; // Default: enabled
+  let speechSynthesis = window.speechSynthesis;
+  let currentUtterance = null;
+
+  // Initialize speech recognition
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      input.value = transcript;
+      stopRecording();
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      stopRecording();
+      if (event.error === 'no-speech') {
+        showToast('Không nghe thấy giọng nói. Vui lòng thử lại.');
+      } else if (event.error === 'not-allowed') {
+        showToast('Vui lòng cho phép truy cập microphone.');
+      }
+    };
+
+    recognition.onend = () => {
+      stopRecording();
+    };
+  } else {
+    voiceBtn.style.display = 'none';
+    console.warn('Speech recognition not supported');
+  }
+
+  // Update speaker button appearance
+  function updateSpeakerButton() {
+    if (autoSpeakEnabled) {
+      speakerBtn.textContent = '🔊';
+      speakerBtn.title = 'Đang bật đọc tự động (nhấn để tắt)';
+      speakerBtn.classList.add('speaking');
+    } else {
+      speakerBtn.textContent = '🔇';
+      speakerBtn.title = 'Đang tắt đọc tự động (nhấn để bật)';
+      speakerBtn.classList.remove('speaking');
+    }
+  }
+  updateSpeakerButton();
+
+  // Toggle auto-speak
+  speakerBtn.addEventListener('click', () => {
+    autoSpeakEnabled = !autoSpeakEnabled;
+    localStorage.setItem('autoSpeak', autoSpeakEnabled);
+    updateSpeakerButton();
+    
+    // Stop current speech if disabling
+    if (!autoSpeakEnabled && currentUtterance) {
+      speechSynthesis.cancel();
+    }
+    
+    showToast(autoSpeakEnabled ? '✓ Đã bật đọc tự động' : '✗ Đã tắt đọc tự động');
+  });
+
+  // Start/stop recording
+  function startRecording() {
+    if (!recognition) return;
+    
+    isRecording = true;
+    voiceBtn.classList.add('recording');
+    voiceBtn.textContent = '⏹️';
+    voiceBtn.title = 'Đang nghe... (nhấn để dừng)';
+    
+    try {
+      recognition.start();
+      showToast('Đang nghe... Hãy nói câu hỏi của bạn');
+    } catch (e) {
+      console.error('Error starting recognition:', e);
+      stopRecording();
+    }
+  }
+
+  function stopRecording() {
+    if (!recognition || !isRecording) return;
+    
+    isRecording = false;
+    voiceBtn.classList.remove('recording');
+    voiceBtn.textContent = '🎤';
+    voiceBtn.title = 'Nhấn để nói (hoặc giữ phím Space)';
+    
+    try {
+      recognition.stop();
+    } catch (e) {
+      console.error('Error stopping recognition:', e);
+    }
+  }
+
+  voiceBtn.addEventListener('click', () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
+
+  // Keyboard shortcut: Hold Space to record
+  let spacePressed = false;
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spacePressed && document.activeElement !== input && !isRecording) {
+      spacePressed = true;
+      e.preventDefault();
+      startRecording();
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && spacePressed) {
+      spacePressed = false;
+      stopRecording();
+    }
+  });
+
+  // Text-to-speech function
+  function speakText(text) {
+    if (!autoSpeakEnabled || !speechSynthesis) return;
+    
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+    
+    // Remove markdown and special characters for cleaner speech
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/`/g, '')
+      .replace(/\n+/g, '. ');
+    
+    currentUtterance = new SpeechSynthesisUtterance(cleanText);
+    currentUtterance.lang = 'vi-VN';
+    currentUtterance.rate = 0.9;
+    currentUtterance.pitch = 1;
+    
+    // Find Vietnamese voice if available
+    const voices = speechSynthesis.getVoices();
+    const viVoice = voices.find(voice => voice.lang.startsWith('vi'));
+    if (viVoice) {
+      currentUtterance.voice = viVoice;
+    }
+    
+    speechSynthesis.speak(currentUtterance);
+  }
+
+  // Show toast notification
+  function showToast(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10000;
+      animation: slideIn 0.3s ease-out;
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease-out';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  // Check if marked is loaded, otherwise use fallback
+  const hasMarked = typeof marked !== 'undefined';
+  if (hasMarked) {
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+  }
+
+  /**
+   * Simple markdown parser fallback (if marked.js fails to load)
+   */
+  function simpleMarkdown(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+
+  /**
+   * Format timestamp to HH:MM
+   */
+  function formatTime() {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Create copy button for bot messages
+   */
+  function createCopyButton(text) {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.onclick = function() {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    };
+    return btn;
+  }
+
+  /**
+   * Append message to chat window
+   * @param {string} msg - Message text
+   * @param {string} who - 'user' or 'bot'
+   * @param {boolean} isTyping - Show typing indicator
+   * @returns {HTMLElement} Message element
+   */
+  function append(msg, who, isTyping = false) {
     const el = document.createElement('div');
-    el.classList.add('message', `${who}-msg`);
+    el.className = 'message ' + who;
 
     const avatar = document.createElement('img');
     avatar.className = 'avatar';
-
     const content = document.createElement('div');
-    content.className = 'message-content';
+    content.className = 'content';
 
-    if(who==='user'){
+    if(who === 'user') {
       avatar.src = USER_AVATAR;
       content.textContent = msg;
     } else {
       avatar.src = BOT_AVATAR;
       if(isTyping) {
-        // Tạo typing indicator với 3 dấu chấm nhấp nháy
+        // Typing indicator
         content.className = 'typing-indicator';
         for(let i = 0; i < 3; i++) {
           const dot = document.createElement('span');
           content.appendChild(dot);
         }
       } else {
-        // Sử dụng textContent để tránh XSS từ nội dung trả về. Nếu muốn cho phép
-        // một lượng HTML an toàn, hãy xử lý / sanitize phía server hoặc dùng thư viện
-        // như DOMPurify phía client.
-        content.textContent = msg;
+        // Render markdown for bot messages (with fallback)
+        try {
+          if (hasMarked && typeof marked !== 'undefined' && marked.parse) {
+            content.innerHTML = marked.parse(msg);
+          } else {
+            content.innerHTML = simpleMarkdown(msg);
+          }
+        } catch (e) {
+          console.error('Markdown rendering failed:', e);
+          content.innerHTML = simpleMarkdown(msg);
+        }
+        
+        // Add copy button
+        const copyBtn = createCopyButton(msg);
+        content.appendChild(copyBtn);
+        
+        // Add timestamp
+        const timestamp = document.createElement('span');
+        timestamp.className = 'message-timestamp';
+        timestamp.textContent = formatTime();
+        content.appendChild(timestamp);
       }
     }
 
     el.appendChild(avatar);
     el.appendChild(content);
     chatWindow.appendChild(el);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
+    
+    // Smooth scroll to bottom
+    smoothScrollToBottom();
     return el;
   }
 
+  /**
+   * Smooth scroll to bottom of chat
+   */
+  function smoothScrollToBottom() {
+    chatWindow.scrollTo({
+      top: chatWindow.scrollHeight,
+      behavior: 'smooth'
+    });
+  }
+
+  /**
+   * Send message and handle response
+   */
   async function send(){
     const q = input.value.trim();
     if(!q) return;
+    
+    // Disable input while processing
+    input.disabled = true;
+    btn.disabled = true;
+    
     append(q,'user');
     input.value = '';
-    // Phát hiện lời chào và trả lời ngay với câu trả lời có sẵn
+    
+    // Handle greetings locally
     if (isGreeting(q)) {
       const greetingReplies = [
-        'Chào bạn 👋 Hãy hỏi tôi về triệu chứng, nguyên nhân, khái niệm hoặc phòng ngừa.'
+        'Chào bạn! 👋 Tôi có thể giúp bạn:\n\n- **Triệu chứng** bệnh cà chua\n- **Nguyên nhân** và cách phòng tránh\n- **Chăm sóc** và thu hoạch\n\nHãy hỏi tôi nhé!'
       ];
       const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
-      append(reply, 'bot');
+      setTimeout(() => {
+        append(reply, 'bot');
+        updateDynamicSuggestions(['Triệu chứng bệnh cháy sớm?', 'Cách chăm sóc cà chua', 'Khi nào thu hoạch?']);
+        input.disabled = false;
+        btn.disabled = false;
+        input.focus();
+      }, 500);
       return;
     }
 
-    // For non-greeting: show a thinking indicator and ensure it's visible for at least 2s
+    // Show typing indicator
     const thinking = append('', 'bot', true);
 
-    const minimumDelay = sleep(2000); // 2 seconds minimum
-    const fetchPromise = fetch('{{ url_for('api_chat') }}', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q})
-    }).then(r => r.json()).catch(e => ({ error: true }));
+    try {
+      const startTime = Date.now();
+      const response = await fetch('{{ url_for('api_chat') }}', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({q})
+      });
 
-    const [data] = await Promise.all([fetchPromise, minimumDelay]).then(results => [results[0]]).catch(() => [{ error: true }]);
+      const data = await response.json();
+      const elapsed = Date.now() - startTime;
+      
+      // Ensure minimum display time for typing indicator
+      const minDelay = Math.max(0, 1500 - elapsed);
+      await sleep(minDelay);
 
-    // Xóa biểu tượng đang suy nghĩ
-    if (thinking) thinking.remove();
+      // Remove typing indicator
+      if (thinking) thinking.remove();
 
-    if (!data || data.error) {
-      append('Lỗi kết nối.', 'bot');
-    } else {
-      append(data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín hoặc hỏi ý kiến từ các chuyên gia.', 'bot');
+      if (!data || data.error) {
+        const errorMsg = data.error === 'rate_limit' 
+          ? '⚠️ Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.' 
+          : '⚠️ Lỗi kết nối. Vui lòng thử lại.';
+        append(errorMsg, 'bot');
+      } else {
+        const answer = data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín.';
+        append(answer, 'bot');
+        
+        // Speak the answer if auto-speak is enabled
+        speakText(answer);
+        
+        // Update dynamic suggestions based on answer
+        updateDynamicSuggestions(generateSuggestions(q, answer));
+      }
+    } catch (error) {
+      if (thinking) thinking.remove();
+      append('⚠️ Không thể kết nối với server. Vui lòng thử lại sau.', 'bot');
+    } finally {
+      input.disabled = false;
+      btn.disabled = false;
+      input.focus();
     }
   }
 
+  /**
+   * Generate dynamic suggestions based on context
+   */
+  function generateSuggestions(question, answer) {
+    const q = question.toLowerCase();
+    const a = answer.toLowerCase();
+    
+    // Detect disease mentions in answer
+    const diseases = ['early_blight', 'late_blight', 'septoria', 'yellow_curl', 'mosaic', 'target_spot', 
+                      'bệnh sớm', 'bệnh muộn', 'đốm lá', 'xoắn lá', 'khảm lá'];
+    const mentionedDisease = diseases.find(d => a.includes(d));
+    
+    // Context-aware suggestions
+    if (q.includes('triệu chứng') || q.includes('dấu hiệu')) {
+      return [
+        'Nguyên nhân gây bệnh này?',
+        'Cách điều trị và phòng ngừa?',
+        'Bệnh khác tương tự?',
+        'Thuốc trị bệnh nào hiệu quả?'
+      ];
+    } else if (q.includes('phòng') || q.includes('ngừa') || q.includes('tránh')) {
+      return [
+        'Thuốc trị bệnh gì?',
+        'Cách chăm sóc đúng?',
+        'Triệu chứng bệnh này?',
+        'Khi nào cần xử lý?'
+      ];
+    } else if (q.includes('thuốc') || q.includes('điều trị') || q.includes('xử lý')) {
+      return [
+        'Liều lượng phun bao nhiêu?',
+        'Cách phòng ngừa lâu dài?',
+        'Sử dụng thuốc bao lâu?',
+        'Có biện pháp tự nhiên không?'
+      ];
+    } else if (q.includes('bệnh')) {
+      if (mentionedDisease) {
+        return [
+          'Triệu chứng chi tiết?',
+          'Cách điều trị hiệu quả?',
+          'Phòng ngừa thế nào?',
+          'So sánh với bệnh khác?'
+        ];
+      }
+      return [
+        'Các loại bệnh thường gặp?',
+        'Triệu chứng từng bệnh?',
+        'Cách phân biệt các bệnh?',
+        'Bệnh nào nguy hiểm nhất?'
+      ];
+    } else if (q.includes('chăm sóc') || q.includes('trồng') || q.includes('thu hoạch')) {
+      return [
+        'Bón phân như thế nào?',
+        'Tưới nước ra sao?',
+        'Khi nào thu hoạch?',
+        'Cách tỉa cành đúng?'
+      ];
+    } else if (q.includes('phân') || q.includes('dinh dưỡng')) {
+      return [
+        'Loại phân nào tốt?',
+        'Tần suất bón phân?',
+        'Thiếu dinh dưỡng nhận biết sao?',
+        'Phân hữu cơ hay hóa học?'
+      ];
+    } else if (q.includes('tưới') || q.includes('nước')) {
+      return [
+        'Tưới bao nhiêu lít/ngày?',
+        'Thời điểm tưới tốt nhất?',
+        'Tưới quá nhiều có sao không?',
+        'Hệ thống tưới nhỏ giọt?'
+      ];
+    } else if (q.includes('sâu') || q.includes('rệp') || q.includes('sâu bệnh')) {
+      return [
+        'Cách diệt sâu tự nhiên?',
+        'Thuốc trừ sâu nào an toàn?',
+        'Nhận biết sâu hại?',
+        'Phòng ngừa sâu bệnh?'
+      ];
+    } else {
+      // Smart default based on common topics
+      return [
+        'Triệu chứng các bệnh lá?',
+        'Phòng ngừa bệnh hiệu quả?',
+        'Cách chăm sóc cà chua?',
+        'Khi nào cần phun thuốc?',
+        'Lá khỏe mạnh trông ra sao?'
+      ];
+    }
+  }
+
+  /**
+   * Update suggestion bubbles dynamically
+   */
+  function updateDynamicSuggestions(suggestions) {
+    const container = document.getElementById('suggestion-bubbles');
+    if (!container) return;
+    
+    // Animate out old suggestions
+    container.style.opacity = '0.5';
+    
+    setTimeout(() => {
+      container.innerHTML = '';
+      
+      // Limit to 5 suggestions
+      const limitedSuggestions = suggestions.slice(0, 5);
+      
+      limitedSuggestions.forEach(s => {
+        const bubble = document.createElement('div');
+        bubble.className = 'suggestion-bubble';
+        bubble.textContent = s;
+        bubble.onclick = () => askSuggestion(s);
+        container.appendChild(bubble);
+      });
+      
+      // Animate in new suggestions
+      container.style.opacity = '1';
+    }, 200);
+  }
+
+  /**
+   * Check if message is a greeting
+   */
   function isGreeting(text) {
     if (!text) return false;
     const t = text.trim().toLowerCase();
@@ -265,8 +854,16 @@
     return false;
   }
 
-  function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+  /**
+   * Sleep utility function
+   */
+  function sleep(ms){ 
+    return new Promise(resolve => setTimeout(resolve, ms)); 
+  }
 
+  /**
+   * Ask a suggestion question
+   */
   function askSuggestion(question) {
     const input = document.getElementById('chat-input');
     input.value = question;
@@ -276,9 +873,39 @@
   btn.addEventListener('click', send);
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
 
-  // Thêm tin nhắn chào mừng ban đầu
-  document.addEventListener('DOMContentLoaded', function() {
-    append('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua.', 'bot');
+  // Initialize chat with welcome message
+  window.addEventListener('DOMContentLoaded', function() {
+    console.log('Chat initialized');
+    setTimeout(() => {
+      append('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua. 🍅', 'bot');
+      speakText('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua.');
+    }, 100);
   });
+
+  // Add CSS animation for toast
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+  `;
+  document.head.appendChild(style);
 </script>
 {% endblock %}
