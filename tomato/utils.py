@@ -311,3 +311,222 @@ def detect_leaf_region(img_bgr):
     except Exception as e:
         logging.getLogger(__name__).exception("Error detecting leaf region: %s", e)
         return None, None, None
+
+
+# ==================== SEVERITY ASSESSMENT ====================
+
+def calculate_affected_area_from_heatmap(heatmap, threshold=0.5):
+    """
+    Calculate percentage of affected area from Grad-CAM heatmap.
+    
+    Args:
+        heatmap: Grad-CAM heatmap (height, width) with values in [0, 1]
+        threshold: Threshold for considering area as "affected" (default: 0.5)
+    
+    Returns:
+        affected_percentage: Percentage of area above threshold (0-100)
+        affected_pixels: Number of pixels above threshold
+        total_pixels: Total number of pixels
+    """
+    try:
+        if heatmap is None or heatmap.size == 0:
+            return 0.0, 0, 0
+        
+        # Count pixels above threshold (indicating disease presence)
+        affected_pixels = np.sum(heatmap >= threshold)
+        total_pixels = heatmap.size
+        
+        affected_percentage = (affected_pixels / total_pixels) * 100.0
+        
+        return affected_percentage, int(affected_pixels), int(total_pixels)
+        
+    except Exception as e:
+        logging.getLogger(__name__).exception("Error calculating affected area: %s", e)
+        return 0.0, 0, 0
+
+
+def assess_disease_severity(predicted_label, confidence, affected_area_pct, heatmap=None):
+    """
+    Assess disease severity based on multiple factors.
+    
+    Args:
+        predicted_label: Predicted disease class
+        confidence: Model confidence (0-1)
+        affected_area_pct: Percentage of affected area (0-100)
+        heatmap: Optional Grad-CAM heatmap for additional analysis
+    
+    Returns:
+        severity_dict: Dictionary containing:
+            - level: 'Healthy', 'Mild', 'Moderate', 'Severe', 'Critical'
+            - score: Numeric score (0-100)
+            - affected_area: Percentage of affected area
+            - confidence: Model confidence
+            - description: Human-readable description
+            - recommendations: List of recommended actions
+            - color: CSS color for visualization
+    """
+    try:
+        # Base severity score
+        severity_score = 0.0
+        
+        # Check if healthy
+        if predicted_label.lower() in ['healthy', 'tomato_healthy']:
+            return {
+                'level': 'Healthy',
+                'score': 0.0,
+                'affected_area': 0.0,
+                'confidence': confidence,
+                'description': 'Lá cà chua khỏe mạnh, không có dấu hiệu bệnh.',
+                'recommendations': [
+                    'Tiếp tục chăm sóc cây theo quy trình thông thường',
+                    'Giám sát định kỳ để phát hiện sớm bệnh',
+                    'Duy trì độ ẩm và dinh dưỡng đầy đủ'
+                ],
+                'color': '#4caf50',
+                'icon': '✅'
+            }
+        
+        # Disease-specific severity weights
+        disease_weights = {
+            'early_blight': 1.2,      # Moderate severity disease
+            'late_blight': 1.5,       # High severity - spreads rapidly
+            'leaf_mold': 1.0,         # Moderate severity
+            'septoria_leaf_spot': 1.1,
+            'spider_mites': 1.3,
+            'target_spot': 1.1,
+            'yellow_leaf_curl_virus': 1.4,
+            'mosaic_virus': 1.3,
+            'bacterial_spot': 1.2,
+        }
+        
+        # Get disease weight (default 1.0 for unknown diseases)
+        disease_key = predicted_label.lower().replace(' ', '_')
+        disease_weight = disease_weights.get(disease_key, 1.0)
+        
+        # Calculate severity score from affected area (0-40 points)
+        area_score = min(affected_area_pct * 0.4, 40)
+        
+        # Add confidence factor (0-30 points) - higher confidence = more reliable severe assessment
+        confidence_score = confidence * 30
+        
+        # Add disease type factor (0-30 points)
+        disease_score = disease_weight * 20
+        
+        # Total severity score (0-100)
+        severity_score = area_score + confidence_score + disease_score
+        
+        # Determine severity level
+        if severity_score < 20:
+            level = 'Mild'
+            color = '#ffc107'
+            icon = '⚠️'
+            description = 'Bệnh ở giai đoạn đầu, mức độ nhẹ.'
+            recommendations = [
+                'Loại bỏ lá bệnh để tránh lây lan',
+                'Theo dõi sát sao trong 5-7 ngày tới',
+                'Cải thiện thông gió và giảm độ ẩm',
+                'Xem xét sử dụng thuốc phòng bệnh sinh học'
+            ]
+        elif severity_score < 40:
+            level = 'Moderate'
+            color = '#ff9800'
+            icon = '⚠️'
+            description = 'Bệnh ở mức độ trung bình, cần xử lý sớm.'
+            recommendations = [
+                'Xử lý ngay bằng thuốc chuyên dụng phù hợp',
+                'Loại bỏ và tiêu hủy tất cả lá bệnh',
+                'Tăng cường thông gió cho cây',
+                'Tránh tưới nước vào buổi tối',
+                'Cách ly cây bệnh nếu có thể'
+            ]
+        elif severity_score < 60:
+            level = 'Severe'
+            color = '#f44336'
+            icon = '🔴'
+            description = 'Bệnh ở mức độ nghiêm trọng, cần xử lý khẩn cấp.'
+            recommendations = [
+                '🚨 Xử lý ngay lập tức bằng thuốc hóa học mạnh',
+                'Loại bỏ và đốt tất cả bộ phận bị nhiễm',
+                'Phun thuốc định kỳ theo hướng dẫn',
+                'Cách ly hoàn toàn cây bệnh khỏi vườn',
+                'Khử trùng dụng cụ làm vườn',
+                'Xem xét tư vấn chuyên gia nông nghiệp'
+            ]
+        else:
+            level = 'Critical'
+            color = '#b71c1c'
+            icon = '🔴'
+            description = 'Bệnh ở mức độ rất nghiêm trọng, nguy cơ mất cây cao.'
+            recommendations = [
+                '🚨🚨 KHẨN CẤP: Liên hệ chuyên gia nông nghiệp ngay',
+                'Xem xét nhổ bỏ cây để tránh lây lan toàn vườn',
+                'Cách ly hoàn toàn khu vực bị nhiễm',
+                'Sử dụng thuốc hóa học mạnh theo chỉ dẫn chuyên gia',
+                'Khử trùng đất và dụng cụ kỹ lưỡng',
+                'Không trồng cà chua ở khu vực này trong 6-12 tháng'
+            ]
+        
+        return {
+            'level': level,
+            'score': round(severity_score, 2),
+            'affected_area': round(affected_area_pct, 2),
+            'confidence': round(confidence * 100, 2),
+            'description': description,
+            'recommendations': recommendations,
+            'color': color,
+            'icon': icon
+        }
+        
+    except Exception as e:
+        logging.getLogger(__name__).exception("Error assessing disease severity: %s", e)
+        return {
+            'level': 'Unknown',
+            'score': 0.0,
+            'affected_area': 0.0,
+            'confidence': 0.0,
+            'description': 'Không thể đánh giá mức độ nghiêm trọng.',
+            'recommendations': ['Vui lòng thử lại hoặc liên hệ hỗ trợ'],
+            'color': '#9e9e9e',
+            'icon': '❓'
+        }
+
+
+def calculate_severity_from_prediction(model, img_array, predicted_label, confidence, pred_index=None):
+    """
+    Calculate disease severity by combining Grad-CAM analysis with prediction results.
+    
+    Args:
+        model: Keras model used for prediction
+        img_array: Preprocessed image array
+        predicted_label: Predicted disease class
+        confidence: Model confidence (0-1)
+        pred_index: Index of predicted class
+    
+    Returns:
+        severity_dict: Complete severity assessment dictionary
+    """
+    try:
+        # Generate Grad-CAM heatmap
+        heatmap = generate_gradcam(model, img_array, pred_index=pred_index)
+        
+        # Calculate affected area from heatmap
+        if heatmap is not None:
+            affected_area_pct, _, _ = calculate_affected_area_from_heatmap(heatmap, threshold=0.5)
+        else:
+            # Fallback: estimate from confidence if Grad-CAM fails
+            affected_area_pct = confidence * 50  # Conservative estimate
+        
+        # Assess overall severity
+        severity = assess_disease_severity(
+            predicted_label=predicted_label,
+            confidence=confidence,
+            affected_area_pct=affected_area_pct,
+            heatmap=heatmap
+        )
+        
+        return severity
+        
+    except Exception as e:
+        logging.getLogger(__name__).exception("Error calculating severity from prediction: %s", e)
+        # Return default severity on error
+        return assess_disease_severity(predicted_label, confidence, 0.0)

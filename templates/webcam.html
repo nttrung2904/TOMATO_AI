@@ -232,6 +232,7 @@
       </div>
     </div>
     <div id="all-probabilities" style="margin-top: 15px;"></div>
+    <div id="severity-section" style="margin-top: 20px; display: none;"></div>
   </div>
 
   <div class="settings">
@@ -376,7 +377,7 @@
       const data = await response.json();
 
       if (data.ok) {
-        displayPrediction(data.prediction);
+        displayPrediction(data.prediction, data.image_quality);
       } else {
         showToast('✗ Prediction failed: ' + data.error, 'error');
       }
@@ -393,7 +394,7 @@
     }
   }
 
-  function displayPrediction(pred) {
+  function displayPrediction(pred, quality) {
     predictionDisplay.style.display = 'block';
     
     const predClass = pred.class;
@@ -430,6 +431,70 @@
         </div>
       `;
     });
+
+    // Display image quality
+    if (quality) {
+      const qualitySection = document.getElementById('quality-section') || (() => {
+        const section = document.createElement('div');
+        section.id = 'quality-section';
+        section.style.marginTop = '15px';
+        allProbsDiv.parentNode.insertBefore(section, allProbsDiv.nextSibling);
+        return section;
+      })();
+      
+      const qualityColor = quality.quality_score >= 70 ? '#4caf50' : quality.quality_score >= 50 ? '#ff9800' : '#f44336';
+      qualitySection.style.display = 'block';
+      qualitySection.innerHTML = `
+        <div style="padding: 12px; background: linear-gradient(135deg, ${qualityColor}15 0%, ${qualityColor}08 100%); border-radius: 8px; border-left: 3px solid ${qualityColor};">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>${quality.level_icon}</span>
+              <strong style="font-size: 0.95em;">Quality: ${quality.quality_level}</strong>
+            </div>
+            <span style="font-weight: 700; color: ${qualityColor};">${quality.quality_score}/100</span>
+          </div>
+          ${quality.warning_message ? `
+            <div style="font-size: 0.85em; color: #e65100; margin-top: 6px;">
+              ${quality.warning_message}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Display severity assessment
+    const severitySection = document.getElementById('severity-section');
+    if (pred.severity) {
+      const sev = pred.severity;
+      severitySection.style.display = 'block';
+      severitySection.innerHTML = `
+        <div style="padding: 18px; background: linear-gradient(135deg, ${sev.color}15 0%, ${sev.color}08 100%); border-radius: 12px; border-left: 4px solid ${sev.color};">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span style="font-size: 1.3em;">${sev.icon}</span>
+            <strong style="font-size: 1.05em;">Mức độ nghiêm trọng: ${sev.level}</strong>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.8em; color: #6c757d;">Score</div>
+              <div style="font-size: 1.2em; font-weight: 700; color: ${sev.color};">${sev.score}</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.8em; color: #6c757d;">Area</div>
+              <div style="font-size: 1.2em; font-weight: 700; color: ${sev.color};">${sev.affected_area}%</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.8em; color: #6c757d;">Conf</div>
+              <div style="font-size: 1.2em; font-weight: 700; color: #495057;">${sev.confidence}%</div>
+            </div>
+          </div>
+          <div style="font-size: 0.9em; color: #495057; margin-top: 8px;">
+            <strong>📋 ${sev.description}</strong>
+          </div>
+        </div>
+      `;
+    } else {
+      severitySection.style.display = 'none';
+    }
 
     // Smooth scroll
     predictionDisplay.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

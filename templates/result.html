@@ -71,6 +71,58 @@
           <div style="width:100%;margin-bottom:8px;"><strong>Model:</strong> <span style="color:#1976d2">{{ model_name }}</span></div>
           <div style="width:100%;margin-bottom:8px;"><strong>Pipeline:</strong> <span style="color:var(--leaf-600)">{{ pipeline_key }}</span></div>
         </div>
+        
+        <!-- Image Quality Assessment -->
+        {% if image_quality %}
+        <div style="margin:12px 0; padding:14px; background:linear-gradient(135deg, {% if image_quality.quality_score >= 70 %}#e8f5e9{% elif image_quality.quality_score >= 50 %}#fff9e6{% else %}#ffebee{% endif %} 0%, #ffffff 100%); border-radius:10px; border-left:4px solid {% if image_quality.quality_score >= 70 %}#4caf50{% elif image_quality.quality_score >= 50 %}#ffc107{% else %}#f44336{% endif %};">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.2em;">{{ image_quality.level_icon }}</span>
+              <strong style="color:#2c3e50;">Chất lượng ảnh: {{ image_quality.quality_level }}</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="font-size:1.3em;font-weight:700;color:{% if image_quality.quality_score >= 70 %}#4caf50{% elif image_quality.quality_score >= 50 %}#ff9800{% else %}#f44336{% endif %};">
+                {{ image_quality.quality_score }}/100
+              </div>
+            </div>
+          </div>
+          
+          {% if image_quality.warning_message %}
+          <div style="padding:10px;background:rgba(255,152,0,0.1);border-radius:6px;margin-bottom:10px;font-size:0.95em;color:#e65100;">
+            {{ image_quality.warning_message }}
+          </div>
+          {% endif %}
+          
+          {% if image_quality.issues and image_quality.quality_score < 85 %}
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer;font-weight:600;color:#555;font-size:0.9em;padding:6px;background:rgba(0,0,0,0.03);border-radius:4px;">
+              🔍 Vấn đề phát hiện ({{ image_quality.issues|length }})
+            </summary>
+            <div style="margin-top:8px;padding:8px;background:white;border-radius:6px;">
+              <ul style="margin:0;padding-left:20px;font-size:0.9em;color:#666;">
+                {% for issue in image_quality.issues %}
+                <li style="margin:4px 0;">{{ issue }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </details>
+          {% endif %}
+          
+          <details style="margin-top:10px;" {% if image_quality.quality_score < 70 %}open{% endif %}>
+            <summary style="cursor:pointer;font-weight:600;color:#555;font-size:0.9em;padding:6px;background:rgba(0,0,0,0.03);border-radius:4px;">
+              💡 Gợi ý cải thiện
+            </summary>
+            <div style="margin-top:8px;padding:8px;background:white;border-radius:6px;">
+              <ul style="margin:0;padding-left:20px;font-size:0.9em;color:#666;line-height:1.7;">
+                {% for suggestion in image_quality.suggestions %}
+                <li style="margin:4px 0;">{{ suggestion }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </details>
+        </div>
+        {% endif %}
+        
         {# possibly_not_tomato warning moved below to avoid duplicate messages #}
         {% if show_feedback %}
         <div style="margin-top:8px;" id="confirm-buttons">
@@ -182,6 +234,60 @@
             </div>
           {% endfor %}
           </div>
+          
+          <!-- Severity Assessment Section -->
+          {% if severity and not rejected_not_tomato %}
+          <div style="margin-top: 24px; padding: 18px; background: linear-gradient(135deg, {{ severity.color }}15 0%, {{ severity.color }}08 100%); border-radius: 12px; border-left: 4px solid {{ severity.color }};">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3 style="margin: 0; font-size: 1.15em; color: #2c3e50; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3em;">{{ severity.icon }}</span>
+                Đánh giá mức độ nghiêm trọng
+              </h3>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 1.3em; font-weight: 700; color: {{ severity.color }};">{{ severity.level }}</span>
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+              <div style="text-align: center;">
+                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 4px;">Severity Score</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: {{ severity.color }};">{{ severity.score }}</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 4px;">Diện tích ảnh hưởng</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: {{ severity.color }};">{{ severity.affected_area }}%</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 0.85em; color: #6c757d; margin-bottom: 4px;">Độ tin cậy</div>
+                <div style="font-size: 1.5em; font-weight: 700; color: #495057;">{{ severity.confidence }}%</div>
+              </div>
+            </div>
+            
+            <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.8); border-radius: 8px;">
+              <strong style="color: #2c3e50; display: block; margin-bottom: 8px;">📋 Mô tả:</strong>
+              <p style="margin: 0 0 12px 0; color: #495057; line-height: 1.6;">{{ severity.description }}</p>
+              
+              <strong style="color: #2c3e50; display: block; margin-bottom: 8px;">💡 Khuyến nghị xử lý:</strong>
+              <ul style="margin: 0; padding-left: 20px; color: #495057; line-height: 1.7;">
+                {% for rec in severity.recommendations %}
+                <li style="margin-bottom: 6px;">{{ rec }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            
+            {% if severity.level in ['Severe', 'Critical'] %}
+            <div style="margin-top: 12px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; display: flex; align-items: start; gap: 10px;">
+              <span style="font-size: 1.5em;">⚠️</span>
+              <div>
+                <strong style="color: #856404;">Cảnh báo nghiêm trọng!</strong>
+                <p style="margin: 6px 0 0 0; color: #856404; font-size: 0.95em;">
+                  Bệnh ở mức độ nguy hiểm. Cần xử lý khẩn cấp để tránh lây lan và thiệt hại lớn cho vườn cà chua.
+                </p>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
           
           <!-- Action Buttons -->
           <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e9ecef;">

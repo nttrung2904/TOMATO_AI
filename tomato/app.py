@@ -10,7 +10,13 @@ from functools import wraps
 import tensorflow as tf
 import shutil 
 from PIL import Image
-from utils import compute_hist, compute_embedding as _compute_embedding
+from utils import (
+    compute_hist, 
+    compute_embedding as _compute_embedding,
+    calculate_severity_from_prediction,
+    assess_disease_severity,
+    check_image_quality
+)
 from datetime import datetime, timedelta
 import threading
 from uuid import uuid4
@@ -1551,6 +1557,233 @@ def history():
         flash('Không thể tải lịch sử dự đoán')
         return redirect(url_for('index'))
 
+
+# ============= GAME / ENTERTAINMENT ROUTES =============
+
+# Quiz Questions Database
+QUIZ_QUESTIONS = [
+    # Easy Questions (1-3)
+    {
+        'id': 1,
+        'difficulty': 'easy',
+        'question': 'Cà chua thuộc họ thực vật nào?',
+        'options': ['Họ Cà (Solanaceae)', 'Họ Đậu (Fabaceae)', 'Họ Bầu bí (Cucurbitaceae)', 'Họ Hoa hồng (Rosaceae)'],
+        'correct': 0,
+        'hint': 'Cùng họ với khoai tây, ớt và cà tím'
+    },
+    {
+        'id': 2,
+        'difficulty': 'easy',
+        'question': 'Bệnh nào sau đây KHÔNG phải là bệnh phổ biến trên cà chua?',
+        'options': ['Late Blight', 'Early Blight', 'Bệnh đốm nhỏ', 'Bệnh khảm lá'],
+        'correct': 2,
+        'hint': 'Bệnh đốm nhỏ thường xuất hiện ở lúa'
+    },
+    {
+        'id': 3,
+        'difficulty': 'easy',
+        'question': 'Triệu chứng nào là dấu hiệu của cà chua khỏe mạnh?',
+        'options': ['Lá vàng úa', 'Lá xanh đậm, không có đốm', 'Lá cuộn và héo', 'Lá có nhiều vết đen'],
+        'correct': 1,
+        'hint': 'Khỏe mạnh = màu xanh tươi'
+    },
+    # Medium Questions (4-6)
+    {
+        'id': 4,
+        'difficulty': 'medium',
+        'question': 'Late Blight (bệnh mốc sương) do tác nhân nào gây ra?',
+        'options': ['Vi khuẩn', 'Nấm (Phytophthora infestans)', 'Virus', 'Côn trùng'],
+        'correct': 1,
+        'hint': 'Tên khoa học: Phytophthora infestans'
+    },
+    {
+        'id': 5,
+        'difficulty': 'medium',
+        'question': 'Điều kiện nào thuận lợi cho sự phát triển của Late Blight?',
+        'options': ['Khô hanh, nắng gắt', 'Ẩm ướt, nhiệt độ 15-25°C', 'Rất lạnh dưới 5°C', 'Gió mạnh, khô ráo'],
+        'correct': 1,
+        'hint': 'Bệnh mốc thích môi trường ẩm'
+    },
+    {
+        'id': 6,
+        'difficulty': 'medium',
+        'question': 'Early Blight thường bắt đầu xuất hiện ở đâu trên cây cà chua?',
+        'options': ['Đỉnh cây', 'Lá già ở phần dưới cây', 'Hoa', 'Rễ'],
+        'correct': 1,
+        'hint': 'Bệnh tiến triển từ dưới lên trên'
+    },
+    # Hard Questions (7-10)
+    {
+        'id': 7,
+        'difficulty': 'hard',
+        'question': 'Septoria Leaf Spot có đặc điểm gì để phân biệt?',
+        'options': ['Đốm lớn màu nâu', 'Đốm nhỏ tròn với viền đen và tâm trắng xám', 'Lá cuộn lại', 'Vết vàng lan rộng'],
+        'correct': 1,
+        'hint': 'Có hình dạng đặc trưng: tâm sáng, viền tối'
+    },
+    {
+        'id': 8,
+        'difficulty': 'hard',
+        'question': 'Virus TYLCV (Tomato Yellow Leaf Curl Virus) lây lan qua con đường nào?',
+        'options': ['Gió và mưa', 'Ruồi trắng (Whitefly - Bemisia tabaci)', 'Đất nhiễm bệnh', 'Hạt giống'],
+        'correct': 1,
+        'hint': 'Vector truyền bệnh là một loài côn trùng nhỏ màu trắng'
+    },
+    {
+        'id': 9,
+        'difficulty': 'hard',
+        'question': 'Biện pháp nào HIỆU QUẢ NHẤT để phòng ngừa Late Blight?',
+        'options': ['Chỉ tưới nước vào buổi sáng, tránh ẩm ướt kéo dài', 'Bón nhiều đạm', 'Trồng dày đặc', 'Tưới nước buổi tối'],
+        'correct': 0,
+        'hint': 'Kiểm soát độ ẩm là chìa khóa'
+    },
+    {
+        'id': 10,
+        'difficulty': 'hard',
+        'question': 'Target Spot (Corynespora cassiicola) có đặc điểm nào sau đây?',
+        'options': ['Chỉ tấn công rễ', 'Đốm có dạng vòng tròn đồng tâm giống bia bắn', 'Lá chuyển màu tím', 'Chỉ xuất hiện vào mùa đông'],
+        'correct': 1,
+        'hint': 'Tên gọi "Target" gợi ý hình dạng như mục tiêu bắn'
+    }
+]
+
+def _get_high_scores():
+    """Load high scores from file"""
+    try:
+        scores_file = BASE_DIR / 'data' / 'quiz_scores.jsonl'
+        if not scores_file.exists():
+            return []
+        
+        scores = []
+        with open(scores_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    scores.append(json.loads(line.strip()))
+                except json.JSONDecodeError:
+                    continue
+        
+        # Sort by score desc, time asc
+        scores.sort(key=lambda x: (-x.get('score', 0), x.get('timestamp', '')))
+        return scores[:10]  # Top 10
+    except Exception:
+        app.logger.exception('Error loading quiz scores')
+        return []
+
+def _save_quiz_score(player_name, score, correct_answers, total_questions, time_taken):
+    """Save quiz score to file"""
+    try:
+        scores_dir = BASE_DIR / 'data'
+        scores_dir.mkdir(parents=True, exist_ok=True)
+        scores_file = scores_dir / 'quiz_scores.jsonl'
+        
+        entry = {
+            'id': str(uuid4())[:8],
+            'player_name': player_name,
+            'score': score,
+            'correct_answers': correct_answers,
+            'total_questions': total_questions,
+            'timestamp': datetime.utcnow().isoformat(),
+            'time_taken': time_taken
+        }
+        
+        with open(scores_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        
+        return True
+    except Exception:
+        app.logger.exception('Error saving quiz score')
+        return False
+
+def _generate_voucher(player_name):
+    """Generate discount voucher"""
+    voucher_code = f"TOMATO{str(uuid4())[:8].upper()}"
+    voucher_data = {
+        'code': voucher_code,
+        'player_name': player_name,
+        'discount': '15%',
+        'expires': (datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d'),
+        'generated': datetime.utcnow().isoformat(),
+        'description': 'Giảm giá 15% khi mua phân bón và thuốc trừ sâu cho cà chua'
+    }
+    
+    try:
+        vouchers_dir = BASE_DIR / 'data'
+        vouchers_dir.mkdir(parents=True, exist_ok=True)
+        vouchers_file = vouchers_dir / 'vouchers.jsonl'
+        
+        with open(vouchers_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(voucher_data, ensure_ascii=False) + '\n')
+        
+        return voucher_data
+    except Exception:
+        app.logger.exception('Error generating voucher')
+        return None
+
+@app.route('/game')
+def game_menu():
+    """Game menu page"""
+    high_scores = _get_high_scores()
+    return render_template('game_menu.html', high_scores=high_scores)
+
+@app.route('/game/quiz')
+def quiz_game():
+    """Tomato quiz game"""
+    return render_template('quiz.html', questions=QUIZ_QUESTIONS)
+
+@app.route('/api/quiz/submit', methods=['POST'])
+def submit_quiz():
+    """Submit quiz answers and get results"""
+    try:
+        data = request.get_json()
+        player_name = data.get('player_name', 'Anonymous').strip()[:50]
+        answers = data.get('answers', {})
+        time_taken = data.get('time_taken', 0)
+        
+        if not player_name:
+            player_name = 'Anonymous'
+        
+        # Calculate score
+        correct_count = 0
+        total_questions = len(QUIZ_QUESTIONS)
+        
+        for question in QUIZ_QUESTIONS:
+            qid = str(question['id'])
+            if qid in answers and answers[qid] == question['correct']:
+                correct_count += 1
+        
+        # Calculate score (100 points per correct answer)
+        score = correct_count * 100
+        
+        # Check for perfect score
+        perfect_score = (correct_count == total_questions)
+        voucher = None
+        
+        if perfect_score:
+            voucher = _generate_voucher(player_name)
+        
+        # Save score
+        _save_quiz_score(player_name, score, correct_count, total_questions, time_taken)
+        
+        # Get updated high scores
+        high_scores = _get_high_scores()
+        
+        return {
+            'ok': True,
+            'score': score,
+            'correct_answers': correct_count,
+            'total_questions': total_questions,
+            'perfect_score': perfect_score,
+            'voucher': voucher,
+            'high_scores': high_scores
+        }
+        
+    except Exception as e:
+        app.logger.exception('Error submitting quiz')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/history')
+
 @app.route('/history/clear', methods=['POST'])
 def clear_history():
     """Xóa toàn bộ lịch sử dự đoán"""
@@ -2351,6 +2584,101 @@ def prepare_image_for_prediction(img_bgr):
     
     return img_bgr
 
+
+def assess_image_quality_with_suggestions(img_bgr):
+    """
+    Assess image quality and provide actionable suggestions.
+    
+    Args:
+        img_bgr: Input image in BGR format
+    
+    Returns:
+        dict with:
+            - is_good (bool): Whether quality is sufficient
+            - quality_score (float): 0-100
+            - quality_level (str): 'Excellent', 'Good', 'Fair', 'Poor'
+            - issues (list): List of detected issues
+            - suggestions (list): Actionable suggestions for improvement
+            - warning_message (str): User-friendly warning if quality is poor
+    """
+    try:
+        is_good, quality_score, issues = check_image_quality(img_bgr, min_size=100, max_blur_threshold=100)
+        
+        # Determine quality level
+        if quality_score >= 85:
+            quality_level = 'Excellent'
+            level_icon = '🟢'
+        elif quality_score >= 70:
+            quality_level = 'Good'
+            level_icon = '🟢'
+        elif quality_score >= 50:
+            quality_level = 'Fair'
+            level_icon = '🟡'
+        else:
+            quality_level = 'Poor'
+            level_icon = '🔴'
+        
+        # Generate suggestions based on issues
+        suggestions = []
+        warning_message = None
+        
+        for issue in issues:
+            if 'too small' in issue.lower():
+                suggestions.append('📏 Chụp ảnh với độ phân giải cao hơn hoặc chụp gần lá hơn')
+            elif 'blurry' in issue.lower():
+                suggestions.append('🎯 Giữ camera ổn định và đợi auto-focus hoàn tất')
+                suggestions.append('💡 Chụp ở nơi có ánh sáng tốt để tăng shutter speed')
+            elif 'too dark' in issue.lower():
+                suggestions.append('💡 Chụp ở nơi sáng hơn hoặc bật flash')
+                suggestions.append('☀️ Chụp ngoài trời vào buổi sáng/chiều')
+            elif 'too bright' in issue.lower():
+                suggestions.append('🌤️ Tránh chụp dưới ánh nắng trực tiếp')
+                suggestions.append('🌳 Chụp ở nơi có bóng râm nhẹ')
+            elif 'low contrast' in issue.lower():
+                suggestions.append('🎨 Đảm bảo lá nổi bật so với background')
+                suggestions.append('📱 Điều chỉnh cài đặt camera để tăng contrast')
+        
+        # Add general suggestions if no specific issues
+        if not suggestions:
+            suggestions = [
+                '✅ Chất lượng ảnh tốt!',
+                '💡 Tips: Chụp khi lá đang khô để tránh phản quang'
+            ]
+        
+        # Create warning message for poor quality
+        if quality_score < 50:
+            warning_message = (
+                f"⚠️ Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
+                "Kết quả dự đoán có thể không chính xác. Đề nghị chụp lại ảnh tốt hơn."
+            )
+        elif quality_score < 70:
+            warning_message = (
+                f"⚡ Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
+                "Có thể cải thiện để được kết quả chính xác hơn."
+            )
+        
+        return {
+            'is_good': is_good,
+            'quality_score': round(quality_score, 1),
+            'quality_level': quality_level,
+            'level_icon': level_icon,
+            'issues': issues,
+            'suggestions': suggestions,
+            'warning_message': warning_message
+        }
+        
+    except Exception as e:
+        app.logger.exception("Error assessing image quality: %s", str(e))
+        return {
+            'is_good': True,
+            'quality_score': 50.0,
+            'quality_level': 'Unknown',
+            'level_icon': '❓',
+            'issues': ['Could not assess quality'],
+            'suggestions': ['Vui lòng đảm bảo ảnh rõ ràng và có ánh sáng tốt'],
+            'warning_message': None
+        }
+
 def run_model_prediction(img_bgr, model_name, pipeline_key):
     """
     Thực hiện dự đoán bệnh cà chua từ ảnh đầu vào.
@@ -2493,12 +2821,16 @@ def run_model_prediction(img_bgr, model_name, pipeline_key):
             user_message="Lỗi xác thực kết quả prediction"
         ) from e
     
+    # Get predicted index for Grad-CAM
+    pred_index = int(np.argmax(preds[0]))
+    
     app.logger.info("Prediction successful")
     return {
         'model': model,
         'class_names': model_class_names,
         'predictions': preds,
-        'preprocessed': x
+        'preprocessed': x,
+        'pred_index': pred_index
     }
 
 def process_prediction_results(preds, class_names):
@@ -2568,7 +2900,8 @@ def save_prediction_history(prediction_data):
             'probability': float(prediction_data.get('probability', 0)),
             'possibly_not_tomato': prediction_data.get('possibly_not_tomato', False),
             'rejected': prediction_data.get('rejected', False),
-            'image_path': prediction_data.get('image_path')
+            'image_path': prediction_data.get('image_path'),
+            'severity': prediction_data.get('severity')  # Add severity data
         }
         
         with open(history_file, 'a', encoding='utf-8') as f:
@@ -2579,6 +2912,40 @@ def save_prediction_history(prediction_data):
     except Exception:
         app.logger.exception("Error saving prediction history")
         return None
+
+def calculate_severity_assessment(model, img_array, predicted_label, confidence, pred_index):
+    """
+    Calculate disease severity for prediction.
+    
+    Args:
+        model: Keras model
+        img_array: Preprocessed image array
+        predicted_label: Predicted disease class
+        confidence: Model confidence (0-1)
+        pred_index: Index of predicted class
+    
+    Returns:
+        severity_dict: Severity assessment dictionary
+    """
+    try:
+        app.logger.info("Calculating disease severity...")
+        severity = calculate_severity_from_prediction(
+            model=model,
+            img_array=img_array,
+            predicted_label=predicted_label,
+            confidence=confidence,
+            pred_index=pred_index
+        )
+        app.logger.info(
+            "Severity assessment: level=%s, score=%.2f, affected_area=%.2f%%",
+            severity['level'], severity['score'], severity['affected_area']
+        )
+        return severity
+    except Exception as e:
+        app.logger.exception("Error calculating severity: %s", str(e))
+        # Return default severity on error
+        return assess_disease_severity(predicted_label, confidence, 0.0)
+
 
 def assess_prediction_quality(img_bgr, predicted_prob):
     """
@@ -2717,6 +3084,9 @@ def batch_predict():
                 # Prepare image
                 img_bgr = prepare_image_for_prediction(img_bgr)
                 
+                # Assess image quality
+                image_quality = assess_image_quality_with_suggestions(img_bgr)
+                
                 # Run prediction
                 prediction_result = run_model_prediction(
                     img_bgr, model_name, pipeline_key
@@ -2739,6 +3109,15 @@ def batch_predict():
                 # Get disease info
                 disease_info = get_disease_information(pred_results['label'])
                 
+                # Calculate severity
+                severity = calculate_severity_assessment(
+                    model=prediction_result['model'],
+                    img_array=prediction_result['preprocessed'],
+                    predicted_label=pred_results['label'],
+                    confidence=pred_results['probability'],
+                    pred_index=prediction_result['pred_index']
+                )
+                
                 # Assess quality
                 quality = assess_prediction_quality(img_bgr, pred_results['probability'])
                 
@@ -2750,7 +3129,8 @@ def batch_predict():
                     'probability': pred_results['probability'],
                     'possibly_not_tomato': quality['possibly_not_tomato'],
                     'rejected': quality['rejected_not_tomato'],
-                    'image_path': image_path
+                    'image_path': image_path,
+                    'severity': severity
                 })
                 
                 results.append({
@@ -2763,7 +3143,9 @@ def batch_predict():
                     'possibly_not_tomato': quality['possibly_not_tomato'],
                     'rejected_not_tomato': quality['rejected_not_tomato'],
                     'prediction_id': prediction_id,
-                    'all_probs': pred_results['all_probs']
+                    'all_probs': pred_results['all_probs'],
+                    'severity': severity,
+                    'image_quality': image_quality
                 })
                 
                 app.logger.info(
@@ -3005,6 +3387,15 @@ def predict():
         app.logger.info("[%s] Step 3: Preparing image for prediction", request_id)
         img_bgr = prepare_image_for_prediction(img_bgr)
         
+        # Bước 3.5: Assess image quality
+        app.logger.info("[%s] Step 3.5: Assessing image quality", request_id)
+        image_quality = assess_image_quality_with_suggestions(img_bgr)
+        app.logger.info(
+            "[%s] Image quality: %s (score: %.1f/100, issues: %d)",
+            request_id, image_quality['quality_level'], 
+            image_quality['quality_score'], len(image_quality['issues'])
+        )
+        
         # Bước 4: Chạy dự đoán model
         app.logger.info("[%s] Step 4: Running model prediction", request_id)
         prediction_result = run_model_prediction(
@@ -3035,6 +3426,16 @@ def predict():
         app.logger.info("[%s] Step 7: Getting disease information", request_id)
         disease_info = get_disease_information(results['label'])
         
+        # Bước 7.5: Calculate disease severity
+        app.logger.info("[%s] Step 7.5: Calculating disease severity", request_id)
+        severity = calculate_severity_assessment(
+            model=prediction_result['model'],
+            img_array=prediction_result['preprocessed'],
+            predicted_label=results['label'],
+            confidence=results['probability'],
+            pred_index=prediction_result['pred_index']
+        )
+        
         # Bước 8: Đánh giá chất lượng dự đoán
         app.logger.info("[%s] Step 8: Assessing prediction quality", request_id)
         quality = assess_prediction_quality(img_bgr, results['probability'])
@@ -3048,13 +3449,14 @@ def predict():
             'probability': results['probability'],
             'possibly_not_tomato': quality['possibly_not_tomato'],
             'rejected': quality['rejected_not_tomato'],
-            'image_path': image_path
+            'image_path': image_path,
+            'severity': severity
         })
         
         # Step 10: Render result
         app.logger.info(
-            "[%s] Step 10: Rendering result (quality flags - possibly_not_tomato: %s, rejected: %s)",
-            request_id, quality['possibly_not_tomato'], quality['rejected_not_tomato']
+            "[%s] Step 10: Rendering result (quality: %s, severity: %s)",
+            request_id, image_quality['quality_level'], severity['level']
         )
         app.logger.info("[%s] Prediction request completed successfully", request_id)
         app.logger.info("=" * 50)
@@ -3073,7 +3475,9 @@ def predict():
             rejected_not_tomato=quality['rejected_not_tomato'],
             show_feedback=quality['show_feedback'],
             sim_info=quality['sim_info'],
-            prediction_id=prediction_id
+            prediction_id=prediction_id,
+            severity=severity,
+            image_quality=image_quality
         )
     
     except AppException as e:
@@ -3378,6 +3782,9 @@ def api_webcam_predict():
         if img_bgr is None:
             return {'ok': False, 'error': 'Invalid image'}, 400
         
+        # Optional: Assess image quality (non-blocking for webcam)
+        image_quality = assess_image_quality_with_suggestions(img_bgr)
+        
         model_name = data.get('model', DEFAULT_MODEL)
         pipeline_key = data.get('pipeline', DEFAULT_PIPELINE)
         
@@ -3395,6 +3802,15 @@ def api_webcam_predict():
         confidence = float(preds[0][pred_class_idx])
         pred_class = model_class_names[pred_class_idx]
         
+        # Calculate severity
+        severity = calculate_severity_assessment(
+            model=model,
+            img_array=img_array,
+            predicted_label=pred_class,
+            confidence=confidence,
+            pred_index=pred_class_idx
+        )
+        
         # Get all class probabilities
         all_probs = {model_class_names[i]: float(preds[0][i]) for i in range(len(model_class_names))}
         
@@ -3403,8 +3819,10 @@ def api_webcam_predict():
             'prediction': {
                 'class': pred_class,
                 'confidence': confidence,
-                'all_probabilities': all_probs
-            }
+                'all_probabilities': all_probs,
+                'severity': severity
+            },
+            'image_quality': image_quality
         }
         
     except Exception as e:

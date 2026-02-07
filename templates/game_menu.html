@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}🎮 Giải trí | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .game-menu {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .game-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    color: white;
+  }
+  
+  .game-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2.5em;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  }
+  
+  .game-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+  }
+  
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+    margin-bottom: 50px;
+  }
+  
+  .game-card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .game-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+  }
+  
+  .game-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcf7f, #4ecdc4, #a8e6cf);
+    background-size: 200% 100%;
+    animation: gradientMove 3s ease infinite;
+  }
+  
+  @keyframes gradientMove {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .game-icon {
+    font-size: 4em;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .game-card h2 {
+    margin: 0 0 15px 0;
+    color: var(--tomato-700);
+    font-size: 1.8em;
+  }
+  
+  .game-card p {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  
+  .game-features {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+  }
+  
+  .game-features li {
+    padding: 8px 0;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .game-features li::before {
+    content: '✓';
+    color: #4caf50;
+    font-weight: bold;
+    font-size: 1.2em;
+  }
+  
+  .play-btn {
+    display: inline-block;
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-align: center;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.1em;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .play-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  .leaderboard {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  }
+  
+  .leaderboard h2 {
+    margin: 0 0 20px 0;
+    color: var(--tomato-700);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .leaderboard-table th {
+    background: #f5f5f5;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #555;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  
+  .leaderboard-table td {
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .leaderboard-table tr:hover {
+    background: #fafafa;
+  }
+  
+  .rank-medal {
+    font-size: 1.3em;
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+  }
+  
+  .score-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #ffd93d 0%, #ff8c00 100%);
+    color: white;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+  }
+  
+  .empty-state svg {
+    width: 80px;
+    height: 80px;
+    opacity: 0.3;
+    margin-bottom: 20px;
+  }
+</style>
+
+<div class="game-menu">
+  <div class="game-header">
+    <h1>🎮 Khu vực Giải trí</h1>
+    <p>Vui chơi và học hỏi kiến thức về cà chua!</p>
+  </div>
+  
+  <div class="games-grid">
+    <!-- Quiz Game Card -->
+    <div class="game-card">
+      <div class="game-icon">🧠</div>
+      <h2>Quiz Cà Chua</h2>
+      <p>Thử thách kiến thức của bạn về cà chua và các bệnh phổ biến!</p>
+      
+      <ul class="game-features">
+        <li>10 câu hỏi từ dễ đến khó</li>
+        <li>3 quyền trợ giúp (50/50, Gợi ý, Bỏ qua)</li>
+        <li>Bảng xếp hạng điểm cao</li>
+        <li>🎁 Phiếu giảm giá khi đạt điểm tuyệt đối!</li>
+      </ul>
+      
+      <a href="{{ url_for('quiz_game') }}" class="play-btn">
+        🚀 Bắt đầu chơi
+      </a>
+    </div>
+    
+    <!-- Coming Soon Card -->
+    <div class="game-card" style="opacity: 0.7; cursor: not-allowed;">
+      <div class="game-icon">🎯</div>
+      <h2>Tìm Bệnh Nhanh</h2>
+      <p>Xác định bệnh trên lá cà chua trong thời gian giới hạn!</p>
+      
+      <ul class="game-features">
+        <li>Chế độ đếm ngược thời gian</li>
+        <li>Nhiều cấp độ khó</li>
+        <li>So sánh điểm với bạn bè</li>
+        <li>Phần thưởng hấp dẫn</li>
+      </ul>
+      
+      <button class="play-btn" disabled style="opacity: 0.5;">
+        🔒 Sắp ra mắt
+      </button>
+    </div>
+  </div>
+  
+  <!-- Leaderboard -->
+  <div class="leaderboard">
+    <h2>
+      <span>🏆</span>
+      <span>Bảng xếp hạng Quiz</span>
+    </h2>
+    
+    {% if high_scores %}
+    <table class="leaderboard-table">
+      <thead>
+        <tr>
+          <th>Hạng</th>
+          <th>Tên</th>
+          <th>Điểm</th>
+          <th>Đúng/Tổng</th>
+          <th>Thời gian</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for score in high_scores %}
+        <tr>
+          <td>
+            <span class="rank-medal">
+              {% if loop.index == 1 %}🥇
+              {% elif loop.index == 2 %}🥈
+              {% elif loop.index == 3 %}🥉
+              {% else %}{{ loop.index }}
+              {% endif %}
+            </span>
+          </td>
+          <td><strong>{{ score.player_name }}</strong></td>
+          <td><span class="score-badge">{{ score.score }}</span></td>
+          <td>{{ score.correct_answers }}/{{ score.total_questions }}</td>
+          <td>{{ score.time_taken }}s</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <svg fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+      </svg>
+      <p><strong>Chưa có ai chơi</strong></p>
+      <p>Hãy là người đầu tiên trên bảng xếp hạng!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
