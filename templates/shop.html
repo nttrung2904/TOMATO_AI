@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block title %}🛒 Cửa hàng | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .shop-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .shop-header {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 16px;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+  
+  .shop-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2.5em;
+  }
+  
+  .shop-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+  }
+  
+  .cart-icon {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: var(--tomato-600);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    z-index: 50;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .cart-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  }
+  
+  .cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #f44336;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75em;
+    font-weight: bold;
+  }
+  
+  .filter-section {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+  }
+  
+  .filter-btn {
+    padding: 10px 24px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 600;
+    color: #555;
+  }
+  
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--tomato-500);
+    color: white;
+    border-color: var(--tomato-500);
+  }
+  
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 50px;
+  }
+  
+  .product-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  }
+  
+  .product-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #f5f5f5;
+  }
+  
+  .product-info {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .product-category {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    width: fit-content;
+  }
+  
+  .product-name {
+    margin: 0 0 10px 0;
+    font-size: 1.2em;
+    color: #333;
+    font-weight: 600;
+  }
+  
+  .product-description {
+    color: #666;
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin-bottom: 15px;
+    flex: 1;
+  }
+  
+  .product-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 15px;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  .product-price {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--tomato-600);
+  }
+  
+  .add-to-cart-btn {
+    padding: 10px 20px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s, transform 0.2s;
+  }
+  
+  .add-to-cart-btn:hover {
+    background: var(--tomato-600);
+    transform: scale(1.05);
+  }
+  
+  .add-to-cart-btn:active {
+    transform: scale(0.95);
+  }
+  
+  .product-stock {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  .product-stock.in-stock {
+    color: #4CAF50;
+  }
+  
+  .product-stock.low-stock {
+    color: #ff9800;
+  }
+  
+  .product-stock.out-of-stock {
+    color: #f44336;
+  }
+  
+  @media (max-width: 768px) {
+    .shop-header h1 {
+      font-size: 2em;
+    }
+    
+    .products-grid {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+    
+    .cart-icon {
+      width: 50px;
+      height: 50px;
+      bottom: 20px;
+      right: 20px;
+    }
+  }
+</style>
+
+<div class="shop-container">
+  <div class="shop-header">
+    <h1>🛒 Cửa hàng Thuốc & Phân bón</h1>
+    <p>Sản phẩm chất lượng cho cây cà chua khỏe mạnh</p>
+  </div>
+  
+  <div class="filter-section">
+    <button class="filter-btn active" data-category="all">Tất cả</button>
+    <button class="filter-btn" data-category="pesticide">Thuốc trừ sâu</button>
+    <button class="filter-btn" data-category="fungicide">Thuốc trừ nấm</button>
+    <button class="filter-btn" data-category="fertilizer">Phân bón</button>
+    <button class="filter-btn" data-category="equipment">Dụng cụ</button>
+  </div>
+  
+  <div class="products-grid" id="products-grid">
+    <!-- Products will be rendered here -->
+  </div>
+  
+  <div class="cart-icon" onclick="openCart()">
+    🛒
+    <span class="cart-badge" id="cart-count">0</span>
+  </div>
+</div>
+
+<script>
+const products = [
+  {
+    id: 1,
+    name: 'Thuốc trừ sâu sinh học',
+    category: 'pesticide',
+    price: 125000,
+    description: 'Thuốc trừ sâu sinh học an toàn, không độc hại. Hiệu quả với sâu đục thân, sâu cuốn lá.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 50
+  },
+  {
+    id: 2,
+    name: 'Thuốc trừ nấm Septoria',
+    category: 'fungicide',
+    price: 145000,
+    description: 'Chuyên trị bệnh đốm lá Septoria, hiệu quả cao, sử dụng đơn giản.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 35
+  },
+  {
+    id: 3,
+    name: 'Thuốc trừ Early Blight',
+    category: 'fungicide',
+    price: 155000,
+    description: 'Ngăn ngừa và điều trị bệnh Early Blight (Alternaria), bảo vệ lá khỏi đốm nâu.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 28
+  },
+  {
+    id: 4,
+    name: 'Phân bón NPK 16-16-8',
+    category: 'fertilizer',
+    price: 95000,
+    description: 'Phân bón đa vi lượng, cung cấp dinh dưỡng toàn diện cho cây cà chua.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 100
+  },
+  {
+    id: 5,
+    name: 'Phân bón lá vi lượng',
+    category: 'fertilizer',
+    price: 85000,
+    description: 'Bổ sung vi lượng thiết yếu, tăng cường sức đề kháng cho cây.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 75
+  },
+  {
+    id: 6,
+    name: 'Thuốc trừ Late Blight',
+    category: 'fungicide',
+    price: 165000,
+    description: 'Phòng trị bệnh mốc sương (Late Blight), bảo vệ cây khỏi nấm Phytophthora.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 20
+  },
+  {
+    id: 7,
+    name: 'Thuốc trừ Bacterial Spot',
+    category: 'fungicide',
+    price: 135000,
+    description: 'Điều trị đốm lá do vi khuẩn, ngăn ngừa lây lan trên lá và quả.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 42
+  },
+  {
+    id: 8,
+    name: 'Phun sương cầm tay',
+    category: 'equipment',
+    price: 185000,
+    description: 'Bình phun sương áp lực cao, dung tích 2L, tiện lợi cho vườn nhỏ.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 15
+  },
+  {
+    id: 9,
+    name: 'Thuốc trừ Yellow Leaf Curl',
+    category: 'fungicide',
+    price: 175000,
+    description: 'Ngăn chặn virus gây vàng lá và cuộn lá, bảo vệ cây non.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 18
+  },
+  {
+    id: 10,
+    name: 'Phân bón hữu cơ',
+    category: 'fertilizer',
+    price: 65000,
+    description: 'Phân compost hữu cơ, cải thiện đất, tăng độ phì nhiêu.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 120
+  },
+  {
+    id: 11,
+    name: 'Thuốc trừ Spider Mites',
+    category: 'pesticide',
+    price: 115000,
+    description: 'Diệt nhện đỏ hai chấm, bảo vệ lá khỏi bị hút nhựa.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 32
+  },
+  {
+    id: 12,
+    name: 'Găng tay làm vườn',
+    category: 'equipment',
+    price: 45000,
+    description: 'Găng tay chống thấm nước, bảo vệ tay khi làm vườn.',
+    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
+    stock: 60
+  }
+];
+
+let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
+
+function renderProducts(category = 'all') {
+  const grid = document.getElementById('products-grid');
+  const filteredProducts = category === 'all' 
+    ? products 
+    : products.filter(p => p.category === category);
+  
+  grid.innerHTML = filteredProducts.map(product => {
+    let stockClass = 'in-stock';
+    let stockText = `Còn ${product.stock} sản phẩm`;
+    
+    if (product.stock === 0) {
+      stockClass = 'out-of-stock';
+      stockText = 'Hết hàng';
+    } else if (product.stock < 20) {
+      stockClass = 'low-stock';
+    }
+    
+    return `
+      <div class="product-card" data-category="${product.category}">
+        <img src="${product.image}" alt="${product.name}" class="product-image">
+        <div class="product-info">
+          <span class="product-category">${getCategoryName(product.category)}</span>
+          <h3 class="product-name">${product.name}</h3>
+          <p class="product-description">${product.description}</p>
+          <div class="product-footer">
+            <div>
+              <div class="product-price">${formatPrice(product.price)}</div>
+              <div class="product-stock ${stockClass}">${stockText}</div>
+            </div>
+            <button 
+              class="add-to-cart-btn" 
+              onclick="addToCart(${product.id})"
+              ${product.stock === 0 ? 'disabled' : ''}
+            >
+              ${product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function getCategoryName(category) {
+  const names = {
+    'pesticide': 'Thuốc trừ sâu',
+    'fungicide': 'Thuốc trừ nấm',
+    'fertilizer': 'Phân bón',
+    'equipment': 'Dụng cụ'
+  };
+  return names[category] || category;
+}
+
+function formatPrice(price) {
+  return price.toLocaleString('vi-VN') + 'đ';
+}
+
+function addToCart(productId) {
+  const product = products.find(p => p.id === productId);
+  if (!product || product.stock === 0) return;
+  
+  const existingItem = cart.find(item => item.id === productId);
+  if (existingItem) {
+    if (existingItem.quantity < product.stock) {
+      existingItem.quantity++;
+    } else {
+      showToast('Đã đạt số lượng tối đa trong kho!', 'warning');
+      return;
+    }
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      maxStock: product.stock
+    });
+  }
+  
+  saveCart();
+  updateCartCount();
+  showToast(`Đã thêm ${product.name} vào giỏ hàng!`, 'success');
+  
+  // Animation effect
+  const btn = event.target;
+  btn.style.transform = 'scale(1.2)';
+  setTimeout(() => btn.style.transform = '', 200);
+}
+
+function saveCart() {
+  localStorage.setItem('tomatoCart', JSON.stringify(cart));
+}
+
+function updateCartCount() {
+  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  document.getElementById('cart-count').textContent = count;
+}
+
+function openCart() {
+  window.location.href = '{{ url_for("cart") }}';
+}
+
+function showToast(message, type = 'info') {
+  // Use existing toast system from base template
+  if (window.showToast) {
+    window.showToast(message, type);
+  } else {
+    alert(message);
+  }
+}
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    renderProducts(this.dataset.category);
+  });
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  renderProducts();
+  updateCartCount();
+});
+</script>
+
+{% endblock %}

@@ -4,6 +4,8 @@ import pickle
 import os
 import cv2
 import json
+import random
+import hashlib
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response
 from functools import wraps
@@ -493,6 +495,16 @@ app = Flask(__name__,
 app.config['START_TIME'] = datetime.utcnow()
 # Sử dụng biến môi trường cho secret_key, với một giá trị mặc định an toàn cho môi trường dev
 app.secret_key = os.environ.get('SECRET_KEY', 'a-strong-default-secret-key-for-development-only')
+
+# ----------------- Jinja2 Custom Filters -----------------
+@app.template_filter('format_number')
+def format_number_filter(value):
+    """Format number with thousand separators for Vietnamese."""
+    try:
+        return f"{int(value):,}".replace(',', '.')
+    except (ValueError, TypeError):
+        return value
+
 # Giới hạn kích thước file tải lên để tránh chấp nhận file quá lớn (16 MB)
 
 # ----------------- ADMIN AUTHENTICATION -----------------
@@ -1723,7 +1735,8 @@ def _generate_voucher(player_name):
 def game_menu():
     """Game menu page"""
     high_scores = _get_high_scores()
-    return render_template('game_menu.html', high_scores=high_scores)
+    memory_high_scores = _get_memory_high_scores()
+    return render_template('game_menu.html', high_scores=high_scores, memory_high_scores=memory_high_scores)
 
 @app.route('/game/quiz')
 def quiz_game():
@@ -1779,6 +1792,468 @@ def submit_quiz():
         
     except Exception as e:
         app.logger.exception('Error submitting quiz')
+        return {'ok': False, 'error': str(e)}, 500
+
+# ==================== Memory Game ====================
+
+def _get_memory_high_scores():
+    """Load memory game high scores from file"""
+    try:
+        scores_file = BASE_DIR / 'data' / 'memory_scores.jsonl'
+        if not scores_file.exists():
+            return []
+        
+        scores = []
+        with open(scores_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    scores.append(json.loads(line.strip()))
+                except json.JSONDecodeError:
+                    continue
+        
+        # Sort by score desc, time asc
+        scores.sort(key=lambda x: (-x.get('score', 0), x.get('time_taken', 999)))
+        return scores[:10]  # Top 10
+    except Exception:
+        app.logger.exception('Error loading memory scores')
+        return []
+
+def _save_memory_score(player_name, score, moves, time_taken, difficulty, pairs):
+    """Save memory game score to file"""
+    try:
+        scores_dir = BASE_DIR / 'data'
+        scores_dir.mkdir(parents=True, exist_ok=True)
+        scores_file = scores_dir / 'memory_scores.jsonl'
+        
+        entry = {
+            'id': str(uuid4())[:8],
+            'player_name': player_name,
+            'score': score,
+            'moves': moves,
+            'time_taken': time_taken,
+            'difficulty': difficulty,
+            'pairs': pairs,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        with open(scores_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'Saved memory score: {player_name} - {score}')
+        return True
+    except Exception:
+        app.logger.exception('Error saving memory score')
+        return False
+
+@app.route('/game/memory')
+def memory_game():
+    """Memory matching game"""
+    # Get random tomato images
+    images_dir = Path(app.static_folder) / 'images' / 'tomato_samples'
+    tomato_images = []
+    
+    if images_dir.exists():
+        # Get all image files
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
+            tomato_images.extend([
+                url_for('static', filename=f'images/tomato_samples/{img.name}')
+                for img in images_dir.glob(ext)
+            ])
+    
+    # Shuffle and limit to 20 images max
+    random.shuffle(tomato_images)
+    tomato_images = tomato_images[:20]
+    
+    return render_template('memory_game.html', tomato_images=tomato_images)
+
+@app.route('/api/memory/submit', methods=['POST'])
+def submit_memory():
+    """Submit memory game score"""
+    try:
+        data = request.get_json()
+        player_name = data.get('player_name', 'Anonymous').strip()[:50]
+        score = data.get('score', 0)
+        moves = data.get('moves', 0)
+        time_taken = data.get('time_taken', 0)
+        difficulty = data.get('difficulty', 'medium')
+        pairs = data.get('pairs', 8)
+        
+        if not player_name:
+            player_name = 'Anonymous'
+        
+        # Save score
+        _save_memory_score(player_name, score, moves, time_taken, difficulty, pairs)
+        
+        return {'ok': True}
+        
+    except Exception as e:
+        app.logger.exception('Error submitting memory game score')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/memory/scores', methods=['GET'])
+def get_memory_scores():
+    """Get memory game high scores"""
+    try:
+        scores = _get_memory_high_scores()
+        return {'ok': True, 'scores': scores}
+    except Exception as e:
+        app.logger.exception('Error getting memory scores')
+        return {'ok': False, 'error': str(e)}, 500
+
+# ==================== Shop ====================
+
+@app.route('/shop')
+def shop():
+    """Shop page for pesticides and fertilizers"""
+    return render_template('shop.html')
+
+@app.route('/cart')
+def cart():
+    """Shopping cart page"""
+    user = None
+    addresses = []
+    
+    if 'user_id' in session:
+        user = get_user_by_email(session.get('user_email'))
+        addresses = get_user_addresses(session.get('user_id'))
+    
+    return render_template('cart.html', user=user, addresses=addresses)
+
+@app.route('/api/order/submit', methods=['POST'])
+def submit_order():
+    """Submit order"""
+    try:
+        data = request.get_json()
+        
+        order = {
+            'id': str(uuid4())[:8],
+            'user_id': session.get('user_id', ''),
+            'customer_name': data.get('customer_name', '').strip()[:100],
+            'customer_phone': data.get('customer_phone', '').strip()[:20],
+            'customer_address': data.get('customer_address', '').strip()[:500],
+            'order_note': data.get('order_note', '').strip()[:500],
+            'items': data.get('items', []),
+            'subtotal': data.get('subtotal', 0),
+            'shipping': data.get('shipping', 0),
+            'total': data.get('total', 0),
+            'payment_method': data.get('payment_method', 'cod'),
+            'status': 'pending',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Save order
+        orders_dir = BASE_DIR / 'data'
+        orders_dir.mkdir(parents=True, exist_ok=True)
+        orders_file = orders_dir / 'orders.jsonl'
+        
+        with open(orders_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(order, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'Order submitted: {order["id"]} - {order["customer_name"]}')
+        
+        return {'ok': True, 'order_id': order['id']}
+        
+    except Exception as e:
+        app.logger.exception('Error submitting order')
+        return {'ok': False, 'error': str(e)}, 500
+
+# ==================== User Authentication ====================
+
+def hash_password(password):
+    """Hash password with SHA256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_user_by_email(email):
+    """Get user by email"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return None
+        
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    user = json.loads(line.strip())
+                    if user.get('email') == email:
+                        return user
+                except json.JSONDecodeError:
+                    continue
+        return None
+    except Exception:
+        app.logger.exception('Error getting user')
+        return None
+
+def create_user(email, password, full_name):
+    """Create new user"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        users_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        user = {
+            'id': str(uuid4())[:8],
+            'email': email,
+            'password': hash_password(password),
+            'full_name': full_name,
+            'phone': '',
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        with open(users_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        
+        return user
+    except Exception:
+        app.logger.exception('Error creating user')
+        return None
+
+def get_user_addresses(user_id):
+    """Get all addresses for a user"""
+    try:
+        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
+        if not addresses_file.exists():
+            return []
+        
+        addresses = []
+        with open(addresses_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    addr = json.loads(line.strip())
+                    if addr.get('user_id') == user_id:
+                        addresses.append(addr)
+                except json.JSONDecodeError:
+                    continue
+        return addresses
+    except Exception:
+        app.logger.exception('Error getting addresses')
+        return []
+
+def save_address(user_id, address_data):
+    """Save address for user"""
+    try:
+        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
+        addresses_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        address = {
+            'id': str(uuid4())[:8],
+            'user_id': user_id,
+            'full_name': address_data.get('full_name', ''),
+            'phone': address_data.get('phone', ''),
+            'address': address_data.get('address', ''),
+            'city': address_data.get('city', ''),
+            'district': address_data.get('district', ''),
+            'is_default': address_data.get('is_default', False),
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        # If this is default, unset other defaults
+        if address['is_default']:
+            addresses = []
+            if addresses_file.exists():
+                with open(addresses_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        try:
+                            addr = json.loads(line.strip())
+                            if addr.get('user_id') == user_id and addr.get('is_default'):
+                                addr['is_default'] = False
+                            addresses.append(addr)
+                        except json.JSONDecodeError:
+                            continue
+                
+                # Rewrite file
+                with open(addresses_file, 'w', encoding='utf-8') as f:
+                    for addr in addresses:
+                        f.write(json.dumps(addr, ensure_ascii=False) + '\n')
+        
+        with open(addresses_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(address, ensure_ascii=False) + '\n')
+        
+        return address
+    except Exception:
+        app.logger.exception('Error saving address')
+        return None
+
+def login_required(f):
+    """Decorator to require login"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Vui lòng đăng nhập để tiếp tục', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        full_name = request.form.get('full_name', '').strip()
+        
+        # Validation
+        if not email or not password or not full_name:
+            flash('Vui lòng điền đầy đủ thông tin', 'error')
+            return redirect(url_for('register'))
+        
+        if password != confirm_password:
+            flash('Mật khẩu xác nhận không khớp', 'error')
+            return redirect(url_for('register'))
+        
+        if len(password) < 6:
+            flash('Mật khẩu phải có ít nhất 6 ký tự', 'error')
+            return redirect(url_for('register'))
+        
+        # Check if email exists
+        if get_user_by_email(email):
+            flash('Email đã được sử dụng', 'error')
+            return redirect(url_for('register'))
+        
+        # Create user
+        user = create_user(email, password, full_name)
+        if user:
+            session['user_id'] = user['id']
+            session['user_email'] = user['email']
+            session['user_name'] = user['full_name']
+            session['is_admin'] = False
+            flash('Đăng ký thành công!', 'success')
+            return redirect(url_for('profile'))
+        else:
+            flash('Có lỗi xảy ra. Vui lòng thử lại!', 'error')
+            return redirect(url_for('register'))
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            flash('Vui lòng điền đầy đủ thông tin', 'error')
+            return redirect(url_for('login'))
+        
+        # Check if admin login (case-insensitive)
+        if email.lower() == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
+            session['user_id'] = 'admin'
+            session['user_email'] = ADMIN_USERNAME
+            session['user_name'] = 'Quản trị viên'
+            session['is_admin'] = True
+            flash('Đăng nhập quản trị viên thành công!', 'success')
+            return redirect(url_for('admin_feedback'))
+        
+        # Check regular user (convert email to lowercase for DB lookup)
+        user = get_user_by_email(email.lower())
+        if user and user['password'] == hash_password(password):
+            session['user_id'] = user['id']
+            session['user_email'] = user['email']
+            session['user_name'] = user['full_name']
+            session['is_admin'] = False
+            flash('Đăng nhập thành công!', 'success')
+            
+            # Redirect to next page or profile
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('profile'))
+        else:
+            flash('Email hoặc mật khẩu không đúng', 'error')
+            return redirect(url_for('login'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """User logout"""
+    session.clear()
+    flash('Đã đăng xuất', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    # Check if admin
+    if session.get('is_admin'):
+        user = {
+            'id': 'admin',
+            'email': ADMIN_USERNAME,
+            'full_name': 'Quản trị viên',
+            'created_at': ''
+        }
+        addresses = []
+        orders = []
+        return render_template('profile.html', user=user, addresses=addresses, orders=orders)
+    
+    user = get_user_by_email(session.get('user_email'))
+    addresses = get_user_addresses(session.get('user_id'))
+    
+    # Get user orders
+    orders = []
+    try:
+        orders_file = BASE_DIR / 'data' / 'orders.jsonl'
+        if orders_file.exists():
+            with open(orders_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        order = json.loads(line.strip())
+                        if order.get('user_id') == session.get('user_id'):
+                            orders.append(order)
+                    except json.JSONDecodeError:
+                        continue
+            # Sort by timestamp desc
+            orders.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    except Exception:
+        app.logger.exception('Error loading orders')
+    
+    return render_template('profile.html', user=user, addresses=addresses, orders=orders)
+
+@app.route('/api/address/add', methods=['POST'])
+@login_required
+def add_address():
+    """Add new address"""
+    try:
+        data = request.get_json()
+        address = save_address(session.get('user_id'), data)
+        
+        if address:
+            return {'ok': True, 'address': address}
+        else:
+            return {'ok': False, 'error': 'Không thể lưu địa chỉ'}, 500
+    except Exception as e:
+        app.logger.exception('Error adding address')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/address/delete/<address_id>', methods=['POST'])
+@login_required
+def delete_address(address_id):
+    """Delete address"""
+    try:
+        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
+        if not addresses_file.exists():
+            return {'ok': False, 'error': 'File not found'}, 404
+        
+        addresses = []
+        with open(addresses_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    addr = json.loads(line.strip())
+                    # Keep if not matching or not user's address
+                    if addr.get('id') != address_id or addr.get('user_id') != session.get('user_id'):
+                        addresses.append(addr)
+                except json.JSONDecodeError:
+                    continue
+        
+        # Rewrite file
+        with open(addresses_file, 'w', encoding='utf-8') as f:
+            for addr in addresses:
+                f.write(json.dumps(addr, ensure_ascii=False) + '\n')
+        
+        return {'ok': True}
+    except Exception as e:
+        app.logger.exception('Error deleting address')
         return {'ok': False, 'error': str(e)}, 500
 
 

@@ -1,0 +1,925 @@
+{% extends "base.html" %}
+
+{% block title %}🛒 Giỏ hàng | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .cart-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .cart-header {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 16px;
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  
+  .cart-header h1 {
+    margin: 0;
+    font-size: 2em;
+  }
+  
+  .cart-content {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+  }
+  
+  .cart-items {
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .cart-items,
+  [data-theme="dark"] .cart-summary {
+    background: var(--bg-secondary);
+  }
+  
+  .section-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .section-title {
+    color: #ddd;
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .cart-item {
+    display: flex;
+    gap: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .cart-item {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .cart-item:last-child {
+    border-bottom: none;
+  }
+  
+  .item-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #f5f5f5;
+  }
+  
+  .item-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .item-name {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 5px 0;
+  }
+  
+  [data-theme="dark"] .item-name {
+    color: #ddd;
+  }
+  
+  .item-price {
+    color: var(--tomato-600);
+    font-weight: 600;
+    font-size: 1.1em;
+  }
+  
+  [data-theme="dark"] .item-price {
+    color: var(--tomato-400);
+  }
+  
+  .item-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  
+  .quantity-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 5px;
+  }
+  
+  [data-theme="dark"] .quantity-control {
+    background: var(--bg-tertiary);
+  }
+  
+  .qty-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .qty-btn {
+    background: var(--bg-secondary);
+    color: #ddd;
+  }
+  
+  .qty-btn:hover {
+    background: #e0e0e0;
+  }
+  
+  [data-theme="dark"] .qty-btn:hover {
+    background: var(--tomato-900);
+  }
+  
+  .qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  
+  .qty-number {
+    min-width: 30px;
+    text-align: center;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .qty-number {
+    color: #ddd;
+  }
+  
+  .remove-btn {
+    padding: 8px 16px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+  }
+  
+  .remove-btn:hover {
+    background: #d32f2f;
+  }
+  
+  .cart-summary {
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+  }
+  
+  .summary-title {
+    font-size: 1.3em;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .summary-title {
+    color: #ddd;
+  }
+  
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .summary-row {
+    border-bottom-color: var(--bg-tertiary);
+    color: #ddd;
+  }
+  
+  .summary-row:last-of-type {
+    border-bottom: 2px solid #e0e0e0;
+    font-weight: 600;
+    font-size: 1.2em;
+    color: var(--tomato-600);
+    padding: 20px 0 15px 0;
+  }
+  
+  [data-theme="dark"] .summary-row:last-of-type {
+    border-bottom-color: var(--bg-tertiary);
+    color: var(--tomato-400);
+  }
+  
+  .checkout-form {
+    margin-top: 25px;
+  }
+  
+  .form-section {
+    margin-bottom: 25px;
+  }
+  
+  .form-section-title {
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  [data-theme="dark"] .form-section-title {
+    color: #ccc;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
+  }
+  
+  [data-theme="dark"] .form-group label {
+    color: #ccc;
+  }
+  
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95em;
+    transition: border 0.3s;
+    background: white;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group textarea,
+  [data-theme="dark"] .form-group select {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+    color: #ddd;
+  }
+  
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+  }
+  
+  .form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+  
+  .address-selector {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border 0.3s;
+    margin-bottom: 10px;
+    background: white;
+  }
+  
+  [data-theme="dark"] .address-selector {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+  }
+  
+  .address-selector:hover {
+    border-color: var(--tomato-500);
+  }
+  
+  .address-selector.selected {
+    border-color: var(--tomato-500);
+    background: #fff5f5;
+  }
+  
+  [data-theme="dark"] .address-selector.selected {
+    background: var(--tomato-900);
+  }
+  
+  .address-selector input[type="radio"] {
+    margin-right: 10px;
+  }
+  
+  .address-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 3px;
+  }
+  
+  [data-theme="dark"] .address-name {
+    color: #ddd;
+  }
+  
+  .address-detail {
+    font-size: 0.9em;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .address-detail {
+    color: #999;
+  }
+  
+  .new-address-link {
+    color: var(--tomato-500);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+  
+  .new-address-link:hover {
+    text-decoration: underline;
+  }
+  
+  .payment-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .payment-option {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+  }
+  
+  [data-theme="dark"] .payment-option {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+  }
+  
+  .payment-option:hover {
+    border-color: var(--tomato-500);
+  }
+  
+  .payment-option.selected {
+    border-color: var(--tomato-500);
+    background: #fff5f5;
+  }
+  
+  [data-theme="dark"] .payment-option.selected {
+    background: var(--tomato-900);
+  }
+  
+  .payment-option input[type="radio"] {
+    margin: 0;
+  }
+  
+  .payment-icon {
+    font-size: 1.5em;
+  }
+  
+  .payment-info {
+    flex: 1;
+  }
+  
+  .payment-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 3px;
+  }
+  
+  [data-theme="dark"] .payment-name {
+    color: #ddd;
+  }
+  
+  .payment-desc {
+    font-size: 0.85em;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .payment-desc {
+    color: #999;
+  }
+  
+  .checkout-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: background 0.3s, transform 0.2s;
+  }
+  
+  .checkout-btn:hover {
+    background: var(--tomato-600);
+    transform: translateY(-2px);
+  }
+  
+  .checkout-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .empty-cart {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+  }
+  
+  .empty-cart-icon {
+    font-size: 5em;
+    margin-bottom: 20px;
+  }
+  
+  .continue-shopping {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 12px 30px;
+    background: var(--tomato-500);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.3s;
+  }
+  
+  .continue-shopping:hover {
+    background: var(--tomato-600);
+  }
+  
+  .login-prompt {
+    background: #e3f2fd;
+    border: 1px solid #2196F3;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  [data-theme="dark"] .login-prompt {
+    background: rgba(33, 150, 243, 0.1);
+    border-color: #2196F3;
+  }
+  
+  .login-prompt-icon {
+    font-size: 1.5em;
+  }
+  
+  .login-prompt-text {
+    flex: 1;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .login-prompt-text {
+    color: #ddd;
+  }
+  
+  .login-prompt a {
+    color: #2196F3;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  
+  .login-prompt a:hover {
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 768px) {
+    .cart-content {
+      grid-template-columns: 1fr;
+    }
+    
+    .cart-summary {
+      position: static;
+    }
+    
+    .cart-item {
+      flex-direction: column;
+    }
+    
+    .item-image {
+      width: 100%;
+      height: 150px;
+    }
+  }
+</style>
+
+<div class="cart-container">
+  <div class="cart-header">
+    <h1>🛒 Giỏ hàng của bạn</h1>
+  </div>
+  
+  <div id="cart-content">
+    <!-- Will be populated by JavaScript -->
+  </div>
+</div>
+
+<script>
+let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
+const user = {{ user | tojson | safe }};
+const addresses = {{ addresses | tojson | safe }};
+let selectedAddress = null;
+let selectedPayment = 'cod';
+
+// Select default address
+if (addresses && addresses.length > 0) {
+  selectedAddress = addresses.find(a => a.is_default) || addresses[0];
+}
+
+function formatPrice(price) {
+  return price.toLocaleString('vi-VN') + 'đ';
+}
+
+function updateQuantity(itemId, change) {
+  const item = cart.find(i => i.id === itemId);
+  if (!item) return;
+  
+  const newQty = item.quantity + change;
+  if (newQty < 1 || newQty > item.maxStock) return;
+  
+  item.quantity = newQty;
+  saveCart();
+  renderCart();
+}
+
+function removeItem(itemId) {
+  if (confirm('Bạn có chắc muốn xóa sản phẩm này?')) {
+    cart = cart.filter(i => i.id !== itemId);
+    saveCart();
+    renderCart();
+    showToast('Đã xóa sản phẩm khỏi giỏ hàng', 'info');
+  }
+}
+
+function saveCart() {
+  localStorage.setItem('tomatoCart', JSON.stringify(cart));
+}
+
+function calculateTotal() {
+  return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+}
+
+function renderCart() {
+  const container = document.getElementById('cart-content');
+  
+  if (cart.length === 0) {
+    container.innerHTML = `
+      <div class="cart-items">
+        <div class="empty-cart">
+          <div class="empty-cart-icon">🛒</div>
+          <h2>Giỏ hàng trống</h2>
+          <p>Bạn chưa có sản phẩm nào trong giỏ hàng</p>
+          <a href="{{ url_for('shop') }}" class="continue-shopping">
+            Tiếp tục mua sắm
+          </a>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  const total = calculateTotal();
+  const shipping = total > 500000 ? 0 : 30000;
+  const finalTotal = total + shipping;
+  
+  const cartItemsHtml = cart.map(item => `
+    <div class="cart-item">
+      <img src="{{ url_for('static', filename='images/tomato.jpg') }}" 
+           alt="${item.name}" 
+           class="item-image">
+      <div class="item-details">
+        <h3 class="item-name">${item.name}</h3>
+        <div class="item-price">${formatPrice(item.price)}</div>
+        <div class="item-actions">
+          <div class="quantity-control">
+            <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)" 
+                    ${item.quantity <= 1 ? 'disabled' : ''}>−</button>
+            <span class="qty-number">${item.quantity}</span>
+            <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)"
+                    ${item.quantity >= item.maxStock ? 'disabled' : ''}>+</button>
+          </div>
+          <button class="remove-btn" onclick="removeItem(${item.id})">
+            Xóa
+          </button>
+        </div>
+      </div>
+      <div style="text-align: right; font-weight: 600; color: var(--tomato-600); font-size: 1.2em;">
+        ${formatPrice(item.price * item.quantity)}
+      </div>
+    </div>
+  `).join('');
+  
+  // Address section
+  let addressSection = '';
+  if (user) {
+    if (addresses && addresses.length > 0) {
+      addressSection = `
+        <div class="form-section">
+          <div class="form-section-title">
+            📍 Địa chỉ giao hàng
+          </div>
+          ${addresses.map(addr => `
+            <label class="address-selector ${selectedAddress && selectedAddress.id === addr.id ? 'selected' : ''}" 
+                   onclick="selectAddress('${addr.id}')">
+              <input type="radio" name="address" value="${addr.id}" 
+                     ${selectedAddress && selectedAddress.id === addr.id ? 'checked' : ''}>
+              <div class="address-name">${addr.full_name} - ${addr.phone}</div>
+              <div class="address-detail">${addr.address}, ${addr.district}, ${addr.city}</div>
+            </label>
+          `).join('')}
+          <a href="{{ url_for('profile') }}" class="new-address-link">
+            ➕ Thêm địa chỉ mới
+          </a>
+        </div>
+      `;
+    } else {
+      addressSection = `
+        <div class="form-section">
+          <div class="form-section-title">
+            📍 Địa chỉ giao hàng
+          </div>
+          <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+            <p style="margin: 0; color: #666;">Bạn chưa có địa chỉ giao hàng</p>
+            <a href="{{ url_for('profile') }}" class="new-address-link">
+              ➕ Thêm địa chỉ mới
+            </a>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    // Guest checkout
+    addressSection = `
+      <div class="login-prompt">
+        <div class="login-prompt-icon">ℹ️</div>
+        <div class="login-prompt-text">
+          <a href="{{ url_for('login') }}">Đăng nhập</a> để lưu địa chỉ và quản lý đơn hàng dễ dàng hơn
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">
+          📍 Thông tin giao hàng
+        </div>
+        <div class="form-group">
+          <label>Họ và tên *</label>
+          <input type="text" id="guest-name" required>
+        </div>
+        <div class="form-group">
+          <label>Số điện thoại *</label>
+          <input type="tel" id="guest-phone" required pattern="[0-9]{10,11}">
+        </div>
+        <div class="form-group">
+          <label>Địa chỉ giao hàng *</label>
+          <textarea id="guest-address" required></textarea>
+        </div>
+      </div>
+    `;
+  }
+  
+  container.innerHTML = `
+    <div class="cart-content">
+      <div class="cart-items">
+        <h2 class="section-title">Sản phẩm</h2>
+        ${cartItemsHtml}
+      </div>
+      
+      <div class="cart-summary">
+        <h2 class="summary-title">Thanh toán</h2>
+        
+        <div class="summary-row">
+          <span>Tạm tính</span>
+          <span>${formatPrice(total)}</span>
+        </div>
+        
+        <div class="summary-row">
+          <span>Phí vận chuyển</span>
+          <span>${shipping === 0 ? 'Miễn phí' : formatPrice(shipping)}</span>
+        </div>
+        
+        ${shipping === 0 ? '' : `
+          <div style="font-size: 0.85em; color: #666; padding: 10px 0;">
+            💡 Mua thêm ${formatPrice(500000 - total)} để được miễn phí ship!
+          </div>
+        `}
+        
+        <div class="summary-row">
+          <span>Tổng cộng</span>
+          <span>${formatPrice(finalTotal)}</span>
+        </div>
+        
+        <form class="checkout-form" onsubmit="checkout(event)">
+          ${addressSection}
+          
+          <div class="form-section">
+            <div class="form-section-title">
+              💳 Phương thức thanh toán
+            </div>
+            <div class="payment-methods">
+              <label class="payment-option selected" onclick="selectPayment('cod')">
+                <input type="radio" name="payment" value="cod" checked>
+                <div class="payment-icon">💵</div>
+                <div class="payment-info">
+                  <div class="payment-name">Thanh toán khi nhận hàng</div>
+                  <div class="payment-desc">COD (Cash on Delivery)</div>
+                </div>
+              </label>
+              
+              <label class="payment-option" onclick="selectPayment('bank')">
+                <input type="radio" name="payment" value="bank">
+                <div class="payment-icon">🏦</div>
+                <div class="payment-info">
+                  <div class="payment-name">Chuyển khoản ngân hàng</div>
+                  <div class="payment-desc">Chuyển trước khi giao hàng</div>
+                </div>
+              </label>
+              
+              <label class="payment-option" onclick="selectPayment('card')">
+                <input type="radio" name="payment" value="card">
+                <div class="payment-icon">💳</div>
+                <div class="payment-info">
+                  <div class="payment-name">Thẻ tín dụng/ghi nợ</div>
+                  <div class="payment-desc">Visa, Mastercard, JCB</div>
+                </div>
+              </label>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Ghi chú đơn hàng</label>
+            <textarea id="order-note" placeholder="Ghi chú thêm về đơn hàng..."></textarea>
+          </div>
+          
+          <button type="submit" class="checkout-btn">
+            Đặt hàng (${formatPrice(finalTotal)})
+          </button>
+        </form>
+        
+        <div style="margin-top: 15px; text-align: center;">
+          <a href="{{ url_for('shop') }}" style="color: var(--tomato-500); text-decoration: none;">
+            ← Tiếp tục mua sắm
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectAddress(addressId) {
+  selectedAddress = addresses.find(a => a.id === addressId);
+  document.querySelectorAll('.address-selector').forEach(el => {
+    el.classList.remove('selected');
+  });
+  event.currentTarget.classList.add('selected');
+}
+
+function selectPayment(method) {
+  selectedPayment = method;
+  document.querySelectorAll('.payment-option').forEach(el => {
+    el.classList.remove('selected');
+  });
+  event.currentTarget.classList.add('selected');
+}
+
+async function checkout(event) {
+  event.preventDefault();
+  
+  const total = calculateTotal();
+  const shipping = total > 500000 ? 0 : 30000;
+  const finalTotal = total + shipping;
+  
+  let customerName, customerPhone, customerAddress;
+  
+  if (user) {
+    if (!selectedAddress && addresses.length > 0) {
+      alert('Vui lòng chọn địa chỉ giao hàng');
+      return;
+    }
+    if (!selectedAddress && addresses.length === 0) {
+      alert('Vui lòng thêm địa chỉ giao hàng trong trang cá nhân');
+      return;
+    }
+    
+    customerName = selectedAddress.full_name;
+    customerPhone = selectedAddress.phone;
+    customerAddress = `${selectedAddress.address}, ${selectedAddress.district}, ${selectedAddress.city}`;
+  } else {
+    // Guest checkout
+    customerName = document.getElementById('guest-name').value;
+    customerPhone = document.getElementById('guest-phone').value;
+    customerAddress = document.getElementById('guest-address').value;
+    
+    if (!customerName || !customerPhone || !customerAddress) {
+      alert('Vui lòng điền đầy đủ thông tin giao hàng');
+      return;
+    }
+  }
+  
+  const orderNote = document.getElementById('order-note').value;
+  
+  const orderData = {
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    customer_address: customerAddress,
+    order_note: orderNote,
+    items: cart,
+    subtotal: total,
+    shipping: shipping,
+    total: finalTotal,
+    payment_method: selectedPayment
+  };
+  
+  try {
+    const response = await fetch('/api/order/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(orderData)
+    });
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      let message = 'Đặt hàng thành công!';
+      
+      if (selectedPayment === 'bank') {
+        message += '\n\nThông tin chuyển khoản:\nNgân hàng: Vietcombank\nSTK: 1234567890\nChủ TK: Tomato AI\nNội dung: ' + result.order_id;
+      } else if (selectedPayment === 'card') {
+        message += '\n\nBạn sẽ được chuyển đến trang thanh toán...';
+      }
+      
+      alert(message);
+      
+      // Clear cart
+      cart = [];
+      saveCart();
+      
+      // Redirect after 1 second
+      setTimeout(() => {
+        if (user) {
+          window.location.href = '{{ url_for("profile") }}';
+        } else {
+          window.location.href = '{{ url_for("shop") }}';
+        }
+      }, 1000);
+    } else {
+      alert('Có lỗi xảy ra. Vui lòng thử lại!');
+    }
+  } catch (error) {
+    console.error('Checkout error:', error);
+    alert('Không thể kết nối đến server!');
+  }
+}
+
+function showToast(message, type = 'info') {
+  if (window.toast) {
+    window.toast.show(message, type);
+  } else {
+    alert(message);
+  }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  renderCart();
+});
+</script>
+
+{% endblock %}

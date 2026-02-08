@@ -47,6 +47,9 @@
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
   
   .game-card:hover {
@@ -81,18 +84,21 @@
     margin: 0 0 15px 0;
     color: var(--tomato-700);
     font-size: 1.8em;
+    min-height: 60px;
   }
   
   .game-card p {
     color: #666;
     line-height: 1.6;
     margin-bottom: 20px;
+    min-height: 48px;
   }
   
   .game-features {
     list-style: none;
     padding: 0;
     margin: 20px 0;
+    flex: 1;
   }
   
   .game-features li {
@@ -109,9 +115,7 @@
     font-weight: bold;
     font-size: 1.2em;
   }
-  
-  .play-btn {
-    display: inline-block;
+  block;
     width: 100%;
     padding: 14px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -122,6 +126,9 @@
     font-weight: 600;
     font-size: 1.1em;
     transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+    margin-top: autonsform 0.2s, box-shadow 0.2s;
     border: none;
     cursor: pointer;
   }
@@ -198,6 +205,31 @@
     opacity: 0.3;
     margin-bottom: 20px;
   }
+  
+  .leaderboards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 30px;
+    margin-bottom: 50px;
+  }
+  
+  @media (max-width: 768px) {
+    .games-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .leaderboards-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .game-header h1 {
+      font-size: 2em;
+    }
+    
+    .leaderboard-table {
+      font-size: 0.9em;
+    }
+  }
 </style>
 
 <div class="game-menu">
@@ -225,6 +257,24 @@
       </a>
     </div>
     
+    <!-- Memory Game Card -->
+    <div class="game-card">
+      <div class="game-icon">🃏</div>
+      <h2>Lật Ảnh Cà Chua</h2>
+      <p>Tìm các cặp ảnh lá cà chua giống nhau để ghi điểm!</p>
+      
+      <ul class="game-features">
+        <li>3 cấp độ: Dễ, Trung bình, Khó</li>
+        <li>Rèn luyện trí nhớ và tập trung</li>
+        <li>Thi đua tốc độ và số lượt</li>
+        <li>Bảng xếp hạng điểm cao</li>
+      </ul>
+      
+      <a href="{{ url_for('memory_game') }}" class="play-btn">
+        🚀 Bắt đầu chơi
+      </a>
+    </div>
+    
     <!-- Coming Soon Card -->
     <div class="game-card" style="opacity: 0.7; cursor: not-allowed;">
       <div class="game-icon">🎯</div>
@@ -244,53 +294,105 @@
     </div>
   </div>
   
-  <!-- Leaderboard -->
-  <div class="leaderboard">
-    <h2>
-      <span>🏆</span>
-      <span>Bảng xếp hạng Quiz</span>
-    </h2>
-    
-    {% if high_scores %}
-    <table class="leaderboard-table">
-      <thead>
-        <tr>
-          <th>Hạng</th>
-          <th>Tên</th>
-          <th>Điểm</th>
-          <th>Đúng/Tổng</th>
-          <th>Thời gian</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for score in high_scores %}
-        <tr>
-          <td>
-            <span class="rank-medal">
-              {% if loop.index == 1 %}🥇
-              {% elif loop.index == 2 %}🥈
-              {% elif loop.index == 3 %}🥉
-              {% else %}{{ loop.index }}
-              {% endif %}
-            </span>
-          </td>
-          <td><strong>{{ score.player_name }}</strong></td>
-          <td><span class="score-badge">{{ score.score }}</span></td>
-          <td>{{ score.correct_answers }}/{{ score.total_questions }}</td>
-          <td>{{ score.time_taken }}s</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-      <svg fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
-      </svg>
-      <p><strong>Chưa có ai chơi</strong></p>
-      <p>Hãy là người đầu tiên trên bảng xếp hạng!</p>
+  <!-- Leaderboards -->
+  <div class="leaderboards-grid">
+    <!-- Quiz Leaderboard -->
+    <div class="leaderboard">
+      <h2>
+        <span>🏆</span>
+        <span>Bảng xếp hạng Quiz</span>
+      </h2>
+      
+      {% if high_scores %}
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Hạng</th>
+            <th>Tên</th>
+            <th>Điểm</th>
+            <th>Đúng/Tổng</th>
+            <th>Thời gian</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for score in high_scores %}
+          <tr>
+            <td>
+              <span class="rank-medal">
+                {% if loop.index == 1 %}🥇
+                {% elif loop.index == 2 %}🥈
+                {% elif loop.index == 3 %}🥉
+                {% else %}{{ loop.index }}
+                {% endif %}
+              </span>
+            </td>
+            <td><strong>{{ score.player_name }}</strong></td>
+            <td><span class="score-badge">{{ score.score }}</span></td>
+            <td>{{ score.correct_answers }}/{{ score.total_questions }}</td>
+            <td>{{ score.time_taken }}s</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <svg fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+        </svg>
+        <p><strong>Chưa có ai chơi</strong></p>
+        <p>Hãy là người đầu tiên trên bảng xếp hạng!</p>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
+    
+    <!-- Memory Game Leaderboard -->
+    <div class="leaderboard">
+      <h2>
+        <span>🃏</span>
+        <span>Bảng xếp hạng Lật Ảnh</span>
+      </h2>
+      
+      {% if memory_high_scores %}
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Hạng</th>
+            <th>Tên</th>
+            <th>Điểm</th>
+            <th>Lượt</th>
+            <th>Thời gian</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for score in memory_high_scores %}
+          <tr>
+            <td>
+              <span class="rank-medal">
+                {% if loop.index == 1 %}🥇
+                {% elif loop.index == 2 %}🥈
+                {% elif loop.index == 3 %}🥉
+                {% else %}{{ loop.index }}
+                {% endif %}
+              </span>
+            </td>
+            <td><strong>{{ score.player_name }}</strong></td>
+            <td><span class="score-badge">{{ score.score }}</span></td>
+            <td>{{ score.moves }}</td>
+            <td>{{ score.time_taken }}s</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <svg fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+        </svg>
+        <p><strong>Chưa có ai chơi</strong></p>
+        <p>Hãy là người đầu tiên trên bảng xếp hạng!</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 

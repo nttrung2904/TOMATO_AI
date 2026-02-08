@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Đăng nhập | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .auth-container {
+    max-width: 450px;
+    margin: 60px auto;
+    padding: 20px;
+  }
+  
+  .auth-card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .auth-card {
+    background: var(--bg-secondary);
+  }
+  
+  .auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .auth-icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+  }
+  
+  .auth-header h1 {
+    margin: 0 0 10px 0;
+    color: var(--tomato-700);
+    font-size: 2em;
+  }
+  
+  [data-theme="dark"] .auth-header h1 {
+    color: var(--tomato-400);
+  }
+  
+  .auth-header p {
+    margin: 0;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .auth-header p {
+    color: #999;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+  }
+  
+  [data-theme="dark"] .form-group label {
+    color: #ccc;
+  }
+  
+  .form-group input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 1em;
+    transition: border 0.3s;
+    background: white;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .form-group input {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+    color: #ddd;
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+  }
+  
+  .form-group input::placeholder {
+    color: #999;
+  }
+  
+  .password-wrapper {
+    position: relative;
+  }
+  
+  .password-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2em;
+    color: #666;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  
+  [data-theme="dark"] .password-toggle {
+    color: #999;
+  }
+  
+  .password-toggle:hover {
+    color: var(--tomato-500);
+  }
+  
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+  }
+  
+  .submit-btn:hover {
+    background: var(--tomato-600);
+    transform: translateY(-2px);
+  }
+  
+  .auth-footer {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 1px solid #e0e0e0;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .auth-footer {
+    border-top-color: var(--bg-tertiary);
+    color: #999;
+  }
+  
+  .auth-footer a {
+    color: var(--tomato-500);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  
+  .auth-footer a:hover {
+    color: var(--tomato-600);
+    text-decoration: underline;
+  }
+  
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 25px 0;
+    color: #999;
+  }
+  
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  [data-theme="dark"] .divider::before,
+  [data-theme="dark"] .divider::after {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .divider span {
+    padding: 0 15px;
+    font-size: 0.9em;
+  }
+  
+  .guest-checkout {
+    width: 100%;
+    padding: 16px;
+    background: white;
+    color: var(--tomato-500);
+    border: 2px solid var(--tomato-500);
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .guest-checkout {
+    background: var(--bg-tertiary);
+  }
+  
+  .guest-checkout:hover {
+    background: var(--tomato-50);
+  }
+  
+  [data-theme="dark"] .guest-checkout:hover {
+    background: var(--tomato-900);
+  }
+  
+  @media (max-width: 768px) {
+    .auth-container {
+      margin: 20px auto;
+    }
+    
+    .auth-card {
+      padding: 30px 20px;
+    }
+  }
+</style>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-icon">🔐</div>
+      <h1>Đăng nhập</h1>
+      <p>Đăng nhập để quản lý đơn hàng và địa chỉ</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="form-group">
+        <label for="email">Email hoặc Tài khoản</label>
+        <input type="text" id="email" name="email" required 
+               placeholder="example@email.com hoặc admin"
+               autocomplete="username">
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Mật khẩu</label>
+        <div class="password-wrapper">
+          <input type="password" id="password" name="password" required 
+                 placeholder="Nhập mật khẩu"
+                 autocomplete="current-password">
+          <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
+            <span id="password-icon">👁️</span>
+          </button>
+        </div>
+      </div>
+      
+      <button type="submit" class="submit-btn">
+        Đăng nhập
+      </button>
+    </form>
+    
+    <div class="divider">
+      <span>hoặc</span>
+    </div>
+    
+    <button type="button" class="guest-checkout" onclick="guestCheckout()">
+      Mua hàng không cần tài khoản
+    </button>
+    
+    <div class="auth-footer">
+      Chưa có tài khoản? 
+      <a href="{{ url_for('register') }}">Đăng ký ngay</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function guestCheckout() {
+  window.location.href = '{{ url_for("cart") }}';
+}
+
+function togglePassword() {
+  const passwordInput = document.getElementById('password');
+  const passwordIcon = document.getElementById('password-icon');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    passwordIcon.textContent = '🙈';
+  } else {
+    passwordInput.type = 'password';
+    passwordIcon.textContent = '👁️';
+  }
+}
+</script>
+
+{% endblock %}

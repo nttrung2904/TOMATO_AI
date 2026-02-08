@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Đăng ký | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .auth-container {
+    max-width: 450px;
+    margin: 60px auto;
+    padding: 20px;
+  }
+  
+  .auth-card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  
+  .auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .auth-icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+  }
+  
+  .auth-header h1 {
+    margin: 0 0 10px 0;
+    color: var(--tomato-700);
+    font-size: 2em;
+  }
+  
+  .auth-header p {
+    margin: 0;
+    color: #666;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+  }
+  
+  .form-group input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 1em;
+    transition: border 0.3s;
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+  }
+  
+  .form-group input::placeholder {
+    color: #999;
+  }
+  
+  .password-wrapper {
+    position: relative;
+  }
+  
+  .password-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2em;
+    color: #666;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  
+  .password-toggle:hover {
+    color: var(--tomato-500);
+  }
+  
+  .password-hint {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+    margin-top: 10px;
+  }
+  
+  .submit-btn:hover {
+    background: var(--tomato-600);
+    transform: translateY(-2px);
+  }
+  
+  .auth-footer {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 1px solid #e0e0e0;
+    color: #666;
+  }
+  
+  .auth-footer a {
+    color: var(--tomato-500);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  
+  .auth-footer a:hover {
+    color: var(--tomato-600);
+    text-decoration: underline;
+  }
+  
+  .benefits {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+  }
+  
+  .benefits h3 {
+    margin: 0 0 12px 0;
+    color: #333;
+    font-size: 1em;
+  }
+  
+  .benefits ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  
+  .benefits li {
+    color: #555;
+    font-size: 0.9em;
+    margin: 6px 0;
+  }
+  
+  @media (max-width: 768px) {
+    .auth-container {
+      margin: 20px auto;
+    }
+    
+    .auth-card {
+      padding: 30px 20px;
+    }
+  }
+</style>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-icon">👤</div>
+      <h1>Đăng ký tài khoản</h1>
+      <p>Tạo tài khoản để trải nghiệm đầy đủ</p>
+    </div>
+    
+    <div class="benefits">
+      <h3>✨ Lợi ích khi đăng ký:</h3>
+      <ul>
+        <li>Quản lý đơn hàng dễ dàng</li>
+        <li>Lưu nhiều địa chỉ giao hàng</li>
+        <li>Thanh toán nhanh hơn</li>
+        <li>Nhận thông báo về đơn hàng</li>
+      </ul>
+    </div>
+    
+    <form method="POST" action="{{ url_for('register') }}" onsubmit="return validateForm()">
+      <div class="form-group">
+        <label for="full_name">Họ và tên *</label>
+        <input type="text" id="full_name" name="full_name" required 
+               placeholder="Nguyễn Văn A">
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input type="email" id="email" name="email" required 
+               placeholder="example@email.com">
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Mật khẩu *</label>
+        <div class="password-wrapper">
+          <input type="password" id="password" name="password" required 
+                 placeholder="Ít nhất 6 ký tự" minlength="6">
+          <button type="button" class="password-toggle" onclick="togglePassword('password', 'password-icon')" aria-label="Toggle password visibility">
+            <span id="password-icon">👁️</span>
+          </button>
+        </div>
+        <div class="password-hint">Mật khẩu phải có ít nhất 6 ký tự</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="confirm_password">Xác nhận mật khẩu *</label>
+        <div class="password-wrapper">
+          <input type="password" id="confirm_password" name="confirm_password" required 
+                 placeholder="Nhập lại mật khẩu">
+          <button type="button" class="password-toggle" onclick="togglePassword('confirm_password', 'confirm-icon')" aria-label="Toggle password visibility">
+            <span id="confirm-icon">👁️</span>
+          </button>
+        </div>
+      </div>
+      
+      <button type="submit" class="submit-btn">
+        Đăng ký
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      Đã có tài khoản? 
+      <a href="{{ url_for('login') }}">Đăng nhập</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function validateForm() {
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirm_password').value;
+  
+  if (password !== confirmPassword) {
+    alert('Mật khẩu xác nhận không khớp!');
+    return false;
+  }
+  
+  if (password.length < 6) {
+    alert('Mật khẩu phải có ít nhất 6 ký tự!');
+    return false;
+  }
+  
+  return true;
+}
+
+function togglePassword(inputId, iconId) {
+  const passwordInput = document.getElementById(inputId);
+  const passwordIcon = document.getElementById(iconId);
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    passwordIcon.textContent = '🙈';
+  } else {
+    passwordInput.type = 'password';
+    passwordIcon.textContent = '👁️';
+  }
+}
+</script>
+
+{% endblock %}
