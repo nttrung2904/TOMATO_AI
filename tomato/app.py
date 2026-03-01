@@ -1,4 +1,20 @@
 import io
+import sys
+
+# Fix Windows console encoding FIRST (before any print statements)
+if sys.platform == 'win32':
+    import codecs
+    try:
+        # Reconfigure stdout and stderr to use UTF-8
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        # Python < 3.7 fallback
+        if hasattr(sys.stdout, 'buffer'):
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+        if hasattr(sys.stderr, 'buffer'):
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+
 import numpy as np
 import pickle
 import os
@@ -7,7 +23,7 @@ import json
 import random
 import hashlib
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response, jsonify
 from functools import wraps
 import tensorflow as tf
 import shutil 
@@ -24,13 +40,26 @@ import threading
 from uuid import uuid4
 import logging
 from logging.handlers import RotatingFileHandler
-import sys
 from dotenv import load_dotenv
 import google.generativeai as genai
 from collections import Counter, defaultdict
 import time
 import hashlib
 from typing import Dict, List, Optional, Tuple, Any, Union
+import requests
+from decimal import Decimal
+from payment import VNPayPayment, MoMoPayment, get_client_ip
+from notifications import (
+    init_email_service, 
+    send_order_confirmation_email,
+    send_payment_success_email,
+    send_payment_failed_email,
+    send_welcome_email
+)
+try:
+    import markdown
+except ImportError:
+    markdown = None  # Fallback nếu chưa cài
 
 # Load biến môi trường từ file .env
 load_dotenv()
@@ -45,7 +74,7 @@ if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
         # Security: Chỉ hiển thị 8 ký tự đầu của API key
         masked_key = f"{GEMINI_API_KEY[:8]}***{GEMINI_API_KEY[-4:]}" if len(GEMINI_API_KEY) > 12 else "***"
-        print(f"✓ Gemini API key configured: {masked_key}")
+        print(f"[OK] Gemini API key configured: {masked_key}")
         
         # Khởi tạo model - không test ngay để tránh waste quota
         # Thử các model theo thứ tự: model miễn phí ổn định nhất trước
@@ -58,14 +87,14 @@ if GEMINI_API_KEY:
         # Khởi tạo model đầu tiên, sẽ test khi user gửi câu hỏi thật
         GEMINI_MODEL = genai.GenerativeModel(model_names[0])
         LAST_WORKING_MODEL = model_names[0]
-        print(f"✓ Gemini model initialized: {model_names[0]}")
-        print(f"✓ Chatbot ready to answer questions")
+        print(f"[OK] Gemini model initialized: {model_names[0]}")
+        print(f"[OK] Chatbot ready to answer questions")
         
     except Exception as e:
-        print(f"✗ Failed to configure Gemini API: {e}")
+        print(f"[ERROR] Failed to configure Gemini API: {e}")
         GEMINI_MODEL = None
 else:
-    print("⚠ GEMINI_API_KEY not found - chatbot will not work")
+    print("[WARNING] GEMINI_API_KEY not found - chatbot will not work")
 
 # Lưu ý: Các tiện ích trích xuất đặc trưng sâu được cung cấp bởi `utils.py` (get_feature_extractor,
 # compute_embedding). Tránh duplicate MobileNetV2/preprocess_input ở đây để ngăn
@@ -106,10 +135,8 @@ def setup_logging(app):
     # Xóa các handlers mặc định
     app.logger.handlers.clear()
     
-    # Console handler với output màu cho development
-    # Đặt UTF-8 encoding cho Windows console để xử lý ký tự tiếng Việt
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    # Console handler với output cho development
+    # UTF-8 encoding đã được set ở đầu file cho Windows
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter(
@@ -496,6 +523,82 @@ app.config['START_TIME'] = datetime.utcnow()
 # Sử dụng biến môi trường cho secret_key, với một giá trị mặc định an toàn cho môi trường dev
 app.secret_key = os.environ.get('SECRET_KEY', 'a-strong-default-secret-key-for-development-only')
 
+# ----------------- Payment Gateway Configuration -----------------
+# VNPay Configuration
+VNPAY_TMN_CODE = os.environ.get('VNPAY_TMN_CODE', '')
+VNPAY_SECRET_KEY = os.environ.get('VNPAY_SECRET_KEY', '')
+VNPAY_PAYMENT_URL = os.environ.get('VNPAY_PAYMENT_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html')
+VNPAY_RETURN_URL = os.environ.get('VNPAY_RETURN_URL', 'http://localhost:5000/payment/vnpay/callback')
+
+# MoMo Configuration
+MOMO_PARTNER_CODE = os.environ.get('MOMO_PARTNER_CODE', '')
+MOMO_ACCESS_KEY = os.environ.get('MOMO_ACCESS_KEY', '')
+MOMO_SECRET_KEY = os.environ.get('MOMO_SECRET_KEY', '')
+MOMO_PAYMENT_URL = os.environ.get('MOMO_PAYMENT_URL', 'https://test-payment.momo.vn/v2/gateway/api/create')
+MOMO_RETURN_URL = os.environ.get('MOMO_RETURN_URL', 'http://localhost:5000/payment/momo/callback')
+MOMO_NOTIFY_URL = os.environ.get('MOMO_NOTIFY_URL', 'http://localhost:5000/payment/momo/ipn')
+
+# Initialize payment gateways
+vnpay_payment = None
+momo_payment = None
+
+if VNPAY_TMN_CODE and VNPAY_SECRET_KEY:
+    vnpay_payment = VNPayPayment(
+        tmn_code=VNPAY_TMN_CODE,
+        secret_key=VNPAY_SECRET_KEY,
+        payment_url=VNPAY_PAYMENT_URL,
+        return_url=VNPAY_RETURN_URL
+    )
+    print(f"[OK] VNPay payment gateway configured")
+else:
+    print("[WARNING] VNPay not configured - payment with VNPay will not work")
+
+if MOMO_PARTNER_CODE and MOMO_ACCESS_KEY and MOMO_SECRET_KEY:
+    momo_payment = MoMoPayment(
+        partner_code=MOMO_PARTNER_CODE,
+        access_key=MOMO_ACCESS_KEY,
+        secret_key=MOMO_SECRET_KEY,
+        payment_url=MOMO_PAYMENT_URL,
+        return_url=MOMO_RETURN_URL,
+        notify_url=MOMO_NOTIFY_URL
+    )
+    print(f"[OK] MoMo payment gateway configured")
+else:
+    print("[WARNING] MoMo not configured - payment with MoMo will not work")
+
+# ----------------- Email Notification Configuration -----------------
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', SMTP_USER)
+SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'Tomato AI')
+
+# Initialize email service
+if SMTP_USER and SMTP_PASSWORD:
+    init_email_service(
+        smtp_host=SMTP_HOST,
+        smtp_port=SMTP_PORT,
+        smtp_user=SMTP_USER,
+        smtp_password=SMTP_PASSWORD,
+        from_email=SMTP_FROM_EMAIL,
+        from_name=SMTP_FROM_NAME
+    )
+    print(f"[OK] Email notification service configured: {SMTP_FROM_EMAIL}")
+else:
+    print("[WARNING] Email service not configured - email notifications will not work")
+
+# ----------------- Weather API Configuration -----------------
+OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY', '')
+WEATHER_CACHE = {}  # Simple in-memory cache: {cache_key: (data, timestamp)}
+WEATHER_CACHE_TTL = 600  # 10 minutes
+
+if OPENWEATHER_API_KEY:
+    masked_key = f"{OPENWEATHER_API_KEY[:8]}***{OPENWEATHER_API_KEY[-4:]}" if len(OPENWEATHER_API_KEY) > 12 else "***"
+    print(f"[OK] OpenWeatherMap API configured: {masked_key}")
+else:
+    print("[WARNING] OpenWeatherMap API key not configured - weather features will not work")
+
 # ----------------- Jinja2 Custom Filters -----------------
 @app.template_filter('format_number')
 def format_number_filter(value):
@@ -528,16 +631,23 @@ def authenticate():
     return response
 
 def requires_admin_auth(f):
-    """Decorator to require HTTP Basic Auth for admin routes."""
+    """Decorator to require admin authentication (session or HTTP Basic Auth)."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Kiểm tra session trước - nếu đã đăng nhập qua form và là admin
+        if session.get('is_admin'):
+            return f(*args, **kwargs)
+        
+        # Nếu chưa có session admin, thử HTTP Basic Auth
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
             app.logger.warning(
                 "Unauthorized admin access attempt from %s to %s",
                 request.remote_addr, request.path
             )
-            return authenticate()
+            # Chuyển hướng về trang login thay vì hiện HTTP Basic Auth dialog
+            flash('Vui lòng đăng nhập với tài khoản quản trị viên', 'warning')
+            return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -846,21 +956,21 @@ def get_gemini_response(user_question: str) -> str:
     global LAST_WORKING_MODEL
     
     if not GEMINI_API_KEY:
-        return "⚠️ Hệ thống chatbot chưa được cấu hình. Vui lòng liên hệ quản trị viên."
+        return "[!] Hệ thống chatbot chưa được cấu hình. Vui lòng liên hệ quản trị viên."
     
     if not GEMINI_MODEL:
-        return "⚠️ Không thể khởi tạo model AI. Vui lòng liên hệ quản trị viên."
+        return "[!] Không thể khởi tạo model AI. Vui lòng liên hệ quản trị viên."
     
     # Check FAQ first (nhanh và không tốn quota)
     faq_answer = check_faq_response(user_question)
     if faq_answer:
-        app.logger.info("✓ Answer from FAQ")
+        app.logger.info("[OK] Answer from FAQ")
         return faq_answer
     
     # Check cache
     cached = get_cached_response(user_question)
     if cached:
-        app.logger.info("✓ Answer from cache")
+        app.logger.info("[OK] Answer from cache")
         return cached
     
     # Danh sách model để thử (ưu tiên model đã thành công)
@@ -921,7 +1031,7 @@ QUAN TRỌNG:
                     answer = ''.join(part.text for part in candidate.content.parts if hasattr(part, 'text')).strip()
                 
                 if answer and len(answer) >= CHAT_MIN_ANSWER_LENGTH:
-                    app.logger.info(f"✓ Success with {model_name} (finish: {finish_reason})")
+                    app.logger.info(f"[OK] Success with {model_name} (finish: {finish_reason})")
                     LAST_WORKING_MODEL = model_name
                     # Cache response
                     cache_response(user_question, answer)
@@ -936,7 +1046,7 @@ QUAN TRỌNG:
             
             # Auth errors - dừng ngay
             if "401" in error_msg or "403" in error_msg or "API key" in error_msg:
-                return "🔒 API key không hợp lệ. Vui lòng liên hệ quản trị viên."
+                return "[AUTH ERROR] API key không hợp lệ. Vui lòng liên hệ quản trị viên."
             
             # Quota errors - thử model khác
             if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
@@ -960,12 +1070,12 @@ QUAN TRỌNG:
     # Error messages
     if last_error:
         if "429" in last_error or "quota" in last_error.lower() or "RESOURCE_EXHAUSTED" in last_error:
-            return ("⚠️ Hệ thống chatbot tạm thời quá tải (đã hết quota miễn phí). "
+            return ("[!] Hệ thống chatbot tạm thời quá tải (đã hết quota miễn phí). "
                    "Vui lòng thử lại sau hoặc liên hệ quản trị viên.")
         elif "timeout" in last_error.lower():
-            return "⚠️ Hệ thống phản hồi quá chậm. Vui lòng thử lại với câu hỏi ngắn gọn hơn."
+            return "[!] Hệ thống phản hồi quá chậm. Vui lòng thử lại với câu hỏi ngắn gọn hơn."
     
-    return "⚠️ Không thể kết nối với chatbot. Vui lòng thử lại sau hoặc tham khảo mục Giới thiệu."
+    return "[!] Không thể kết nối với chatbot. Vui lòng thử lại sau hoặc tham khảo mục Giới thiệu."
 
 # Hàm giả để xử lý lỗi "Could not locate function '_input_preprocess_layer'"
 # Lỗi này xảy ra khi model được lưu có chứa custom object (ví dụ: Lambda layer)
@@ -1561,6 +1671,21 @@ def history():
     """Hiển thị lịch sử dự đoán"""
     try:
         history_list = _read_history_file()
+        
+        # Nếu không phải admin, chỉ hiện lịch sử của user hiện tại
+        if not session.get('is_admin'):
+            current_user_id = session.get('user_id')
+            current_user_email = session.get('user_email')
+            
+            # Filter lịch sử - CHỈ hiện entry của user hiện tại
+            # Không hiện các entry cũ không có user_id (để tránh nhầm lẫn)
+            history_list = [
+                entry for entry in history_list
+                if (entry.get('user_id') == current_user_id or 
+                    entry.get('user_email') == current_user_email) and
+                   (entry.get('user_id') or entry.get('user_email'))  # Chỉ lấy entry có user info
+            ]
+        
         # Sắp xếp theo thời gian mới nhất trước
         history_list.reverse()
         return render_template('history.html', history=history_list)
@@ -1767,12 +1892,62 @@ def submit_quiz():
         # Calculate score (100 points per correct answer)
         score = correct_count * 100
         
-        # Check for perfect score
+        # Check for perfect score or high score (>70%)
         perfect_score = (correct_count == total_questions)
+        high_score = (correct_count >= total_questions * 0.7)  # 70% trở lên
         voucher = None
         
-        if perfect_score:
-            voucher = _generate_voucher(player_name)
+        # Award voucher for high score
+        if high_score:
+            base_value = 50000 if perfect_score else 30000  # 50k for perfect, 30k for high score
+            
+            # Generate voucher code
+            voucher_code = f"QUIZ{str(uuid4())[:8].upper()}"
+            
+            # If user is logged in, add voucher to account with membership boost
+            if 'user_id' in session and session.get('user_id') != 'admin':
+                user_id = session.get('user_id')
+                user = get_user_by_id(user_id)
+                
+                if user:
+                    # Apply membership voucher boost
+                    tier = user.get('membership_tier', 'bronze')
+                    benefits = get_membership_benefits(tier)
+                    voucher_value = int(base_value * benefits.get('voucher_boost', 1.0))
+                    
+                    # Add voucher to user account
+                    add_voucher_to_user(user_id, voucher_code, voucher_value, 'quiz')
+                    
+                    # Update user statistics
+                    quiz_completed = user.get('quiz_completed', 0) + 1
+                    update_user(user_id, {'quiz_completed': quiz_completed})
+                    
+                    # Award points for completing quiz
+                    add_points(user_id, 50, 'quiz_completed', 'Hoàn thành quiz kiến thức')
+                    session['user_points'] = user.get('points', 0) + 50
+                    
+                    # Update quest progress
+                    update_quest_progress(user_id, 'game', increment=1)
+                    
+                    # Check achievements
+                    if perfect_score:
+                        check_and_award_achievements(user_id, 'quiz', {'perfect': True})
+                    
+                    voucher = {
+                        'code': voucher_code,
+                        'value': voucher_value,
+                        'message': f'Mã đã được lưu vào tài khoản! Giảm {voucher_value:,}đ',
+                        'auto_added': True
+                    }
+            else:
+                # User not logged in - just show voucher code to copy
+                voucher_value = base_value
+                voucher = {
+                    'code': voucher_code,
+                    'value': voucher_value,
+                    'message': f'Đăng nhập và nhập mã để nhận giảm giá {voucher_value:,}đ!',
+                    'auto_added': False
+                }
         
         # Save score
         _save_quiz_score(player_name, score, correct_count, total_questions, time_taken)
@@ -1786,6 +1961,7 @@ def submit_quiz():
             'correct_answers': correct_count,
             'total_questions': total_questions,
             'perfect_score': perfect_score,
+            'high_score': high_score,
             'voucher': voucher,
             'high_scores': high_scores
         }
@@ -1881,10 +2057,78 @@ def submit_memory():
         if not player_name:
             player_name = 'Anonymous'
         
+        # Award voucher for high score (based on difficulty)
+        voucher = None
+        min_score_for_voucher = {
+            'easy': 700,
+            'medium': 900,
+            'hard': 1100
+        }
+        
+        if score >= min_score_for_voucher.get(difficulty, 900):
+            # Base voucher value increases with difficulty
+            base_values = {
+                'easy': 15000,    # 15k for easy
+                'medium': 25000,  # 25k for medium
+                'hard': 40000     # 40k for hard
+            }
+            base_value = base_values.get(difficulty, 25000)
+            
+            # Generate voucher code
+            voucher_code = f"MEM{str(uuid4())[:8].upper()}"
+            
+            # If user is logged in, add voucher to account with membership boost
+            if 'user_id' in session and session.get('user_id') != 'admin':
+                user_id = session.get('user_id')
+                user = get_user_by_id(user_id)
+                
+                if user:
+                    # Apply membership voucher boost
+                    tier = user.get('membership_tier', 'bronze')
+                    benefits = get_membership_benefits(tier)
+                    voucher_value = int(base_value * benefits.get('voucher_boost', 1.0))
+                    
+                    # Add voucher to user account
+                    add_voucher_to_user(user_id, voucher_code, voucher_value, 'memory_game')
+                    
+                    # Update user statistics
+                    memory_completed = user.get('memory_completed', 0) + 1
+                    update_user(user_id, {'memory_completed': memory_completed})
+                    
+                    # Award points for completing memory game
+                    add_points(user_id, 30, 'memory_game', 'Hoàn thành trò chơi trí nhớ')
+                    session['user_points'] = user.get('points', 0) + 30
+                    
+                    # Update quest progress
+                    update_quest_progress(user_id, 'game', increment=1)
+                    
+                    # Check achievements (fast completion)
+                    if time_taken < 20:
+                        check_and_award_achievements(user_id, 'memory', {'fast': True, 'time': time_taken})
+                    
+                    voucher = {
+                        'code': voucher_code,
+                        'value': voucher_value,
+                        'message': f'Mã đã được lưu vào tài khoản! Giảm {voucher_value:,}đ',
+                        'auto_added': True
+                    }
+            else:
+                # User not logged in - just show voucher code to copy
+                voucher_value = base_value
+                voucher = {
+                    'code': voucher_code,
+                    'value': voucher_value,
+                    'message': f'Đăng nhập và nhập mã để nhận giảm giá {voucher_value:,}đ!',
+                    'auto_added': False
+                }
+        
         # Save score
         _save_memory_score(player_name, score, moves, time_taken, difficulty, pairs)
         
-        return {'ok': True}
+        return {
+            'ok': True,
+            'voucher': voucher
+        }
         
     except Exception as e:
         app.logger.exception('Error submitting memory game score')
@@ -1900,12 +2144,831 @@ def get_memory_scores():
         app.logger.exception('Error getting memory scores')
         return {'ok': False, 'error': str(e)}, 500
 
+# ==================== FARM GAME ====================
+
+# Farm game constants
+FARM_DISEASES = [
+    {'id': 'healthy', 'name': 'Khỏe mạnh', 'icon': '🌱', 'treatment': None, 'damage': 0},
+    {'id': 'Tomato___Late_blight', 'name': 'Mốc sương', 'icon': '🍄', 'treatment': 'Thuốc trừ nấm', 'damage': 30},
+    {'id': 'Tomato___Early_blight', 'name': 'Bệnh sớm', 'icon': '🦠', 'treatment': 'Thuốc trừ nấm', 'damage': 25},
+    {'id': 'Tomato___Septoria_leaf_spot', 'name': 'Đốm lá Septoria', 'icon': '⚫', 'treatment': 'Thuốc trừ nấm', 'damage': 20},
+    {'id': 'Tomato___Bacterial_spot', 'name': 'Đốm vi khuẩn', 'icon': '🔴', 'treatment': 'Thuốc kháng sinh', 'damage': 25},
+    {'id': 'Tomato___Target_Spot', 'name': 'Đốm mục tiêu', 'icon': '🎯', 'treatment': 'Thuốc trừ nấm', 'damage': 20},
+    {'id': 'Tomato___Leaf_Mold', 'name': 'Mốc lá', 'icon': '🍂', 'treatment': 'Thuốc trừ nấm', 'damage': 15},
+    {'id': 'Tomato___Spider_mites', 'name': 'Nhện đỏ', 'icon': '🕷️', 'treatment': 'Thuốc trừ sâu', 'damage': 20},
+    {'id': 'Tomato___Yellow_Leaf_Curl_Virus', 'name': 'Virus khảm lá', 'icon': '🦠', 'treatment': 'Thuốc trừ ruồi trắng', 'damage': 35},
+    {'id': 'Tomato___Mosaic_virus', 'name': 'Virus khảm', 'icon': '🌈', 'treatment': 'Loại bỏ cây', 'damage': 40}
+]
+
+FARM_ITEMS = {
+    'water': {'name': 'Nước', 'icon': '💧', 'price': 0, 'effect': 'Giữ cây sống'},
+    'fertilizer': {'name': 'Phân bón', 'icon': '🌾', 'price': 50, 'effect': 'Tăng tốc độ lớn 20%'},
+    'fungicide': {'name': 'Thuốc trừ nấm', 'icon': '💊', 'price': 100, 'effect': 'Chữa bệnh nấm'},
+    'pesticide': {'name': 'Thuốc trừ sâu', 'icon': '🧪', 'effect': 'Chữa sâu/nhện', 'price': 100},
+    'antibiotic': {'name': 'Thuốc kháng sinh', 'icon': '💉', 'price': 150, 'effect': 'Chữa vi khuẩn'},
+    'premium_fertilizer': {'name': 'Phân cao cấp', 'icon': '✨', 'price': 200, 'effect': 'Tăng tốc 50%'}
+}
+
+def _get_farm_progress(user_id):
+    """Load farm progress for a user"""
+    try:
+        progress_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
+        if not progress_file.exists():
+            return None
+        
+        with open(progress_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line.strip())
+                    if data.get('user_id') == user_id:
+                        return data
+                except json.JSONDecodeError:
+                    continue
+        return None
+    except Exception:
+        app.logger.exception('Error loading farm progress')
+        return None
+
+def _save_farm_progress(user_id, progress_data):
+    """Save farm progress for a user"""
+    try:
+        progress_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
+        progress_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load existing data
+        all_data = []
+        if progress_file.exists():
+            with open(progress_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        data = json.loads(line.strip())
+                        if data.get('user_id') != user_id:
+                            all_data.append(data)
+                    except json.JSONDecodeError:
+                        continue
+        
+        # Add new data
+        progress_data['user_id'] = user_id
+        progress_data['updated_at'] = datetime.utcnow().isoformat()
+        all_data.append(progress_data)
+        
+        # Write all data
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            for data in all_data:
+                f.write(json.dumps(data, ensure_ascii=False) + '\n')
+        
+        return True
+    except Exception:
+        app.logger.exception('Error saving farm progress')
+        return False
+
+@app.route('/game/farm')
+def farm_game():
+    """Tomato RPG game - control character to farm"""
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập để chơi game')
+        return redirect(url_for('login'))
+    
+    user_id = session.get('user_id')
+    progress = _get_farm_progress(user_id)
+    
+    # Initialize new farm if no progress
+    if not progress:
+        progress = {
+            'coins': 100,
+            'plants': [None] * 6,  # 6 slots, None = empty
+            'inventory': {
+                'water': 10,
+                'fertilizer': 5,
+                'pesticide': 2,
+                'medicine': 1
+            },
+            'total_harvested': 0,
+            'total_earned': 0,
+            'level': 1
+        }
+        _save_farm_progress(user_id, progress)
+    
+    # Ensure plants is a list with proper structure
+    if not isinstance(progress['plants'], list):
+        progress['plants'] = [None] * 6
+    
+    return render_template('farm_rpg.html', progress=progress)
+
+@app.route('/api/farm/plant', methods=['POST'])
+def farm_plant():
+    """Plant a new tomato in a slot"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        slot = data.get('slot', 0)
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check if user has enough coins
+        plant_cost = 20
+        if progress['coins'] < plant_cost:
+            return {'ok': False, 'error': 'Không đủ xu!'}, 400
+        
+        # Check if slot is valid and empty
+        if slot < 0 or slot >= len(progress['plants']):
+            return {'ok': False, 'error': 'Slot không hợp lệ'}, 400
+        
+        if progress['plants'][slot] is not None:
+            return {'ok': False, 'error': 'Ô này đã có cây rồi!'}, 400
+        
+        # Create new plant
+        plant = {
+            'id': str(uuid4())[:8],
+            'planted_at': datetime.utcnow().isoformat(),
+            'stage': 'seed',
+            'health': 100,
+            'disease': None,
+            'last_watered': datetime.utcnow().isoformat(),
+            'last_fertilized': None
+        }
+        
+        progress['plants'][slot] = plant
+        progress['coins'] -= plant_cost
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress}
+        
+    except Exception as e:
+        app.logger.exception('Error planting')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/water', methods=['POST'])
+def farm_water_new():
+    """Water a plant in slot"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        slot = data.get('slot', 0)
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check water in inventory
+        if progress['inventory'].get('water', 0) <= 0:
+            return {'ok': False, 'error': 'Hết nước! Mua thêm ở cửa hàng.'}, 400
+        
+        # Check if slot is valid and has plant
+        if slot < 0 or slot >= len(progress['plants']) or progress['plants'][slot] is None:
+            return {'ok': False, 'error': 'Không có cây ở đây!'}, 400
+        
+        plant = progress['plants'][slot]
+        
+        # Water the plant - boost health slightly
+        plant['health'] = min(100, plant['health'] + 5)
+        plant['last_watered'] = datetime.utcnow().isoformat()
+        progress['inventory']['water'] -= 1
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress}
+        
+    except Exception as e:
+        app.logger.exception('Error watering')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/fertilize', methods=['POST'])
+def farm_fertilize_new():
+    """Fertilize a plant in slot"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        slot = data.get('slot', 0)
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check fertilizer in inventory
+        if progress['inventory'].get('fertilizer', 0) <= 0:
+            return {'ok': False, 'error': 'Hết phân bón!'}, 400
+        
+        # Check if slot is valid and has plant
+        if slot < 0 or slot >= len(progress['plants']) or progress['plants'][slot] is None:
+            return {'ok': False, 'error': 'Không có cây ở đây!'}, 400
+        
+        plant = progress['plants'][slot]
+        
+        # Fertilize - speed up growth
+        plant['health'] = min(100, plant['health'] + 10)
+        plant['last_fertilized'] = datetime.utcnow().isoformat()
+        progress['inventory']['fertilizer'] -= 1
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress}
+        
+    except Exception as e:
+        app.logger.exception('Error fertilizing')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/treat', methods=['POST'])
+def farm_treat_new():
+    """Treat a diseased plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        slot = data.get('slot', 0)
+        medicine = data.get('medicine', 'medicine')
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check if slot is valid and has plant
+        if slot < 0 or slot >= len(progress['plants']) or progress['plants'][slot] is None:
+            return {'ok': False, 'error': 'Không có cây ở đây!'}, 400
+        
+        plant = progress['plants'][slot]
+        
+        if not plant.get('disease'):
+            return {'ok': False, 'error': 'Cây không bị bệnh!'}, 400
+        
+        # Check medicine in inventory
+        if progress['inventory'].get(medicine, 0) <= 0:
+            return {'ok': False, 'error': f'Hết {medicine}!'}, 400
+        
+        # Cure the disease
+        plant['disease'] = None
+        plant['health'] = min(100, plant['health'] + 20)
+        progress['inventory'][medicine] -= 1
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress}
+        
+    except Exception as e:
+        app.logger.exception('Error treating')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/harvest', methods=['POST'])
+def farm_harvest_new():
+    """Harvest a mature plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        slot = data.get('slot', 0)
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check if slot is valid and has plant
+        if slot < 0 or slot >= len(progress['plants']) or progress['plants'][slot] is None:
+            return {'ok': False, 'error': 'Không có cây ở đây!'}, 400
+        
+        plant = progress['plants'][slot]
+        
+        if plant['stage'] != 'fruiting':
+            return {'ok': False, 'error': 'Cây chưa ra quả!'}, 400
+        
+        # Calculate reward based on health
+        base_reward = 50
+        health_bonus = int(base_reward * (plant['health'] / 100))
+        total_reward = base_reward + health_bonus
+        
+        # Give reward
+        progress['coins'] += total_reward
+        progress['total_harvested'] += 1
+        progress['total_earned'] += total_reward
+        
+        # Check level up
+        harvests_for_next_level = progress['level'] * 10
+        if progress['total_harvested'] >= harvests_for_next_level:
+            progress['level'] += 1
+        
+        # Remove plant from slot
+        progress['plants'][slot] = None
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress, 'reward': total_reward}
+        
+    except Exception as e:
+        app.logger.exception('Error harvesting')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/buy', methods=['POST'])
+def farm_buy_new():
+    """Buy an item from shop"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        item = data.get('item')
+        
+        progress = _get_farm_progress(user_id)
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Item prices
+        prices = {
+            'seed': 20,
+            'water': 5,
+            'fertilizer': 15,
+            'pesticide': 20,
+            'medicine': 30
+        }
+        
+        if item not in prices:
+            return {'ok': False, 'error': 'Item không tồn tại!'}, 400
+        
+        price = prices[item]
+        
+        # Check if user has enough coins
+        if progress['coins'] < price:
+            return {'ok': False, 'error': 'Không đủ xu!'}, 400
+        
+        # Buy item (seed is special - doesn't go to inventory)
+        if item != 'seed':
+            progress['inventory'][item] = progress['inventory'].get(item, 0) + 1
+        
+        progress['coins'] -= price
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'progress': progress}
+        
+    except Exception as e:
+        app.logger.exception('Error buying')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/water/<plant_id>', methods=['POST'])
+def farm_water(plant_id):
+    """Water a plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check water in inventory
+        if progress['inventory'].get('water', 0) <= 0:
+            return {'ok': False, 'error': 'Hết nước! Mua thêm trong cửa hàng.'}, 400
+        
+        # Find plant
+        plant = next((p for p in progress['plants'] if p['id'] == plant_id), None)
+        if not plant:
+            return {'ok': False, 'error': 'Plant not found'}, 404
+        
+        # Water the plant
+        plant['water_level'] = min(100, plant['water_level'] + 50)
+        progress['inventory']['water'] -= 1
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'plant': plant, 'inventory': progress['inventory']}
+        
+    except Exception as e:
+        app.logger.exception('Error watering')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/fertilize/<plant_id>', methods=['POST'])
+def farm_fertilize(plant_id):
+    """Fertilize a plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        data = request.get_json() or {}
+        fertilizer_type = data.get('type', 'fertilizer')
+        
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check fertilizer in inventory
+        if progress['inventory'].get(fertilizer_type, 0) <= 0:
+            return {'ok': False, 'error': f'Hết {FARM_ITEMS[fertilizer_type]["name"]}!'}, 400
+        
+        # Find plant
+        plant = next((p for p in progress['plants'] if p['id'] == plant_id), None)
+        if not plant:
+            return {'ok': False, 'error': 'Plant not found'}, 404
+        
+        # Apply fertilizer
+        plant['fertilized'] = fertilizer_type
+        progress['inventory'][fertilizer_type] -= 1
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {'ok': True, 'plant': plant, 'inventory': progress['inventory']}
+        
+    except Exception as e:
+        app.logger.exception('Error fertilizing')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/treat/<plant_id>', methods=['POST'])
+def farm_treat(plant_id):
+    """Treat a diseased plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        data = request.get_json() or {}
+        treatment = data.get('treatment')
+        
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Find plant
+        plant = next((p for p in progress['plants'] if p['id'] == plant_id), None)
+        if not plant or not plant.get('disease'):
+            return {'ok': False, 'error': 'Cây không bệnh!'}, 400
+        
+        # Get disease info
+        disease = next((d for d in FARM_DISEASES if d['id'] == plant['disease']), None)
+        if not disease:
+            return {'ok': False, 'error': 'Unknown disease'}, 400
+        
+        # Check if treatment is correct
+        treatment_map = {
+            'Thuốc trừ nấm': 'fungicide',
+            'Thuốc trừ sâu': 'pesticide',
+            'Thuốc kháng sinh': 'antibiotic',
+            'Loại bỏ cây': 'remove'
+        }
+        
+        required_item = treatment_map.get(disease['treatment'])
+        
+        if treatment == 'remove':
+            # Remove the plant
+            progress['plants'] = [p for p in progress['plants'] if p['id'] != plant_id]
+            _save_farm_progress(user_id, progress)
+            return {'ok': True, 'removed': True, 'message': 'Đã loại bỏ cây bệnh'}
+        
+        # Check if user has the right treatment
+        if not required_item or progress['inventory'].get(required_item, 0) <= 0:
+            return {'ok': False, 'error': f'Cần {disease["treatment"]} để chữa bệnh này!'}, 400
+        
+        # Apply treatment
+        if treatment == required_item:
+            plant['disease'] = None
+            plant['health'] = min(100, plant['health'] + 20)
+            progress['inventory'][required_item] -= 1
+            
+            _save_farm_progress(user_id, progress)
+            
+            return {'ok': True, 'plant': plant, 'inventory': progress['inventory']}
+        else:
+            return {'ok': False, 'error': 'Sai loại thuốc!'}, 400
+        
+    except Exception as e:
+        app.logger.exception('Error treating')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/harvest/<plant_id>', methods=['POST'])
+def farm_harvest(plant_id):
+    """Harvest a mature plant"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Find plant
+        plant = next((p for p in progress['plants'] if p['id'] == plant_id), None)
+        if not plant:
+            return {'ok': False, 'error': 'Plant not found'}, 404
+        
+        # Check if plant is ready to harvest
+        if plant['stage'] != 'fruiting' or plant.get('disease'):
+            return {'ok': False, 'error': 'Cây chưa sẵn sàng thu hoạch!'}, 400
+        
+        # Calculate yield based on health
+        base_yield = 50
+        health_multiplier = plant['health'] / 100
+        yield_coins = int(base_yield * health_multiplier)
+        
+        # Bonus for perfect health
+        if plant['health'] >= 95:
+            yield_coins = int(yield_coins * 1.5)
+        
+        # Remove plant and add coins
+        progress['plants'] = [p for p in progress['plants'] if p['id'] != plant_id]
+        progress['coins'] += yield_coins
+        progress['total_harvested'] = progress.get('total_harvested', 0) + 1
+        progress['total_earned'] = progress.get('total_earned', 0) + yield_coins
+        
+        # Level up check
+        harvests_needed = progress.get('level', 1) * 5
+        if progress['total_harvested'] >= harvests_needed:
+            progress['level'] = progress.get('level', 1) + 1
+            leveled_up = True
+        else:
+            leveled_up = False
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {
+            'ok': True,
+            'yield': yield_coins,
+            'coins': progress['coins'],
+            'total_harvested': progress['total_harvested'],
+            'leveled_up': leveled_up,
+            'level': progress.get('level', 1)
+        }
+        
+    except Exception as e:
+        app.logger.exception('Error harvesting')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/buy', methods=['POST'])
+def farm_buy():
+    """Buy items from shop"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        data = request.get_json() or {}
+        item = data.get('item')
+        quantity = data.get('quantity', 1)
+        
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        # Check if item exists
+        if item not in FARM_ITEMS:
+            return {'ok': False, 'error': 'Item not found'}, 404
+        
+        # Calculate cost
+        item_data = FARM_ITEMS[item]
+        total_cost = item_data['price'] * quantity
+        
+        # Check if user has enough coins
+        if progress['coins'] < total_cost:
+            return {'ok': False, 'error': 'Không đủ xu!'}, 400
+        
+        # Add item to inventory
+        progress['inventory'][item] = progress['inventory'].get(item, 0) + quantity
+        progress['coins'] -= total_cost
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {
+            'ok': True,
+            'inventory': progress['inventory'],
+            'coins': progress['coins']
+        }
+        
+    except Exception as e:
+        app.logger.exception('Error buying item')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/farm/update', methods=['POST'])
+def farm_update():
+    """Update farm state (called periodically by client)"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session.get('user_id')
+        progress = _get_farm_progress(user_id)
+        
+        if not progress:
+            return {'ok': False, 'error': 'No farm data'}, 400
+        
+        current_time = datetime.utcnow()
+        
+        # Update each plant in slots
+        for i, plant in enumerate(progress['plants']):
+            if plant is None:  # Skip empty slots
+                continue
+                
+            planted_time = datetime.fromisoformat(plant['planted_at'])
+            age_seconds = (current_time - planted_time).total_seconds()
+            
+            # Growth stages (in seconds)
+            stage_durations = {
+                'seed': 30,      # 30s
+                'sprout': 60,    # 1 min
+                'growing': 120,  # 2 min
+                'mature': 120,   # 2 min
+                'fruiting': 0    # ready to harvest
+            }
+            
+            # Apply fertilizer speed boost
+            if plant.get('last_fertilized'):
+                fertilized_time = datetime.fromisoformat(plant['last_fertilized'])
+                if (current_time - fertilized_time).total_seconds() < 300:  # Boost for 5 minutes
+                    age_seconds *= 1.3
+            
+            # Determine stage
+            total = 0
+            for stage, duration in stage_durations.items():
+                total += duration
+                if age_seconds < total:
+                    plant['stage'] = stage
+                    break
+            else:
+                plant['stage'] = 'fruiting'
+            
+            # Health decreases slowly over time if not watered
+            if plant.get('last_watered'):
+                watered_time = datetime.fromisoformat(plant['last_watered'])
+                minutes_since_water = (current_time - watered_time).total_seconds() / 60
+                if minutes_since_water > 5:  # Start losing health after 5 min without water
+                    plant['health'] = max(0, plant['health'] - int((minutes_since_water - 5) * 0.5))
+            
+            # Random disease (3% chance if health < 70)
+            if plant['stage'] in ['growing', 'mature', 'fruiting'] and plant['health'] < 70 and not plant.get('disease'):
+                if random.random() < 0.03:  # 3% chance
+                    diseases = ['leaf_spot', 'pests', 'thirsty']
+                    plant['disease'] = random.choice(diseases)
+            
+            # Disease damage
+            if plant.get('disease'):
+                disease_damage = {'leaf_spot': 0.5, 'pests': 0.8, 'thirsty': 0.3}
+                damage = disease_damage.get(plant['disease'], 0.5)
+                plant['health'] = max(0, plant['health'] - damage)
+            
+            # Plant dies if health reaches 0
+            if plant['health'] <= 0:
+                progress['plants'][i] = None  # Remove dead plant
+        
+        _save_farm_progress(user_id, progress)
+        
+        return {
+            'ok': True,
+            'progress': progress
+        }
+        
+    except Exception as e:
+        app.logger.exception('Error updating farm')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/redeem_voucher', methods=['POST'])
+def redeem_voucher():
+    """Redeem a voucher code and add it to user account"""
+    app.logger.info('Redeem voucher request received')
+    
+    try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            app.logger.warning('Redeem voucher: User not logged in')
+            return {'ok': False, 'error': 'Vui lòng đăng nhập để nhập mã giảm giá'}, 401
+        
+        user_id = session.get('user_id')
+        app.logger.info(f'Redeem voucher: User ID = {user_id}')
+        
+        if user_id == 'admin':
+            app.logger.warning('Redeem voucher: Admin tried to redeem')
+            return {'ok': False, 'error': 'Admin không thể sử dụng mã giảm giá'}, 403
+        
+        data = request.get_json()
+        voucher_code = data.get('code', '').strip().upper()
+        app.logger.info(f'Redeem voucher: Code = {voucher_code}')
+        
+        if not voucher_code:
+            app.logger.warning('Redeem voucher: Empty code')
+            return {'ok': False, 'error': 'Vui lòng nhập mã giảm giá'}, 400
+        
+        # Validate voucher code format (must start with MEM or QUIZ and be at least 8 characters)
+        if not (voucher_code.startswith('MEM') or voucher_code.startswith('QUIZ')):
+            app.logger.warning(f'Redeem voucher: Invalid prefix - {voucher_code}')
+            return {'ok': False, 'error': 'Mã giảm giá không hợp lệ. Mã phải bắt đầu bằng MEM hoặc QUIZ (từ trò chơi)'}, 400
+        
+        if len(voucher_code) < 8:
+            app.logger.warning(f'Redeem voucher: Too short - {voucher_code}')
+            return {'ok': False, 'error': 'Mã giảm giá không hợp lệ. Mã phải có ít nhất 8 ký tự'}, 400
+        
+        user = get_user_by_id(user_id)
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy thông tin người dùng'}, 404
+        
+        # Check if voucher already exists in user's account
+        existing_vouchers = user.get('vouchers', [])
+        for v in existing_vouchers:
+            if v.get('code') == voucher_code:
+                app.logger.warning(f'Redeem voucher: Already exists - {voucher_code}')
+                return {'ok': False, 'error': 'Mã giảm giá này đã có trong tài khoản của bạn rồi!'}, 400
+        
+        # Determine voucher value based on code prefix and difficulty
+        # MEM codes from memory game
+        if voucher_code.startswith('MEM'):
+            # Try to determine value from code pattern (default to medium)
+            voucher_value = 25000
+            source = 'memory_game'
+        elif voucher_code.startswith('QUIZ'):
+            voucher_value = 30000
+            source = 'quiz'
+        else:
+            voucher_value = 20000
+            source = 'game'
+        
+        # Apply membership boost
+        tier = user.get('membership_tier', 'bronze')
+        benefits = get_membership_benefits(tier)
+        voucher_value = int(voucher_value * benefits.get('voucher_boost', 1.0))
+        
+        # Add voucher to user
+        success = add_voucher_to_user(user_id, voucher_code, voucher_value, source)
+        
+        if success:
+            app.logger.info(f'User {user_id} redeemed voucher: {voucher_code} ({voucher_value:,}đ)')
+            return {
+                'ok': True,
+                'message': f'Đã thêm mã giảm giá {voucher_value:,}đ vào tài khoản!',
+                'voucher': {
+                    'code': voucher_code,
+                    'value': voucher_value
+                }
+            }
+        else:
+            return {'ok': False, 'error': 'Không thể thêm mã giảm giá. Vui lòng thử lại'}, 500
+            
+    except Exception as e:
+        app.logger.exception('Error redeeming voucher')
+        return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại sau'}, 500
+
 # ==================== Shop ====================
 
 @app.route('/shop')
 def shop():
     """Shop page for pesticides and fertilizers"""
-    return render_template('shop.html')
+    try:
+        products = load_products()
+        # Only show active products
+        products = [p for p in products if p.get('status', 'active') == 'active']
+        return render_template('shop.html', products=products)
+    except Exception as e:
+        app.logger.error(f'Error loading shop: {e}')
+        return render_template('shop.html', products=[])
+
+@app.route('/api/products')
+def api_products():
+    """API endpoint to get products"""
+    try:
+        products = load_products()
+        status_filter = request.args.get('status', 'active')
+        
+        # Filter by status
+        if status_filter:
+            products = [p for p in products if p.get('status', 'active') == status_filter]
+        
+        return jsonify({'ok': True, 'products': products})
+    except Exception as e:
+        app.logger.error(f'Error loading products API: {e}')
+        return jsonify({'ok': False, 'error': str(e)})
+
+# ==================== PRODUCT ROUTES ====================
+
+@app.route('/product/<int:product_id>')
+def product_detail(product_id):
+    """Product detail page"""
+    product = get_product_by_id(product_id)
+    if not product:
+        flash('Sản phẩm không tồn tại', 'error')
+        return redirect(url_for('shop'))
+    
+    # Only show active products to non-admin users
+    if product.get('status') != 'active' and not session.get('is_admin'):
+        flash('Sản phẩm không tồn tại', 'error')
+        return redirect(url_for('shop'))
+    
+    return render_template('product_detail.html', product=product)
 
 @app.route('/cart')
 def cart():
@@ -1925,6 +2988,27 @@ def submit_order():
     try:
         data = request.get_json()
         
+        # Validate stock availability before creating order
+        items = data.get('items', [])
+        stock_errors = []
+        
+        for item in items:
+            product = get_product_by_id(item['id'])
+            if not product:
+                stock_errors.append(f"{item['name']}: Sản phẩm không tồn tại")
+                continue
+            
+            current_stock = product.get('stock', 0)
+            if current_stock < item['quantity']:
+                stock_errors.append(f"{item['name']}: Chỉ còn {current_stock} sản phẩm")
+        
+        if stock_errors:
+            return {
+                'ok': False, 
+                'error': 'Một số sản phẩm không đủ hàng',
+                'details': stock_errors
+            }, 400
+        
         order = {
             'id': str(uuid4())[:8],
             'user_id': session.get('user_id', ''),
@@ -1932,14 +3016,25 @@ def submit_order():
             'customer_phone': data.get('customer_phone', '').strip()[:20],
             'customer_address': data.get('customer_address', '').strip()[:500],
             'order_note': data.get('order_note', '').strip()[:500],
-            'items': data.get('items', []),
+            'items': items,
             'subtotal': data.get('subtotal', 0),
             'shipping': data.get('shipping', 0),
+            'discount': data.get('discount', 0),
+            'coupon_code': data.get('coupon_code', ''),
             'total': data.get('total', 0),
             'payment_method': data.get('payment_method', 'cod'),
             'status': 'pending',
             'timestamp': datetime.utcnow().isoformat()
         }
+        
+        # Decrement stock for each item
+        for item in items:
+            update_product_stock(item['id'], -item['quantity'])
+            
+            # Check for low stock and alert admin
+            product = get_product_by_id(item['id'])
+            if product and product.get('stock', 0) < 10:
+                send_low_stock_alert(product)
         
         # Save order
         orders_dir = BASE_DIR / 'data'
@@ -1951,11 +3046,384 @@ def submit_order():
         
         app.logger.info(f'Order submitted: {order["id"]} - {order["customer_name"]}')
         
+        # Send order confirmation email
+        user_email = session.get('user_email') if 'user_id' in session else None
+        if user_email:
+            try:
+                send_order_confirmation_email(user_email, order)
+                app.logger.info(f'Order confirmation email sent to {user_email}')
+            except Exception as e:
+                app.logger.error(f'Failed to send order confirmation email: {e}')
+        
+        # Create in-app notification
+        if 'user_id' in session and session.get('user_id') != 'admin':
+            try:
+                create_notification(
+                    user_id=session['user_id'],
+                    title='📦 Đơn hàng mới',
+                    message=f'Đơn hàng #{order["id"]} đã được tạo. Tổng tiền: {order["total"]:,.0f} đ',
+                    notification_type='info',
+                    link='/profile'
+                )
+            except Exception as e:
+                app.logger.error(f'Failed to create order notification: {e}')
+        
+        # Update user statistics if logged in
+        if 'user_id' in session and session.get('user_id') != 'admin':
+            user_id = session.get('user_id')
+            user = get_user_by_id(user_id)
+            
+            if user:
+                # Update spending and order count
+                total_spent = user.get('total_spent', 0) + order['total']
+                total_orders = user.get('total_orders', 0) + 1
+                
+                # Calculate new membership tier
+                new_tier, _, _ = calculate_membership_tier(total_spent)
+                
+                # Update user
+                updates = {
+                    'total_spent': total_spent,
+                    'total_orders': total_orders,
+                    'membership_tier': new_tier
+                }
+                update_user(user_id, updates)
+                
+                app.logger.info(f'Updated user {user_id}: spent={total_spent}, tier={new_tier}')
+        
         return {'ok': True, 'order_id': order['id']}
         
     except Exception as e:
         app.logger.exception('Error submitting order')
         return {'ok': False, 'error': str(e)}, 500
+
+# ==================== Payment Processing ====================
+
+@app.route('/api/payment/create', methods=['POST'])
+def create_payment():
+    """Create payment transaction"""
+    try:
+        data = request.get_json()
+        
+        payment_method = data.get('payment_method', 'cod')
+        order_id = data.get('order_id', '')
+        amount = int(data.get('amount', 0))
+        order_info = data.get('order_info', f'Thanh toán đơn hàng #{order_id}')
+        
+        if not order_id or amount <= 0:
+            return {'ok': False, 'error': 'Invalid order information'}, 400
+        
+        # COD - no payment processing needed
+        if payment_method == 'cod':
+            return {'ok': True, 'payment_method': 'cod', 'order_id': order_id}
+        
+        # VNPay payment
+        elif payment_method == 'vnpay':
+            if not vnpay_payment:
+                return {'ok': False, 'error': 'VNPay not configured'}, 500
+            
+            try:
+                client_ip = get_client_ip(request)
+                payment_url = vnpay_payment.create_payment_url(
+                    order_id=order_id,
+                    amount=amount,
+                    order_desc=order_info,
+                    ip_addr=client_ip
+                )
+                
+                app.logger.info(f'Created VNPay payment for order {order_id}: {amount} VND')
+                return {
+                    'ok': True, 
+                    'payment_method': 'vnpay',
+                    'payment_url': payment_url,
+                    'order_id': order_id
+                }
+            except Exception as e:
+                app.logger.error(f'Error creating VNPay payment: {e}')
+                return {'ok': False, 'error': str(e)}, 500
+        
+        # MoMo payment
+        elif payment_method == 'momo':
+            if not momo_payment:
+                return {'ok': False, 'error': 'MoMo not configured'}, 500
+            
+            try:
+                success, result, response_data = momo_payment.create_payment_url(
+                    order_id=order_id,
+                    amount=amount,
+                    order_info=order_info
+                )
+                
+                if success:
+                    app.logger.info(f'Created MoMo payment for order {order_id}: {amount} VND')
+                    return {
+                        'ok': True,
+                        'payment_method': 'momo',
+                        'payment_url': result,
+                        'order_id': order_id
+                    }
+                else:
+                    app.logger.error(f'MoMo payment creation failed: {result}')
+                    return {'ok': False, 'error': result}, 500
+                    
+            except Exception as e:
+                app.logger.error(f'Error creating MoMo payment: {e}')
+                return {'ok': False, 'error': str(e)}, 500
+        
+        else:
+            return {'ok': False, 'error': 'Invalid payment method'}, 400
+            
+    except Exception as e:
+        app.logger.exception('Error creating payment')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/payment/vnpay/callback')
+def vnpay_callback():
+    """VNPay payment callback handler"""
+    try:
+        if not vnpay_payment:
+            flash('Hệ thống thanh toán VNPay chưa được cấu hình', 'error')
+            return redirect(url_for('cart'))
+        
+        # Get all query parameters
+        params = dict(request.args)
+        
+        # Verify payment
+        is_valid, message, payment_data = vnpay_payment.verify_payment(params)
+        
+        if is_valid:
+            order_id = payment_data.get('order_id')
+            amount = payment_data.get('amount')
+            
+            # Update order status
+            update_order_status(order_id, 'paid', {
+                'payment_method': 'vnpay',
+                'transaction_id': payment_data.get('transaction_no'),
+                'bank_code': payment_data.get('bank_code'),
+                'paid_at': payment_data.get('pay_date')
+            })
+            
+            # Send payment success email
+            if 'user_email' in session:
+                try:
+                    send_payment_success_email(session['user_email'], {
+                        'order_id': order_id,
+                        'amount': amount,
+                        'payment_method': 'VNPay',
+                        'transaction_id': payment_data.get('transaction_no')
+                    })
+                except Exception as e:
+                    app.logger.error(f'Failed to send payment success email: {e}')
+            
+            # Create in-app notification
+            if 'user_id' in session and session.get('user_id') != 'admin':
+                try:
+                    create_notification(
+                        user_id=session['user_id'],
+                        title='✅ Thanh toán thành công',
+                        message=f'Thanh toán VNPay cho đơn hàng #{order_id} thành công. Số tiền: {amount:,.0f} đ',
+                        notification_type='success',
+                        link='/profile'
+                    )
+                    
+                    # Award points for purchase (10 points per 10,000 VND)
+                    points_earned = max(1, int(amount / 10000) * 10)
+                    add_points(session['user_id'], points_earned, 'order', 
+                             f'Mua hàng #{order_id} - {amount:,.0f}đ')
+                    user = get_user_by_id(session['user_id'])
+                    if user:
+                        session['user_points'] = user.get('points', 0)
+                    
+                except Exception as e:
+                    app.logger.error(f'Failed to create payment notification: {e}')
+            
+            app.logger.info(f'VNPay payment successful: order={order_id}, amount={amount}')
+            flash(f'Thanh toán thành công! Đơn hàng #{order_id} đã được xác nhận.', 'success')
+            return render_template('payment_success.html', 
+                                 order_id=order_id, 
+                                 amount=amount,
+                                 payment_method='VNPay',
+                                 datetime=datetime)
+        else:
+            app.logger.warning(f'VNPay payment failed: {message}')
+            
+            # Send payment failed email
+            if 'user_email' in session:
+                try:
+                    order_id = params.get('vnp_TxnRef', 'N/A')
+                    send_payment_failed_email(session['user_email'], order_id, message)
+                except Exception as e:
+                    app.logger.error(f'Failed to send payment failed email: {e}')
+            
+            flash(f'Thanh toán thất bại: {message}', 'error')
+            return render_template('payment_failed.html', 
+                                 error=message,
+                                 payment_method='VNPay')
+            
+    except Exception as e:
+        app.logger.exception('Error processing VNPay callback')
+        flash('Có lỗi xảy ra khi xử lý thanh toán', 'error')
+        return redirect(url_for('cart'))
+
+
+@app.route('/payment/momo/callback')
+def momo_callback():
+    """MoMo payment callback handler (return URL)"""
+    try:
+        if not momo_payment:
+            flash('Hệ thống thanh toán MoMo chưa được cấu hình', 'error')
+            return redirect(url_for('cart'))
+        
+        # Get all query parameters
+        params = dict(request.args)
+        
+        # Verify payment
+        is_valid, message, payment_data = momo_payment.verify_payment(params)
+        
+        if is_valid:
+            order_id = payment_data.get('order_id')
+            amount = payment_data.get('amount')
+            
+            # Update order status
+            update_order_status(order_id, 'paid', {
+                'payment_method': 'momo',
+                'transaction_id': payment_data.get('transaction_id'),
+                'pay_type': payment_data.get('pay_type'),
+                'paid_at': payment_data.get('response_time')
+            })
+            
+            # Send payment success email
+            if 'user_email' in session:
+                try:
+                    send_payment_success_email(session['user_email'], {
+                        'order_id': order_id,
+                        'amount': amount,
+                        'payment_method': 'MoMo',
+                        'transaction_id': payment_data.get('transaction_id')
+                    })
+                except Exception as e:
+                    app.logger.error(f'Failed to send payment success email: {e}')
+            
+            # Create in-app notification
+            if 'user_id' in session and session.get('user_id') != 'admin':
+                try:
+                    create_notification(
+                        user_id=session['user_id'],
+                        title='✅ Thanh toán thành công',
+                        message=f'Thanh toán MoMo cho đơn hàng #{order_id} thành công. Số tiền: {amount:,.0f} đ',
+                        notification_type='success',
+                        link='/profile'
+                    )
+                    
+                    # Award points for purchase (10 points per 10,000 VND)
+                    points_earned = max(1, int(amount / 10000) * 10)
+                    add_points(session['user_id'], points_earned, 'order', 
+                             f'Mua hàng #{order_id} - {amount:,.0f}đ')
+                    user = get_user_by_id(session['user_id'])
+                    if user:
+                        session['user_points'] = user.get('points', 0)
+                    
+                except Exception as e:
+                    app.logger.error(f'Failed to create payment notification: {e}')
+            
+            app.logger.info(f'MoMo payment successful: order={order_id}, amount={amount}')
+            flash(f'Thanh toán thành công! Đơn hàng #{order_id} đã được xác nhận.', 'success')
+            return render_template('payment_success.html',
+                                 order_id=order_id,
+                                 amount=amount,
+                                 payment_method='MoMo',
+                                 datetime=datetime)
+        else:
+            app.logger.warning(f'MoMo payment failed: {message}')
+            
+            # Send payment failed email
+            if 'user_email' in session:
+                try:
+                    order_id = params.get('orderId', 'N/A')
+                    send_payment_failed_email(session['user_email'], order_id, message)
+                except Exception as e:
+                    app.logger.error(f'Failed to send payment failed email: {e}')
+            
+            flash(f'Thanh toán thất bại: {message}', 'error')
+            return render_template('payment_failed.html',
+                                 error=message,
+                                 payment_method='MoMo')
+            
+    except Exception as e:
+        app.logger.exception('Error processing MoMo callback')
+        flash('Có lỗi xảy ra khi xử lý thanh toán', 'error')
+        return redirect(url_for('cart'))
+
+
+@app.route('/payment/momo/ipn', methods=['POST'])
+def momo_ipn():
+    """MoMo IPN (Instant Payment Notification) handler"""
+    try:
+        if not momo_payment:
+            return {'ok': False, 'error': 'MoMo not configured'}, 500
+        
+        # Get POST data
+        params = request.get_json() or {}
+        
+        # Verify payment
+        is_valid, message, payment_data = momo_payment.verify_payment(params)
+        
+        if is_valid:
+            order_id = payment_data.get('order_id')
+            
+            # Update order status
+            update_order_status(order_id, 'paid', {
+                'payment_method': 'momo',
+                'transaction_id': payment_data.get('transaction_id'),
+                'pay_type': payment_data.get('pay_type'),
+                'paid_at': payment_data.get('response_time')
+            })
+            
+            app.logger.info(f'MoMo IPN processed: order={order_id}')
+            return {'ok': True, 'message': 'Success'}, 200
+        else:
+            app.logger.warning(f'Invalid MoMo IPN: {message}')
+            return {'ok': False, 'error': message}, 400
+            
+    except Exception as e:
+        app.logger.exception('Error processing MoMo IPN')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+def update_order_status(order_id: str, status: str, payment_info: Dict = None):
+    """Update order status and payment information"""
+    try:
+        orders_file = BASE_DIR / 'data' / 'orders.jsonl'
+        if not orders_file.exists():
+            return False
+        
+        # Read all orders
+        orders = []
+        with open(orders_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    order = json.loads(line.strip())
+                    if order.get('id') == order_id:
+                        order['status'] = status
+                        if payment_info:
+                            order['payment_info'] = payment_info
+                            order['paid_at'] = datetime.utcnow().isoformat()
+                    orders.append(order)
+                except json.JSONDecodeError:
+                    continue
+        
+        # Write back all orders
+        with open(orders_file, 'w', encoding='utf-8') as f:
+            for order in orders:
+                f.write(json.dumps(order, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'Updated order {order_id} status to {status}')
+        return True
+        
+    except Exception as e:
+        app.logger.error(f'Error updating order status: {e}')
+        return False
 
 # ==================== User Authentication ====================
 
@@ -1995,7 +3463,21 @@ def create_user(email, password, full_name):
             'password': hash_password(password),
             'full_name': full_name,
             'phone': '',
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.utcnow().isoformat(),
+            # Membership & Wallet
+            'membership_tier': 'bronze',  # bronze, silver, gold, platinum, diamond
+            'wallet_balance': 0,  # Số dư ví
+            'total_spent': 0,  # Tổng chi tiêu
+            'points': 0,  # Điểm tích lũy
+            # Gamification
+            'streak_days': 0,  # Số ngày liên tục
+            'last_checkin': None,  # Lần check-in cuối
+            'vouchers': [],  # Danh sách mã giảm giá từ games
+            # Statistics
+            'total_orders': 0,
+            'total_predictions': 0,
+            'quiz_completed': 0,
+            'memory_completed': 0
         }
         
         with open(users_file, 'a', encoding='utf-8') as f:
@@ -2004,6 +3486,240 @@ def create_user(email, password, full_name):
         return user
     except Exception:
         app.logger.exception('Error creating user')
+        return None
+
+def update_user_field(user_id, field, value):
+    """Update a specific field in user data"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return False
+        
+        users = []
+        updated = False
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    user = json.loads(line.strip())
+                    if user.get('id') == user_id:
+                        user[field] = value
+                        updated = True
+                    users.append(user)
+                except json.JSONDecodeError:
+                    continue
+        
+        if updated:
+            with open(users_file, 'w', encoding='utf-8') as f:
+                for user in users:
+                    f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        
+        return updated
+    except Exception:
+        app.logger.exception('Error updating user field')
+        return False
+
+def update_user(user_id, updates):
+    """Update multiple fields in user data"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return False
+        
+        users = []
+        updated = False
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    user = json.loads(line.strip())
+                    if user.get('id') == user_id:
+                        user.update(updates)
+                        updated = True
+                    users.append(user)
+                except json.JSONDecodeError:
+                    continue
+        
+        if updated:
+            with open(users_file, 'w', encoding='utf-8') as f:
+                for user in users:
+                    f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        
+        return updated
+    except Exception:
+        app.logger.exception('Error updating user')
+        return False
+
+def calculate_membership_tier(total_spent):
+    """Calculate membership tier based on total spending"""
+    if total_spent >= 50000000:  # 50 triệu
+        return 'diamond', '💎 Kim Cương', '#b9f2ff'
+    elif total_spent >= 20000000:  # 20 triệu
+        return 'platinum', '🏆 Bạch Kim', '#e5e5e5'
+    elif total_spent >= 10000000:  # 10 triệu
+        return 'gold', '🥇 Vàng', '#ffd700'
+    elif total_spent >= 5000000:  # 5 triệu
+        return 'silver', '🥈 Bạc', '#c0c0c0'
+    else:
+        return 'bronze', '🥉 Đồng', '#cd7f32'
+
+def get_membership_benefits(tier):
+    """Get benefits for each membership tier"""
+    benefits = {
+        'bronze': {
+            'discount': 0,
+            'free_shipping': False,
+            'voucher_boost': 1.0,
+            'next_tier': 'silver',
+            'next_amount': 5000000
+        },
+        'silver': {
+            'discount': 5,
+            'free_shipping': False,
+            'voucher_boost': 1.2,
+            'next_tier': 'gold',
+            'next_amount': 10000000
+        },
+        'gold': {
+            'discount': 10,
+            'free_shipping': True,
+            'voucher_boost': 1.5,
+            'next_tier': 'platinum',
+            'next_amount': 20000000
+        },
+        'platinum': {
+            'discount': 15,
+            'free_shipping': True,
+            'voucher_boost': 2.0,
+            'next_tier': 'diamond',
+            'next_amount': 50000000
+        },
+        'diamond': {
+            'discount': 20,
+            'free_shipping': True,
+            'voucher_boost': 3.0,
+            'next_tier': None,
+            'next_amount': None
+        }
+    }
+    return benefits.get(tier, benefits['bronze'])
+
+def add_voucher_to_user(user_id, voucher_code, voucher_value, source):
+    """Add voucher from game to user"""
+    try:
+        user = get_user_by_id(user_id)
+        if not user:
+            return False
+        
+        vouchers = user.get('vouchers', [])
+        voucher = {
+            'code': voucher_code,
+            'value': voucher_value,
+            'source': source,  # 'quiz', 'memory_game', etc.
+            'created_at': datetime.utcnow().isoformat(),
+            'used': False,
+            'expires_at': (datetime.utcnow() + timedelta(days=30)).isoformat()
+        }
+        vouchers.append(voucher)
+        
+        return update_user_field(user_id, 'vouchers', vouchers)
+    except Exception:
+        app.logger.exception('Error adding voucher to user')
+        return False
+
+def get_user_by_id(user_id):
+    """Get user by ID"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return None
+        
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    user = json.loads(line.strip())
+                    if user.get('id') == user_id:
+                        return user
+                except json.JSONDecodeError:
+                    continue
+        return None
+    except Exception:
+        app.logger.exception('Error getting user by ID')
+        return None
+
+def get_user_statistics(user_id):
+    """Get comprehensive user statistics"""
+    try:
+        user = get_user_by_id(user_id)
+        if not user:
+            return None
+        
+        # Ensure all fields exist
+        user.setdefault('membership_tier', 'bronze')
+        user.setdefault('wallet_balance', 0)
+        user.setdefault('total_spent', 0)
+        user.setdefault('points', 0)
+        user.setdefault('vouchers', [])
+        user.setdefault('total_orders', 0)
+        user.setdefault('total_predictions', 0)
+        user.setdefault('quiz_completed', 0)
+        user.setdefault('memory_completed', 0)
+        
+        # Get actual wallet data
+        wallet = get_user_wallet(user_id)
+        
+        # Get referral info
+        referral_info = get_user_referral_info(user_id)
+        
+        # Calculate membership info
+        tier, tier_name, tier_color = calculate_membership_tier(user['total_spent'])
+        benefits = get_membership_benefits(tier)
+        
+        # Count active vouchers
+        active_vouchers = [v for v in user['vouchers'] if not v.get('used', False) and 
+                          datetime.fromisoformat(v.get('expires_at', '2000-01-01')) > datetime.utcnow()]
+        
+        # Calculate progress to next tier
+        progress_pct = 0
+        remaining = 0
+        if benefits['next_tier']:
+            progress_pct = min(100, (user['total_spent'] / benefits['next_amount']) * 100)
+            remaining = max(0, benefits['next_amount'] - user['total_spent'])
+        
+        stats = {
+            'user': user,
+            'membership': {
+                'tier': tier,
+                'tier_name': tier_name,
+                'tier_color': tier_color,
+                'progress_pct': progress_pct,
+                'remaining': remaining,
+                'benefits': benefits
+            },
+            'wallet': {
+                'balance': wallet.get('balance', 0),
+                'total_spent': user['total_spent'],
+                'points': user['points']
+            },
+            'vouchers': {
+                'active': active_vouchers,
+                'total_count': len(active_vouchers),
+                'total_value': sum(v.get('value', 0) for v in active_vouchers)
+            },
+            'activity': {
+                'total_orders': user['total_orders'],
+                'total_predictions': user['total_predictions'],
+                'quiz_completed': user['quiz_completed'],
+                'memory_completed': user['memory_completed']
+            },
+            'referral': {
+                'code': referral_info.get('code', ''),
+                'referral_count': referral_info.get('referral_count', 0),
+                'total_earned': referral_info.get('total_earned', 0)
+            }
+        }
+        
+        return stats
+    except Exception:
+        app.logger.exception('Error getting user statistics')
         return None
 
 def get_user_addresses(user_id):
@@ -2090,6 +3806,7 @@ def register():
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
         full_name = request.form.get('full_name', '').strip()
+        referral_code = request.form.get('referral_code', '').strip().upper()
         
         # Validation
         if not email or not password or not full_name:
@@ -2112,17 +3829,37 @@ def register():
         # Create user
         user = create_user(email, password, full_name)
         if user:
-            session['user_id'] = user['id']
-            session['user_email'] = user['email']
-            session['user_name'] = user['full_name']
-            session['is_admin'] = False
-            flash('Đăng ký thành công!', 'success')
-            return redirect(url_for('profile'))
+            user_id = user['id']
+            
+            # Apply referral code if provided
+            if referral_code:
+                try:
+                    apply_referral_code(user_id, referral_code)
+                except Exception as e:
+                    app.logger.error(f'Error applying referral code: {e}')
+            
+            # Initialize user's referral info
+            try:
+                get_user_referral_info(user_id)
+            except Exception as e:
+                app.logger.error(f'Error initializing referral info: {e}')
+            
+            # Send welcome email
+            try:
+                send_welcome_email(email, full_name)
+                app.logger.info(f'Welcome email sent to {email}')
+            except Exception as e:
+                app.logger.error(f'Failed to send welcome email: {e}')
+            
+            flash('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.', 'success')
+            return redirect(url_for('login'))
         else:
             flash('Có lỗi xảy ra. Vui lòng thử lại!', 'error')
             return redirect(url_for('register'))
     
-    return render_template('register.html')
+    # Get referral code from URL if present
+    referral_code_param = request.args.get('ref', '')
+    return render_template('register.html', referral_code=referral_code_param)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -2150,6 +3887,7 @@ def login():
             session['user_id'] = user['id']
             session['user_email'] = user['email']
             session['user_name'] = user['full_name']
+            session['user_points'] = user.get('points', 0)
             session['is_admin'] = False
             flash('Đăng nhập thành công!', 'success')
             
@@ -2185,10 +3923,17 @@ def profile():
         }
         addresses = []
         orders = []
-        return render_template('profile.html', user=user, addresses=addresses, orders=orders)
+        stats = None
+        return render_template('profile.html', user=user, addresses=addresses, orders=orders, stats=stats)
     
+    user_id = session.get('user_id')
     user = get_user_by_email(session.get('user_email'))
-    addresses = get_user_addresses(session.get('user_id'))
+    
+    # Get comprehensive user statistics
+    stats = get_user_statistics(user_id)
+    
+    # Get addresses
+    addresses = get_user_addresses(user_id)
     
     # Get user orders
     orders = []
@@ -2199,7 +3944,7 @@ def profile():
                 for line in f:
                     try:
                         order = json.loads(line.strip())
-                        if order.get('user_id') == session.get('user_id'):
+                        if order.get('user_id') == user_id:
                             orders.append(order)
                     except json.JSONDecodeError:
                         continue
@@ -2208,7 +3953,7 @@ def profile():
     except Exception:
         app.logger.exception('Error loading orders')
     
-    return render_template('profile.html', user=user, addresses=addresses, orders=orders)
+    return render_template('profile.html', user=user, addresses=addresses, orders=orders, stats=stats)
 
 @app.route('/api/address/add', methods=['POST'])
 @login_required
@@ -2256,18 +4001,4249 @@ def delete_address(address_id):
         app.logger.exception('Error deleting address')
         return {'ok': False, 'error': str(e)}, 500
 
+# ==================== In-App Notifications ====================
 
-@app.route('/history')
+def create_notification(user_id: str, title: str, message: str, 
+                       notification_type: str = 'info', link: str = None):
+    """Create in-app notification for user"""
+    try:
+        notifications_file = BASE_DIR / 'data' / 'notifications.jsonl'
+        notifications_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        notification = {
+            'id': str(uuid4())[:8],
+            'user_id': user_id,
+            'title': title,
+            'message': message,
+            'type': notification_type,  # info, success, warning, error
+            'link': link,
+            'read': False,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        with open(notifications_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(notification, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'Notification created for user {user_id}: {title}')
+        return notification
+    except Exception as e:
+        app.logger.error(f'Error creating notification: {e}')
+        return None
+
+
+def get_user_notifications(user_id: str, unread_only: bool = False, limit: int = 50):
+    """Get notifications for user"""
+    try:
+        notifications_file = BASE_DIR / 'data' / 'notifications.jsonl'
+        if not notifications_file.exists():
+            return []
+        
+        notifications = []
+        with open(notifications_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    notif = json.loads(line.strip())
+                    if notif.get('user_id') == user_id:
+                        if unread_only and notif.get('read'):
+                            continue
+                        notifications.append(notif)
+                except json.JSONDecodeError:
+                    continue
+        
+        # Sort by timestamp descending
+        notifications.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Limit results
+        return notifications[:limit]
+    except Exception as e:
+        app.logger.error(f'Error getting notifications: {e}')
+        return []
+
+
+def mark_notification_read(notification_id: str, user_id: str):
+    """Mark notification as read"""
+    try:
+        notifications_file = BASE_DIR / 'data' / 'notifications.jsonl'
+        if not notifications_file.exists():
+            return False
+        
+        notifications = []
+        updated = False
+        
+        with open(notifications_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    notif = json.loads(line.strip())
+                    if notif.get('id') == notification_id and notif.get('user_id') == user_id:
+                        notif['read'] = True
+                        updated = True
+                    notifications.append(notif)
+                except json.JSONDecodeError:
+                    continue
+        
+        if updated:
+            with open(notifications_file, 'w', encoding='utf-8') as f:
+                for notif in notifications:
+                    f.write(json.dumps(notif, ensure_ascii=False) + '\n')
+        
+        return updated
+    except Exception as e:
+        app.logger.error(f'Error marking notification read: {e}')
+        return False
+
+
+def mark_all_notifications_read(user_id: str):
+    """Mark all notifications as read for user"""
+    try:
+        notifications_file = BASE_DIR / 'data' / 'notifications.jsonl'
+        if not notifications_file.exists():
+            return False
+        
+        notifications = []
+        updated = False
+        
+        with open(notifications_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    notif = json.loads(line.strip())
+                    if notif.get('user_id') == user_id and not notif.get('read'):
+                        notif['read'] = True
+                        updated = True
+                    notifications.append(notif)
+                except json.JSONDecodeError:
+                    continue
+        
+        if updated:
+            with open(notifications_file, 'w', encoding='utf-8') as f:
+                for notif in notifications:
+                    f.write(json.dumps(notif, ensure_ascii=False) + '\n')
+        
+        return updated
+    except Exception as e:
+        app.logger.error(f'Error marking all notifications read: {e}')
+        return False
+
+
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    """Get user notifications"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    user_id = session['user_id']
+    unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+    
+    notifications = get_user_notifications(user_id, unread_only=unread_only)
+    unread_count = len([n for n in notifications if not n.get('read')])
+    
+    return {
+        'ok': True,
+        'notifications': notifications,
+        'unread_count': unread_count
+    }
+
+
+@app.route('/api/notifications/<notification_id>/read', methods=['POST'])
+def mark_notification_as_read(notification_id):
+    """Mark notification as read"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    user_id = session['user_id']
+    success = mark_notification_read(notification_id, user_id)
+    
+    return {'ok': success}
+
+
+@app.route('/api/notifications/read_all', methods=['POST'])
+def mark_all_as_read():
+    """Mark all notifications as read"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Not logged in'}, 401
+    
+    user_id = session['user_id']
+    success = mark_all_notifications_read(user_id)
+    
+    return {'ok': success}
+
+
+# ==================== Coupon System ====================
+
+@app.route('/api/coupon/validate', methods=['POST'])
+def validate_coupon():
+    """Validate coupon code"""
+    try:
+        data = request.get_json()
+        coupon_code = data.get('code', '').strip().upper()
+        order_total = data.get('order_total', 0)
+        
+        if not coupon_code:
+            return {'ok': False, 'error': 'Vui lòng nhập mã giảm giá'}, 400
+        
+        # Load coupons
+        coupons_file = BASE_DIR / 'data' / 'coupons.jsonl'
+        if not coupons_file.exists():
+            return {'ok': False, 'error': 'Mã giảm giá không tồn tại'}, 404
+        
+        coupon = None
+        with open(coupons_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    c = json.loads(line)
+                    if c['code'].upper() == coupon_code:
+                        coupon = c
+                        break
+        
+        if not coupon:
+            return {'ok': False, 'error': 'Mã giảm giá không hợp lệ'}, 404
+        
+        # Check expiry
+        from datetime import datetime
+        if 'expires' in coupon:
+            expires = datetime.fromisoformat(coupon['expires'])
+            if datetime.now() > expires:
+                return {'ok': False, 'error': 'Mã giảm giá đã hết hạn'}, 400
+        
+        # Check usage limit
+        if coupon.get('used_count', 0) >= coupon.get('usage_limit', 9999):
+            return {'ok': False, 'error': 'Mã giảm giá đã hết lượt sử dụng'}, 400
+        
+        # Check minimum order
+        if order_total < coupon.get('min_order', 0):
+            return {
+                'ok': False, 
+                'error': f'Đơn hàng tối thiểu {coupon["min_order"]:,.0f}đ để sử dụng mã này'
+            }, 400
+        
+        # Calculate discount
+        discount_amount = 0
+        if coupon['discount_type'] == 'percent':
+            discount_amount = order_total * coupon['discount_value'] / 100
+            discount_amount = min(discount_amount, coupon.get('max_discount', discount_amount))
+        elif coupon['discount_type'] == 'fixed':
+            discount_amount = coupon['discount_value']
+        elif coupon['discount_type'] == 'shipping':
+            # This will be handled separately for shipping fee
+            discount_amount = coupon['discount_value']
+        
+        return {
+            'ok': True,
+            'coupon': {
+                'code': coupon['code'],
+                'discount_type': coupon['discount_type'],
+                'discount_value': coupon['discount_value'],
+                'discount_amount': discount_amount,
+                'max_discount': coupon.get('max_discount', 0),
+                'description': coupon.get('description', '')
+            }
+        }
+        
+    except Exception as e:
+        app.logger.error(f'Error validating coupon: {e}')
+        return {'ok': False, 'error': 'Lỗi khi kiểm tra mã giảm giá'}, 500
+
+
+# ==================== Product Management ====================
+
+def load_products():
+    """Load all products from database"""
+    products = []
+    products_file = BASE_DIR / 'data' / 'products.jsonl'
+    
+    if products_file.exists():
+        with open(products_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    products.append(json.loads(line))
+    
+    return products
+
+def get_product_by_id(product_id):
+    """Get product by ID"""
+    products = load_products()
+    for product in products:
+        if product['id'] == int(product_id):
+            return product
+    return None
+
+def save_product(product_data):
+    """Save or update product"""
+    products = load_products()
+    products_file = BASE_DIR / 'data' / 'products.jsonl'
+    
+    # Check if updating existing product
+    product_id = product_data.get('id')
+    if product_id:
+        products = [p for p in products if p['id'] != product_id]
+    else:
+        # Generate new ID
+        max_id = max([p['id'] for p in products], default=0)
+        product_data['id'] = max_id + 1
+        product_data['created_at'] = datetime.utcnow().isoformat()
+    
+    products.append(product_data)
+    
+    # Save back to file
+    with open(products_file, 'w', encoding='utf-8') as f:
+        for product in products:
+            f.write(json.dumps(product, ensure_ascii=False) + '\n')
+    
+    return product_data
+
+def delete_product(product_id):
+    """Delete product"""
+    products = load_products()
+    products = [p for p in products if p['id'] != int(product_id)]
+    
+    products_file = BASE_DIR / 'data' / 'products.jsonl'
+    with open(products_file, 'w', encoding='utf-8') as f:
+        for product in products:
+            f.write(json.dumps(product, ensure_ascii=False) + '\n')
+
+def update_product_stock(product_id, quantity_change):
+    """Update product stock"""
+    product = get_product_by_id(product_id)
+    if product:
+        product['stock'] = max(0, product.get('stock', 0) + quantity_change)
+        product['sold'] = product.get('sold', 0) + abs(quantity_change) if quantity_change < 0 else product.get('sold', 0)
+        save_product(product)
+        return product
+    return None
+
+def send_low_stock_alert(product):
+    """Send low stock alert to all admins"""
+    try:
+        stock = product.get('stock', 0)
+        if stock >= 10:
+            return
+        
+        # Find all admin users
+        users = load_users()
+        admin_users = [u for u in users if u.get('is_admin', False)]
+        
+        for admin in admin_users:
+            create_notification(
+                user_id=admin['id'],
+                title='⚠️ Cảnh báo tồn kho thấp',
+                message=f'Sản phẩm "{product["name"]}" chỉ còn {stock} sản phẩm trong kho!',
+                notification_type='warning',
+                link='/admin/products'
+            )
+        
+        app.logger.warning(f'Low stock alert: {product["name"]} -只 còn {stock}')
+    except Exception as e:
+        app.logger.error(f'Error sending low stock alert: {e}')
+
+@app.route('/api/products', methods=['GET'])
+def api_get_products():
+    """API to get products with filters"""
+    try:
+        products = load_products()
+        
+        # Filter by category
+        category = request.args.get('category')
+        if category and category != 'all':
+            products = [p for p in products if p['category'] == category]
+        
+        # Filter by status
+        status = request.args.get('status', 'active')
+        if status != 'all':
+            products = [p for p in products if p.get('status', 'active') == status]
+        
+        # Sort
+        sort_by = request.args.get('sort', 'name')
+        if sort_by == 'price_asc':
+            products = sorted(products, key=lambda x: x['price'])
+        elif sort_by == 'price_desc':
+            products = sorted(products, key=lambda x: x['price'], reverse=True)
+        elif sort_by == 'rating':
+            products = sorted(products, key=lambda x: x.get('rating_avg', 0), reverse=True)
+        elif sort_by == 'sold':
+            products = sorted(products, key=lambda x: x.get('sold', 0), reverse=True)
+        
+        return {'ok': True, 'products': products}
+    except Exception as e:
+        app.logger.error(f'Error loading products: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Wishlist / Favorites ====================
+
+def load_wishlists():
+    """Load all wishlists"""
+    wishlists = []
+    wishlists_file = BASE_DIR / 'data' / 'wishlists.jsonl'
+    
+    if wishlists_file.exists():
+        with open(wishlists_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    wishlists.append(json.loads(line))
+    
+    return wishlists
+
+def get_user_wishlist(user_id):
+    """Get wishlist for a specific user"""
+    wishlists = load_wishlists()
+    for wishlist in wishlists:
+        if wishlist['user_id'] == user_id:
+            return wishlist
+    
+    # Create new wishlist if doesn't exist
+    return {
+        'user_id': user_id,
+        'product_ids': [],
+        'created_at': datetime.utcnow().isoformat(),
+        'updated_at': datetime.utcnow().isoformat()
+    }
+
+def save_wishlist(wishlist_data):
+    """Save or update user's wishlist"""
+    wishlists = load_wishlists()
+    wishlists_file = BASE_DIR / 'data' / 'wishlists.jsonl'
+    
+    user_id = wishlist_data['user_id']
+    wishlists = [w for w in wishlists if w['user_id'] != user_id]
+    
+    wishlist_data['updated_at'] = datetime.utcnow().isoformat()
+    wishlists.append(wishlist_data)
+    
+    with open(wishlists_file, 'w', encoding='utf-8') as f:
+        for wishlist in wishlists:
+            f.write(json.dumps(wishlist, ensure_ascii=False) + '\n')
+    
+    return wishlist_data
+
+def add_to_wishlist(user_id, product_id):
+    """Add product to user's wishlist"""
+    wishlist = get_user_wishlist(user_id)
+    product_id = int(product_id)
+    
+    if product_id not in wishlist['product_ids']:
+        wishlist['product_ids'].append(product_id)
+        save_wishlist(wishlist)
+        return True
+    return False
+
+def remove_from_wishlist(user_id, product_id):
+    """Remove product from user's wishlist"""
+    wishlist = get_user_wishlist(user_id)
+    product_id = int(product_id)
+    
+    if product_id in wishlist['product_ids']:
+        wishlist['product_ids'].remove(product_id)
+        save_wishlist(wishlist)
+        return True
+    return False
+
+@app.route('/api/wishlist', methods=['GET'])
+@login_required
+def api_get_wishlist():
+    """Get user's wishlist with product details"""
+    try:
+        user_id = session.get('user_id')
+        wishlist = get_user_wishlist(user_id)
+        
+        # Get full product details for each wishlist item
+        products = []
+        for product_id in wishlist['product_ids']:
+            product = get_product_by_id(product_id)
+            if product and product.get('status') == 'active':
+                products.append(product)
+        
+        return {'ok': True, 'products': products, 'count': len(products)}
+    except Exception as e:
+        app.logger.error(f'Error loading wishlist: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/wishlist/add/<int:product_id>', methods=['POST'])
+@login_required
+def api_add_to_wishlist(product_id):
+    """Add product to wishlist"""
+    try:
+        user_id = session.get('user_id')
+        
+        # Check if product exists
+        product = get_product_by_id(product_id)
+        if not product:
+            return {'ok': False, 'error': 'Sản phẩm không tồn tại'}, 404
+        
+        success = add_to_wishlist(user_id, product_id)
+        
+        if success:
+            return {'ok': True, 'message': 'Đã thêm vào danh sách yêu thích'}
+        else:
+            return {'ok': False, 'error': 'Sản phẩm đã có trong danh sách yêu thích'}, 400
+    except Exception as e:
+        app.logger.error(f'Error adding to wishlist: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/wishlist/remove/<int:product_id>', methods=['POST'])
+@login_required
+def api_remove_from_wishlist(product_id):
+    """Remove product from wishlist"""
+    try:
+        user_id = session.get('user_id')
+        success = remove_from_wishlist(user_id, product_id)
+        
+        if success:
+            return {'ok': True, 'message': 'Đã xóa khỏi danh sách yêu thích'}
+        else:
+            return {'ok': False, 'error': 'Sản phẩm không có trong danh sách yêu thích'}, 400
+    except Exception as e:
+        app.logger.error(f'Error removing from wishlist: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/wishlist/check/<int:product_id>', methods=['GET'])
+@login_required
+def api_check_wishlist(product_id):
+    """Check if product is in user's wishlist"""
+    try:
+        user_id = session.get('user_id')
+        wishlist = get_user_wishlist(user_id)
+        
+        is_in_wishlist = int(product_id) in wishlist['product_ids']
+        return {'ok': True, 'in_wishlist': is_in_wishlist}
+    except Exception as e:
+        app.logger.error(f'Error checking wishlist: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/wishlist')
+@login_required
+def wishlist_page():
+    """Wishlist page"""
+    return render_template('wishlist.html', 
+                         user=session,
+                         active_page='wishlist')
+
+
+# ==================== Advanced Search & Filter ====================
+
+@app.route('/api/search', methods=['GET'])
+def api_search():
+    """Universal search endpoint - search across products, wiki, history, community"""
+    try:
+        query = request.args.get('q', '').strip()
+        search_type = request.args.get('type', 'all')  # all, products, wiki, history, community
+        
+        if not query:
+            return {'ok': False, 'error': 'Query is required'}, 400
+        
+        results = {}
+        query_lower = query.lower()
+        
+        # Search products
+        if search_type in ['all', 'products']:
+            products = load_products()
+            products = [p for p in products if p.get('status') == 'active']
+            product_results = []
+            
+            for product in products:
+                score = 0
+                if query_lower in product.get('name', '').lower():
+                    score += 10
+                if query_lower in product.get('description', '').lower():
+                    score += 5
+                if query_lower in product.get('category', '').lower():
+                    score += 3
+                
+                if score > 0:
+                    product['search_score'] = score
+                    product_results.append(product)
+            
+            product_results.sort(key=lambda x: x.get('search_score', 0), reverse=True)
+            results['products'] = product_results[:10]
+        
+        # Search wiki articles
+        if search_type in ['all', 'wiki']:
+            wiki_results = search_wiki_articles(query)
+            results['wiki'] = wiki_results[:10]
+        
+        # Search history (if user logged in)
+        if search_type in ['all', 'history'] and 'user_id' in session:
+            history_list = _read_history_file()
+            user_id = session.get('user_id')
+            user_history = [h for h in history_list if h.get('user_id') == user_id]
+            
+            history_results = []
+            for entry in user_history:
+                if (query_lower in entry.get('predicted_label', '').lower() or
+                    query_lower in entry.get('model_name', '').lower() or
+                    query_lower in DISEASE_INFO.get(entry.get('predicted_label', ''), {}).get('name', '').lower()):
+                    history_results.append(entry)
+            
+            results['history'] = history_results[:10]
+        
+        # Search community posts
+        if search_type in ['all', 'community']:
+            posts = load_posts()
+            post_results = []
+            
+            for post in posts:
+                if (query_lower in post.get('content', '').lower() or
+                    query_lower in post.get('user_name', '').lower()):
+                    post_results.append(post)
+            
+            post_results.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            results['community'] = post_results[:10]
+        
+        return {'ok': True, 'query': query, 'results': results}
+    except Exception as e:
+        app.logger.error(f'Error in universal search: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/products/filter', methods=['GET'])
+def api_products_filter():
+    """Advanced products filter with multiple criteria"""
+    try:
+        products = load_products()
+        
+        # Filter by category
+        category = request.args.get('category')
+        if category and category != 'all':
+            products = [p for p in products if p.get('category') == category]
+        
+        # Filter by status
+        status = request.args.get('status', 'active')
+        if status != 'all':
+            products = [p for p in products if p.get('status', 'active') == status]
+        
+        # Filter by price range
+        min_price = request.args.get('min_price', type=int)
+        max_price = request.args.get('max_price', type=int)
+        if min_price is not None:
+            products = [p for p in products if p.get('price', 0) >= min_price]
+        if max_price is not None:
+            products = [p for p in products if p.get('price', 0) <= max_price]
+        
+        # Filter by stock availability
+        in_stock_only = request.args.get('in_stock', '').lower() == 'true'
+        if in_stock_only:
+            products = [p for p in products if p.get('stock', 0) > 0]
+        
+        # Filter by rating
+        min_rating = request.args.get('min_rating', type=float)
+        if min_rating is not None:
+            products = [p for p in products if p.get('rating_avg', 0) >= min_rating]
+        
+        # Search by name or description
+        search_query = request.args.get('q', '').strip()
+        if search_query:
+            query_lower = search_query.lower()
+            products = [p for p in products 
+                       if query_lower in p.get('name', '').lower() or 
+                          query_lower in p.get('description', '').lower()]
+        
+        # Sort
+        sort_by = request.args.get('sort', 'name')
+        if sort_by == 'price_asc':
+            products = sorted(products, key=lambda x: x.get('price', 0))
+        elif sort_by == 'price_desc':
+            products = sorted(products, key=lambda x: x.get('price', 0), reverse=True)
+        elif sort_by == 'rating':
+            products = sorted(products, key=lambda x: x.get('rating_avg', 0), reverse=True)
+        elif sort_by == 'sold':
+            products = sorted(products, key=lambda x: x.get('sold', 0), reverse=True)
+        elif sort_by == 'newest':
+            products = sorted(products, key=lambda x: x.get('created_at', ''), reverse=True)
+        elif sort_by == 'name':
+            products = sorted(products, key=lambda x: x.get('name', ''))
+        
+        # Pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 12, type=int)
+        total = len(products)
+        total_pages = (total + per_page - 1) // per_page
+        start = (page - 1) * per_page
+        end = start + per_page
+        products_page = products[start:end]
+        
+        return {
+            'ok': True, 
+            'products': products_page,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'total_pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            }
+        }
+    except Exception as e:
+        app.logger.error(f'Error filtering products: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/history/filter', methods=['GET'])
+@login_required
+def api_history_filter():
+    """Filter prediction history with multiple criteria"""
+    try:
+        history_list = _read_history_file()
+        
+        # Filter by user (non-admin only sees their own)
+        if not session.get('is_admin'):
+            user_id = session.get('user_id')
+            history_list = [h for h in history_list if h.get('user_id') == user_id]
+        
+        # Filter by disease type
+        disease = request.args.get('disease')
+        if disease and disease != 'all':
+            history_list = [h for h in history_list if h.get('predicted_label') == disease]
+        
+        # Filter by model
+        model = request.args.get('model')
+        if model and model != 'all':
+            history_list = [h for h in history_list if h.get('model_name') == model]
+        
+        # Filter by confidence range
+        min_conf = request.args.get('min_confidence', type=float)
+        max_conf = request.args.get('max_confidence', type=float)
+        if min_conf is not None:
+            history_list = [h for h in history_list if h.get('probability', 0) >= min_conf]
+        if max_conf is not None:
+            history_list = [h for h in history_list if h.get('probability', 0) <= max_conf]
+        
+        # Filter by date range
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        if start_date:
+            history_list = [h for h in history_list if h.get('timestamp', '') >= start_date]
+        if end_date:
+            # Add 1 day to include end_date
+            end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
+            history_list = [h for h in history_list if h.get('timestamp', '') < end_dt.isoformat()]
+        
+        # Search by filename or label
+        search_query = request.args.get('q', '').strip()
+        if search_query:
+            query_lower = search_query.lower()
+            history_list = [h for h in history_list 
+                          if query_lower in h.get('filename', '').lower() or
+                             query_lower in h.get('predicted_label', '').lower() or
+                             query_lower in DISEASE_INFO.get(h.get('predicted_label', ''), {}).get('name', '').lower()]
+        
+        # Sort
+        sort_by = request.args.get('sort', 'date_desc')
+        if sort_by == 'date_desc':
+            history_list.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        elif sort_by == 'date_asc':
+            history_list.sort(key=lambda x: x.get('timestamp', ''))
+        elif sort_by == 'confidence_desc':
+            history_list.sort(key=lambda x: x.get('probability', 0), reverse=True)
+        elif sort_by == 'confidence_asc':
+            history_list.sort(key=lambda x: x.get('probability', 0))
+        
+        # Pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        total = len(history_list)
+        total_pages = (total + per_page - 1) // per_page
+        start = (page - 1) * per_page
+        end = start + per_page
+        history_page = history_list[start:end]
+        
+        return {
+            'ok': True,
+            'history': history_page,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'total_pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            },
+            'stats': {
+                'total_predictions': total,
+                'diseases': list(set(h.get('predicted_label', '') for h in history_list))
+            }
+        }
+    except Exception as e:
+        app.logger.error(f'Error filtering history: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Order Management ====================
+
+def load_orders():
+    """Load all orders"""
+    orders = []
+    orders_file = BASE_DIR / 'data' / 'orders.jsonl'
+    
+    if orders_file.exists():
+        with open(orders_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    orders.append(json.loads(line))
+    
+    return orders
+
+def get_order_by_id(order_id):
+    """Get order by ID"""
+    orders = load_orders()
+    for order in orders:
+        if order['id'] == order_id:
+            return order
+    return None
+
+def update_order_status_new(order_id, new_status, admin_note=''):
+    """Update order status"""
+    orders = load_orders()
+    orders_file = BASE_DIR / 'data' / 'orders.jsonl'
+    
+    for order in orders:
+        if order['id'] == order_id:
+            old_status = order.get('status', 'pending')
+            order['status'] = new_status
+            order['status_updated_at'] = datetime.utcnow().isoformat()
+            
+            # Restore stock if order is being cancelled
+            if new_status == 'cancelled' and old_status != 'cancelled':
+                try:
+                    for item in order.get('items', []):
+                        update_product_stock(item['id'], item['quantity'])
+                        app.logger.info(f"Restored {item['quantity']} units of product {item['id']} from cancelled order {order_id}")
+                except Exception as e:
+                    app.logger.error(f'Error restoring stock for cancelled order {order_id}: {e}')
+            
+            if admin_note:
+                if 'status_history' not in order:
+                    order['status_history'] = []
+                order['status_history'].append({
+                    'from': old_status,
+                    'to': new_status,
+                    'note': admin_note,
+                    'timestamp': datetime.utcnow().isoformat()
+                })
+            
+            # Save
+            with open(orders_file, 'w', encoding='utf-8') as f:
+                for o in orders:
+                    f.write(json.dumps(o, ensure_ascii=False) + '\n')
+            
+            # Send notification to user
+            if order.get('user_id'):
+                status_messages = {
+                    'processing': 'Đơn hàng đang được xử lý',
+                    'shipped': 'Đơn hàng đã được giao cho đơn vị vận chuyển',
+                    'delivered': 'Đơn hàng đã được giao thành công',
+                    'cancelled': 'Đơn hàng đã bị hủy'
+                }
+                
+                try:
+                    create_notification(
+                        user_id=order['user_id'],
+                        title=f'📦 Cập nhật đơn hàng #{order_id}',
+                        message=status_messages.get(new_status, f'Trạng thái: {new_status}'),
+                        notification_type='info',
+                        link='/profile'
+                    )
+                except Exception as e:
+                    app.logger.error(f'Failed to create notification: {e}')
+                
+                # Check purchase achievements when order is completed/delivered
+                if new_status in ['completed', 'delivered']:
+                    try:
+                        check_and_award_achievements(
+                            order['user_id'], 
+                            'purchase', 
+                            {'order_id': order_id, 'amount': order.get('total', 0)}
+                        )
+                    except Exception as e:
+                        app.logger.error(f'Failed to check purchase achievements: {e}')
+            
+            return True
+    
+    return False
+
+
+def get_order_tracking_info(order_id):
+    """Get detailed tracking information for an order with timeline and milestones"""
+    order = get_order_by_id(order_id)
+    if not order:
+        return None
+    
+    # Define order lifecycle milestones
+    milestones = [
+        {
+            'status': 'pending',
+            'title': 'Đơn hàng đã đặt',
+            'icon': '📝',
+            'description': 'Đơn hàng của bạn đã được tiếp nhận'
+        },
+        {
+            'status': 'processing',
+            'title': 'Đang xử lý',
+            'icon': '⚙️',
+            'description': 'Đơn hàng đang được chuẩn bị'
+        },
+        {
+            'status': 'shipped',
+            'title': 'Đã giao vận',
+            'icon': '🚚',
+            'description': 'Đơn hàng đã được giao cho đơn vị vận chuyển'
+        },
+        {
+            'status': 'delivered',
+            'title': 'Đã giao hàng',
+            'icon': '✅',
+            'description': 'Đơn hàng đã được giao thành công'
+        }
+    ]
+    
+    # Map current status to milestone
+    current_status = order.get('status', 'pending')
+    status_order = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+    current_index = status_order.index(current_status) if current_status in status_order else 0
+    
+    # Mark completed milestones
+    for i, milestone in enumerate(milestones):
+        if i <= current_index and current_status != 'cancelled':
+            milestone['completed'] = True
+            milestone['active'] = (i == current_index)
+        else:
+            milestone['completed'] = False
+            milestone['active'] = False
+    
+    # Handle cancelled status
+    if current_status == 'cancelled':
+        for milestone in milestones:
+            milestone['completed'] = False
+            milestone['active'] = False
+        milestones.append({
+            'status': 'cancelled',
+            'title': 'Đã hủy',
+            'icon': '❌',
+            'description': 'Đơn hàng đã bị hủy',
+            'completed': True,
+            'active': True
+        })
+    
+    # Calculate estimated delivery date
+    created_at = datetime.fromisoformat(order.get('timestamp', datetime.now().isoformat()))
+    
+    # Estimate based on status
+    if current_status == 'pending':
+        estimated_delivery = created_at + timedelta(days=5)
+    elif current_status == 'processing':
+        estimated_delivery = created_at + timedelta(days=4)
+    elif current_status == 'shipped':
+        estimated_delivery = created_at + timedelta(days=2)
+    elif current_status == 'delivered':
+        estimated_delivery = datetime.fromisoformat(order.get('status_updated_at', order.get('timestamp')))
+    else:
+        estimated_delivery = None
+    
+    # Get status history timeline
+    status_history = order.get('status_history', [])
+    timeline = []
+    
+    # Add order created event
+    timeline.append({
+        'status': 'pending',
+        'title': 'Đơn hàng được tạo',
+        'timestamp': order.get('timestamp'),
+        'note': f'Khách hàng: {order.get("customer_name", "N/A")}'
+    })
+    
+    # Add status changes
+    for history_item in status_history:
+        timeline.append({
+            'status': history_item.get('to'),
+            'title': f'Cập nhật: {history_item.get("to", "N/A")}',
+            'timestamp': history_item.get('timestamp'),
+            'note': history_item.get('note', '')
+        })
+    
+    # Sort timeline by timestamp
+    timeline.sort(key=lambda x: x.get('timestamp', ''))
+    
+    return {
+        'order': order,
+        'milestones': milestones,
+        'timeline': timeline,
+        'current_status': current_status,
+        'estimated_delivery': estimated_delivery.isoformat() if estimated_delivery else None,
+        'estimated_delivery_formatted': estimated_delivery.strftime('%d/%m/%Y') if estimated_delivery else None
+    }
+
+
+@app.route('/api/order/<order_id>/tracking', methods=['GET'])
+def api_order_tracking(order_id):
+    """API endpoint for order tracking"""
+    try:
+        # Get order
+        order = get_order_by_id(order_id)
+        if not order:
+            return {'ok': False, 'error': 'Đơn hàng không tồn tại'}, 404
+        
+        # Check permission
+        if not session.get('is_admin'):
+            # User can only track their own orders
+            if 'user_id' not in session or order.get('user_id') != session.get('user_id'):
+                return {'ok': False, 'error': 'Bạn không có quyền xem đơn hàng này'}, 403
+        
+        tracking_info = get_order_tracking_info(order_id)
+        
+        return {'ok': True, 'tracking': tracking_info}
+    except Exception as e:
+        app.logger.error(f'Error getting order tracking: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/order/track/<order_id>')
+def order_tracking_page(order_id):
+    """User-facing order tracking page"""
+    try:
+        # Get order
+        order = get_order_by_id(order_id)
+        if not order:
+            flash('Đơn hàng không tồn tại', 'error')
+            return redirect(url_for('index'))
+        
+        # Check permission
+        if not session.get('is_admin'):
+            if 'user_id' not in session or order.get('user_id') != session.get('user_id'):
+                flash('Bạn không có quyền xem đơn hàng này', 'error')
+                return redirect(url_for('index'))
+        
+        tracking_info = get_order_tracking_info(order_id)
+        
+        return render_template('order_tracking.html', 
+                             tracking=tracking_info,
+                             datetime=datetime)
+    except Exception as e:
+        app.logger.error(f'Error loading order tracking page: {e}')
+        flash('Không thể tải thông tin đơn hàng', 'error')
+        return redirect(url_for('profile'))
+
+
+@app.route('/api/orders/my', methods=['GET'])
+@login_required
+def api_my_orders():
+    """Get current user's orders with filters"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin account'}, 403
+        
+        user_id = session.get('user_id')
+        all_orders = load_orders()
+        user_orders = [o for o in all_orders if o.get('user_id') == user_id]
+        
+        # Filter by status
+        status = request.args.get('status')
+        if status and status != 'all':
+            user_orders = [o for o in user_orders if o.get('status') == status]
+        
+        # Filter by payment method
+        payment = request.args.get('payment')
+        if payment and payment != 'all':
+            user_orders = [o for o in user_orders if o.get('payment_method') == payment]
+        
+        # Filter by date range
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        if start_date:
+            user_orders = [o for o in user_orders if o.get('timestamp', '') >= start_date]
+        if end_date:
+            end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
+            user_orders = [o for o in user_orders if o.get('timestamp', '') < end_dt.isoformat()]
+        
+        # Sort
+        sort_by = request.args.get('sort', 'date_desc')
+        if sort_by == 'date_desc':
+            user_orders.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        elif sort_by == 'date_asc':
+            user_orders.sort(key=lambda x: x.get('timestamp', ''))
+        elif sort_by == 'total_desc':
+            user_orders.sort(key=lambda x: x.get('total', 0), reverse=True)
+        elif sort_by == 'total_asc':
+            user_orders.sort(key=lambda x: x.get('total', 0))
+        
+        # Pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        total = len(user_orders)
+        total_pages = (total + per_page - 1) // per_page
+        start = (page - 1) * per_page
+        end = start + per_page
+        orders_page = user_orders[start:end]
+        
+        # Calculate stats
+        stats = {
+            'total_orders': total,
+            'total_spent': sum(o.get('total', 0) for o in user_orders),
+            'pending_orders': len([o for o in user_orders if o.get('status') == 'pending']),
+            'delivered_orders': len([o for o in user_orders if o.get('status') == 'delivered'])
+        }
+        
+        return {
+            'ok': True,
+            'orders': orders_page,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'total_pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages
+            },
+            'stats': stats
+        }
+    except Exception as e:
+        app.logger.error(f'Error getting user orders: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/order/<order_id>/cancel', methods=['POST'])
+@login_required
+def api_cancel_order(order_id):
+    """Cancel order (only pending orders can be cancelled by users)"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin cannot cancel orders this way'}, 403
+        
+        user_id = session.get('user_id')
+        order = get_order_by_id(order_id)
+        
+        if not order:
+            return {'ok': False, 'error': 'Đơn hàng không tồn tại'}, 404
+        
+        # Check permission
+        if order.get('user_id') != user_id:
+            return {'ok': False, 'error': 'Bạn không có quyền hủy đơn hàng này'}, 403
+        
+        # Only pending orders can be cancelled
+        if order.get('status') != 'pending':
+            return {'ok': False, 'error': 'Chỉ có thể hủy đơn hàng đang chờ xử lý'}, 400
+        
+        # Update status
+        success = update_order_status_new(
+            order_id, 
+            'cancelled', 
+            'Khách hàng hủy đơn'
+        )
+        
+        if success:
+            # Create notification
+            try:
+                create_notification(
+                    user_id=user_id,
+                    title='❌ Đơn hàng đã hủy',
+                    message=f'Đơn hàng #{order_id} đã được hủy thành công',
+                    notification_type='info',
+                    link='/profile'
+                )
+            except Exception as e:
+                app.logger.error(f'Failed to create cancel notification: {e}')
+            
+            app.logger.info(f'Order {order_id} cancelled by user {user_id}')
+            return {'ok': True, 'message': 'Đơn hàng đã được hủy'}
+        else:
+            return {'ok': False, 'error': 'Không thể hủy đơn hàng'}, 500
+    except Exception as e:
+        app.logger.error(f'Error cancelling order: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Weather API Routes ====================
+
+@app.route('/api/weather/current', methods=['GET'])
+def api_weather_current():
+    """Get current weather with disease risk assessment"""
+    try:
+        city = request.args.get('city', 'Hanoi')
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
+        
+        # Create cache key
+        if lat and lon:
+            cache_key = f"weather:coord:{lat}:{lon}"
+        else:
+            cache_key = f"weather:city:{city}"
+        
+        # Check cache
+        cached = get_cached_weather(cache_key)
+        if cached:
+            return {'success': True, 'weather': cached, 'cached': True}
+        
+        # Fetch from API
+        weather_data = fetch_weather_from_api(city=city, lat=lat, lon=lon)
+        
+        if not weather_data:
+            return {
+                'success': False, 
+                'error': 'API key not configured or request failed. Check OPENWEATHER_API_KEY in .env file.'
+            }, 500
+        
+        # Assess disease risk
+        risk = assess_disease_risk_from_weather(weather_data)
+        weather_data['disease_risk'] = risk
+        
+        # Cache result
+        cache_weather(cache_key, weather_data)
+        
+        return {'success': True, 'weather': weather_data, 'cached': False}
+    
+    except Exception as e:
+        app.logger.error(f'Weather API error: {e}')
+        return {'success': False, 'error': str(e)}, 500
+
+
+@app.route('/api/weather/forecast', methods=['GET'])
+def api_weather_forecast():
+    """Get weather forecast for next 5 days"""
+    try:
+        city = request.args.get('city', 'Hanoi')
+        days = int(request.args.get('days', 5))
+        
+        if not OPENWEATHER_API_KEY:
+            return {'success': False, 'error': 'API key not configured'}, 500
+        
+        # Check cache
+        cache_key = f"forecast:city:{city}"
+        cached = get_cached_weather(cache_key)
+        if cached:
+            return {'success': True, 'forecast': cached, 'cached': True}
+        
+        # Fetch forecast
+        base_url = "https://api.openweathermap.org/data/2.5/forecast"
+        params = {
+            'q': city,
+            'appid': OPENWEATHER_API_KEY,
+            'units': 'metric',
+            'lang': 'vi'
+        }
+        
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Process forecast (group by day)
+        daily_forecasts = {}
+        for item in data['list'][:40]:  # 5 days * 8 intervals
+            date_str = item['dt_txt'].split(' ')[0]
+            if date_str not in daily_forecasts:
+                daily_forecasts[date_str] = []
+            daily_forecasts[date_str].append(item)
+        
+        # Aggregate daily data
+        forecast_list = []
+        for date_str, intervals in list(daily_forecasts.items())[:days]:
+            temps = [i['main']['temp'] for i in intervals]
+            humidities = [i['main']['humidity'] for i in intervals]
+            
+            forecast_list.append({
+                'date': date_str,
+                'day_name': datetime.strptime(date_str, '%Y-%m-%d').strftime('%A'),
+                'temp_min': min(temps),
+                'temp_max': max(temps),
+                'temp_avg': sum(temps) / len(temps),
+                'humidity_avg': sum(humidities) / len(humidities),
+                'description': intervals[len(intervals)//2]['weather'][0]['description'],
+                'icon': intervals[len(intervals)//2]['weather'][0]['icon'],
+                'rain_total': sum([i.get('rain', {}).get('3h', 0) for i in intervals])
+            })
+        
+        forecast_data = {
+            'city': data['city']['name'],
+            'country': data['city']['country'],
+            'forecasts': forecast_list
+        }
+        
+        # Cache
+        cache_weather(cache_key, forecast_data)
+        
+        return {'success': True, 'forecast': forecast_data, 'cached': False}
+    
+    except Exception as e:
+        app.logger.error(f'Forecast API error: {e}')
+        return {'success': False, 'error': str(e)}, 500
+
+
+# ==================== Wallet API Routes ====================
+
+@app.route('/api/wallet', methods=['GET'])
+@login_required
+def api_get_wallet():
+    """Get user wallet info"""
+    try:
+        user_id = session.get('user_id')
+        wallet = get_user_wallet(user_id)
+        transactions = load_wallet_transactions(user_id)[:20]  # Last 20 transactions
+        
+        return {
+            'ok': True,
+            'wallet': wallet,
+            'transactions': transactions
+        }
+    except Exception as e:
+        app.logger.error(f'Error getting wallet: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/wallet/topup', methods=['POST'])
+@login_required
+def api_wallet_topup():
+    """Create top-up payment request"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        amount = int(data.get('amount', 0))
+        payment_method = data.get('payment_method', 'vnpay')  # vnpay or momo
+        
+        if amount < 10000:
+            return {'ok': False, 'error': 'Số tiền nạp tối thiểu 10,000đ'}, 400
+        
+        if amount > 50000000:
+            return {'ok': False, 'error': 'Số tiền nạp tối đa 50,000,000đ'}, 400
+        
+        # Create pending transaction
+        transaction_id = str(uuid4())
+        transaction = {
+            'id': transaction_id,
+            'user_id': user_id,
+            'amount': amount,
+            'transaction_type': 'topup_pending',
+            'description': f'Nạp tiền vào ví qua {payment_method.upper()}',
+            'payment_method': payment_method,
+            'status': 'pending',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Save pending transaction
+        transaction_file = BASE_DIR / 'data' / 'wallet_transactions.jsonl'
+        with open(transaction_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(transaction, ensure_ascii=False) + '\n')
+        
+        # Generate payment URL
+        if payment_method == 'vnpay' and vnpay_payment:
+            payment_url = vnpay_payment.create_payment_url(
+                order_id=transaction_id,
+                amount=amount,
+                order_desc=f'Nap tien vi - {user_id}',
+                order_type='topup',
+                return_url=url_for('wallet_topup_callback', _external=True)
+            )
+        elif payment_method == 'momo' and momo_payment:
+            payment_url = momo_payment.create_payment_url(
+                order_id=transaction_id,
+                amount=amount,
+                order_info=f'Nap tien vi - {user_id}',
+                return_url=url_for('wallet_topup_callback', _external=True)
+            )
+        else:
+            return {'ok': False, 'error': 'Phương thức thanh toán không khả dụng'}, 400
+        
+        return {'ok': True, 'payment_url': payment_url, 'transaction_id': transaction_id}
+    
+    except Exception as e:
+        app.logger.error(f'Error creating topup: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/wallet/topup/callback', methods=['GET'])
+def wallet_topup_callback():
+    """Handle wallet top-up payment callback"""
+    try:
+        # Similar to payment callback, but update wallet instead
+        payment_method = request.args.get('payment_method', 'vnpay')
+        
+        if payment_method == 'vnpay' and vnpay_payment:
+            is_valid = vnpay_payment.validate_response(dict(request.args))
+            transaction_id = request.args.get('vnp_TxnRef')
+            response_code = request.args.get('vnp_ResponseCode')
+        elif payment_method == 'momo' and momo_payment:
+            is_valid = True  # MoMo has separate signature check
+            transaction_id = request.args.get('orderId')
+            response_code = request.args.get('resultCode')
+        else:
+            flash('Phương thức thanh toán không hợp lệ', 'error')
+            return redirect(url_for('profile'))
+        
+        # Load transaction
+        transactions = []
+        transaction_file = BASE_DIR / 'data' / 'wallet_transactions.jsonl'
+        target_tx = None
+        
+        if transaction_file.exists():
+            with open(transaction_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        tx = json.loads(line)
+                        transactions.append(tx)
+                        if tx['id'] == transaction_id:
+                            target_tx = tx
+        
+        if not target_tx:
+            flash('Giao dịch không tồn tại', 'error')
+            return redirect(url_for('profile'))
+        
+        # Check payment result
+        if (payment_method == 'vnpay' and response_code == '00') or \
+           (payment_method == 'momo' and response_code == '0'):
+            # Success - add money to wallet
+            user_id = target_tx['user_id']
+            amount = target_tx['amount']
+            
+            # Update transaction status
+            for tx in transactions:
+                if tx['id'] == transaction_id:
+                    tx['status'] = 'completed'
+                    tx['transaction_type'] = 'topup'
+                    tx['completed_at'] = datetime.utcnow().isoformat()
+            
+            # Save transactions
+            with open(transaction_file, 'w', encoding='utf-8') as f:
+                for tx in transactions:
+                    f.write(json.dumps(tx, ensure_ascii=False) + '\n')
+            
+            # Credit wallet
+            wallet = get_user_wallet(user_id)
+            wallet['balance'] = float(wallet.get('balance', 0)) + float(amount)
+            wallet['updated_at'] = datetime.utcnow().isoformat()
+            save_wallet(wallet)
+            
+            # Notify
+            create_notification(
+                user_id=user_id,
+                title='💰 Nạp tiền thành công',
+                message=f'Đã nạp {amount:,}đ vào ví. Số dư: {wallet["balance"]:,}đ',
+                notification_type='success',
+                link='/profile'
+            )
+            
+            flash(f'Nạp tiền thành công! Số dư mới: {wallet["balance"]:,}đ', 'success')
+        else:
+            flash('Nạp tiền thất bại hoặc bị hủy', 'error')
+        
+        return redirect(url_for('profile'))
+    
+    except Exception as e:
+        app.logger.error(f'Topup callback error: {e}')
+        flash('Có lỗi xảy ra khi xử lý giao dịch', 'error')
+        return redirect(url_for('profile'))
+
+
+# ==================== Referral API Routes ====================
+
+@app.route('/api/referral/info', methods=['GET'])
+@login_required
+def api_referral_info():
+    """Get user's referral information"""
+    try:
+        user_id = session.get('user_id')
+        referral_info = get_user_referral_info(user_id)
+        leaderboard = get_referral_leaderboard(10)
+        
+        return {
+            'ok': True,
+            'referral': referral_info,
+            'leaderboard': leaderboard
+        }
+    except Exception as e:
+        app.logger.error(f'Error getting referral info: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/referral/apply', methods=['POST'])
+@login_required
+def api_apply_referral():
+    """Apply referral code (for new users)"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        referral_code = data.get('code', '').strip().upper()
+        
+        if not referral_code:
+            return {'ok': False, 'error': 'Mã giới thiệu không hợp lệ'}, 400
+        
+        # Check if user already used a referral code
+        user_ref_info = get_user_referral_info(user_id)
+        if user_ref_info.get('referred_by'):
+            return {'ok': False, 'error': 'Bạn đã sử dụng mã giới thiệu rồi'}, 400
+        
+        success = apply_referral_code(user_id, referral_code)
+        
+        if success:
+            # Bonus for new user
+            add_points(user_id, 50, 'referral_welcome', 'Thưởng từ mã giới thiệu')
+            
+            return {'ok': True, 'message': 'Áp dụng mã giới thiệu thành công! +50 điểm'}
+        else:
+            return {'ok': False, 'error': 'Mã giới thiệu không hợp lệ'}, 400
+    
+    except Exception as e:
+        app.logger.error(f'Error applying referral: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Achievement & Quest API Routes ====================
+
+@app.route('/api/achievements', methods=['GET'])
+@login_required
+def api_get_achievements():
+    """Get user's achievements and available achievements"""
+    try:
+        user_id = session.get('user_id')
+        users = load_users()
+        user = users.get(user_id, {})
+        
+        unlocked = user.get('achievements', [])
+        
+        # Prepare achievement list
+        achievements_list = []
+        for ach_id, ach_data in ACHIEVEMENTS.items():
+            achievements_list.append({
+                'id': ach_id,
+                'name': ach_data['name'],
+                'description': ach_data['desc'],
+                'points': ach_data['points'],
+                'unlocked': ach_id in unlocked
+            })
+        
+        # Sort: unlocked first, then by points
+        achievements_list.sort(key=lambda x: (not x['unlocked'], -x['points']))
+        
+        return {
+            'ok': True,
+            'achievements': achievements_list,
+            'total_unlocked': len(unlocked),
+            'total_available': len(ACHIEVEMENTS)
+        }
+    
+    except Exception as e:
+        app.logger.error(f'Error getting achievements: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/quests/daily', methods=['GET'])
+@login_required
+def api_daily_quests():
+    """Get daily quests for user"""
+    try:
+        user_id = session.get('user_id')
+        quests = get_user_daily_quests(user_id)
+        
+        completed_count = len([q for q in quests if q['completed']])
+        total_rewards = sum([q['reward'] for q in quests if q['completed']])
+        
+        return {
+            'ok': True,
+            'quests': quests,
+            'completed_count': completed_count,
+            'total_count': len(quests),
+            'total_rewards': total_rewards
+        }
+    
+    except Exception as e:
+        app.logger.error(f'Error getting daily quests: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Farmer Dashboard API Routes ====================
+
+@app.route('/api/dashboard/farmer', methods=['GET'])
+@login_required
+def api_farmer_dashboard():
+    """Get comprehensive farmer dashboard data"""
+    try:
+        user_id = session.get('user_id')
+        dashboard_data = get_farmer_dashboard_data(user_id)
+        
+        if not dashboard_data:
+            return {'ok': False, 'error': 'Không thể tải dữ liệu dashboard'}, 500
+        
+        return {'ok': True, 'dashboard': dashboard_data}
+    
+    except Exception as e:
+        app.logger.error(f'Error getting dashboard: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/dashboard')
+@login_required
+def farmer_dashboard_page():
+    """Farmer dashboard page"""
+    try:
+        user_id = session.get('user_id')
+        users = load_users()
+        user = users.get(user_id, {})
+        
+        # Get translations
+        lang = session.get('lang', 'vi')
+        t = load_translations().get(lang, {})
+        
+        return render_template(
+            'farmer_dashboard.html',
+            user=user,
+            t=t
+        )
+    
+    except Exception as e:
+        app.logger.error(f'Dashboard page error: {e}')
+        flash('Có lỗi xảy ra khi tải dashboard', 'error')
+        return redirect(url_for('index'))
+
+
+@app.route('/api/care/schedule', methods=['GET', 'POST', 'DELETE'])
+@login_required
+def api_care_schedule():
+    """Manage care schedule (calendar)"""
+    try:
+        user_id = session.get('user_id')
+        
+        if request.method == 'GET':
+            schedules = load_care_schedule(user_id)
+            upcoming = get_upcoming_care_tasks(user_id, days_ahead=7)
+            
+            return {
+                'ok': True,
+                'schedules': schedules,
+                'upcoming': upcoming
+            }
+        
+        elif request.method == 'POST':
+            data = request.get_json()
+            
+            schedule = {
+                'id': data.get('id', str(uuid4())),
+                'user_id': user_id,
+                'title': data.get('title', ''),
+                'description': data.get('description', ''),
+                'task_type': data.get('task_type', 'other'),  # water, fertilize, spray, prune, other
+                'frequency': data.get('frequency', 'once'),  # once, daily, weekly, monthly
+                'next_due': data.get('next_due'),
+                'active': True,
+                'created_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            
+            save_care_schedule(schedule)
+            
+            return {'ok': True, 'schedule': schedule}
+        
+        elif request.method == 'DELETE':
+            schedule_id = request.args.get('id')
+            if not schedule_id:
+                return {'ok': False, 'error': 'Missing schedule ID'}, 400
+            
+            # Load and filter schedules
+            schedules = load_care_schedule(user_id)
+            schedules = [s for s in schedules if s['id'] != schedule_id or s['user_id'] != user_id]
+            
+            # Save filtered list
+            schedule_file = BASE_DIR / 'data' / 'care_schedules.jsonl'
+            with open(schedule_file, 'w', encoding='utf-8') as f:
+                for s in schedules:
+                    f.write(json.dumps(s, ensure_ascii=False) + '\n')
+            
+            return {'ok': True, 'message': 'Đã xóa lịch chăm sóc'}
+    
+    except Exception as e:
+        app.logger.error(f'Error managing care schedule: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+# ==================== Weather API Integration ====================
+
+def fetch_weather_from_api(city=None, lat=None, lon=None):
+    """
+    Fetch current weather data from OpenWeatherMap API
+    
+    Args:
+        city: City name (e.g., "Hanoi", "Ho Chi Minh City")
+        lat: Latitude
+        lon: Longitude
+    
+    Returns:
+        dict: Weather data or None if failed
+    """
+    if not OPENWEATHER_API_KEY:
+        return None
+    
+    try:
+        base_url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            'appid': OPENWEATHER_API_KEY,
+            'units': 'metric',  # Celsius
+            'lang': 'vi'  # Vietnamese descriptions
+        }
+        
+        if lat and lon:
+            params['lat'] = lat
+            params['lon'] = lon
+        elif city:
+            params['q'] = city
+        else:
+            params['q'] = 'Hanoi'  # Default
+        
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Format response
+        weather_data = {
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'wind_speed': data['wind']['speed'] * 3.6,  # m/s to km/h
+            'description': data['weather'][0]['description'],
+            'icon': data['weather'][0]['icon'],
+            'city_name': data['name'],
+            'country': data['sys'].get('country', ''),
+            'clouds': data.get('clouds', {}).get('all', 0),
+            'rain': data.get('rain', {}).get('1h', 0),  # Rain in last hour
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        return weather_data
+    
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f'Weather API request failed: {e}')
+        return None
+    except Exception as e:
+        app.logger.error(f'Weather parsing error: {e}')
+        return None
+
+
+def assess_disease_risk_from_weather(weather_data):
+    """
+    Assess tomato disease risk based on weather conditions
+    
+    Risk factors:
+    - High humidity (>80%) + Moderate temp (20-30°C) = High risk for fungal diseases
+    - Heavy rain + Wind = High risk for disease spread
+    - Very hot (>32°C) + High humidity = High risk for bacterial diseases
+    
+    Returns:
+        dict: {risk_level: 'low'|'medium'|'high', risk_text: str, risk_color: str, recommendations: list}
+    """
+    if not weather_data:
+        return {
+            'risk_level': 'unknown',
+            'risk_text': 'Không xác định',
+            'risk_color': 'gray',
+            'recommendations': []
+        }
+    
+    temp = weather_data['temperature']
+    humidity = weather_data['humidity']
+    rain = weather_data.get('rain', 0)
+    wind = weather_data['wind_speed']
+    
+    risk_score = 0
+    recommendations = []
+    
+    # Temperature assessment
+    if 20 <= temp <= 30:
+        risk_score += 2
+    elif temp > 32:
+        risk_score += 1
+        recommendations.append('🌡️ Nhiệt độ cao - Tăng tưới nước, che bóng mát cho cây')
+    elif temp < 15:
+        recommendations.append('❄️ Nhiệt độ thấp - Che phủ cây vào ban đêm')
+    
+    # Humidity assessment
+    if humidity > 80:
+        risk_score += 3
+        recommendations.append('💧 Độ ẩm rất cao - Nguy cơ bệnh nấm! Tăng cường thông gió')
+    elif humidity > 70:
+        risk_score += 2
+        recommendations.append('💦 Độ ẩm cao - Theo dõi dấu hiệu bệnh, cân nhắc phun phòng ngừa')
+    elif humidity < 40:
+        recommendations.append('🏜️ Độ ẩm thấp - Tăng tần suất tưới nước')
+    
+    # Rain assessment
+    if rain > 5:
+        risk_score += 2
+        recommendations.append('🌧️ Mưa nhiều - Đảm bảo thoát nước tốt, tránh úng rễ')
+    elif rain > 0:
+        risk_score += 1
+    
+    # Wind assessment
+    if wind > 30:
+        risk_score += 1
+        recommendations.append('💨 Gió mạnh - Kiểm tra giàn đỡ, tránh cây bị gãy')
+    
+    # Combined high-risk conditions
+    if humidity > 80 and 20 <= temp <= 30:
+        risk_score += 2
+        recommendations.append('⚠️ Điều kiện thuận lợi cho bệnh nấm! Xem xét phun thuốc ngay')
+    
+    if temp > 32 and humidity > 70:
+        risk_score += 2
+        recommendations.append('🦠 Nguy cơ bệnh vi khuẩn! Kiểm tra lá vàng, héo')
+    
+    # Determine risk level
+    if risk_score >= 6:
+        risk_level = 'high'
+        risk_text = 'Cao'
+        risk_color = 'red'
+        if not any('phun thuốc' in r for r in recommendations):
+            recommendations.append('🛡️ Xem xét phun thuốc phòng bệnh')
+    elif risk_score >= 3:
+        risk_level = 'medium'
+        risk_text = 'Trung bình'
+        risk_color = 'orange'
+        if not recommendations:
+            recommendations.append('👀 Theo dõi cây thường xuyên, kiểm tra dấu hiệu bệnh')
+    else:
+        risk_level = 'low'
+        risk_text = 'Thấp'
+        risk_color = 'green'
+        if not recommendations:
+            recommendations.append('✅ Điều kiện tốt cho cây trồng')
+            recommendations.append('🌱 Duy trì chế độ chăm sóc hiện tại')
+    
+    return {
+        'risk_level': risk_level,
+        'risk_text': risk_text,
+        'risk_color': risk_color,
+        'risk_score': risk_score,
+        'recommendations': recommendations
+    }
+
+
+def get_cached_weather(cache_key):
+    """Get weather from cache if not expired"""
+    if cache_key in WEATHER_CACHE:
+        cached_data, timestamp = WEATHER_CACHE[cache_key]
+        age = (datetime.utcnow() - timestamp).total_seconds()
+        if age < WEATHER_CACHE_TTL:
+            return cached_data
+    return None
+
+
+def cache_weather(cache_key, data):
+    """Cache weather data"""
+    WEATHER_CACHE[cache_key] = (data, datetime.utcnow())
+
+
+# ==================== Wallet System ====================
+
+def load_wallets():
+    """Load all wallet data"""
+    wallets = {}
+    wallet_file = BASE_DIR / 'data' / 'wallets.jsonl'
+    
+    if wallet_file.exists():
+        with open(wallet_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        wallet = json.loads(line)
+                        wallets[wallet['user_id']] = wallet
+                    except json.JSONDecodeError:
+                        continue
+    
+    return wallets
+
+
+def save_wallet(wallet):
+    """Save updated wallet"""
+    wallet_file = BASE_DIR / 'data' / 'wallets.jsonl'
+    wallets = load_wallets()
+    wallets[wallet['user_id']] = wallet
+    
+    with open(wallet_file, 'w', encoding='utf-8') as f:
+        for w in wallets.values():
+            f.write(json.dumps(w, ensure_ascii=False) + '\n')
+
+
+def get_user_wallet(user_id):
+    """Get or create user wallet"""
+    wallets = load_wallets()
+    
+    if user_id not in wallets:
+        wallet = {
+            'user_id': user_id,
+            'balance': 0.0,
+            'currency': 'VND',
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        save_wallet(wallet)
+        return wallet
+    
+    return wallets[user_id]
+
+
+def add_wallet_transaction(user_id, amount, transaction_type, description, reference_id=None):
+    """
+    Add transaction to wallet history
+    
+    Args:
+        user_id: User ID
+        amount: Amount (positive for credit, negative for debit)
+        transaction_type: Type (topup, purchase, refund, referral_bonus, etc.)
+        description: Description text
+        reference_id: Optional reference (order_id, payment_id, etc.)
+    
+    Returns:
+        dict: Transaction record
+    """
+    transaction_file = BASE_DIR / 'data' / 'wallet_transactions.jsonl'
+    
+    transaction = {
+        'id': str(uuid4()),
+        'user_id': user_id,
+        'amount': float(amount),
+        'transaction_type': transaction_type,
+        'description': description,
+        'reference_id': reference_id,
+        'timestamp': datetime.utcnow().isoformat(),
+        'balance_after': 0.0  # Will be updated
+    }
+    
+    # Update wallet balance
+    wallet = get_user_wallet(user_id)
+    wallet['balance'] = float(wallet.get('balance', 0)) + float(amount)
+    wallet['updated_at'] = datetime.utcnow().isoformat()
+    transaction['balance_after'] = wallet['balance']
+    save_wallet(wallet)
+    
+    # Save transaction
+    with open(transaction_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(transaction, ensure_ascii=False) + '\n')
+    
+    return transaction
+
+
+def load_wallet_transactions(user_id=None):
+    """Load wallet transactions for a user or all transactions"""
+    transactions = []
+    transaction_file = BASE_DIR / 'data' / 'wallet_transactions.jsonl'
+    
+    if transaction_file.exists():
+        with open(transaction_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        tx = json.loads(line)
+                        if user_id is None or tx['user_id'] == user_id:
+                            transactions.append(tx)
+                    except json.JSONDecodeError:
+                        continue
+    
+    return sorted(transactions, key=lambda x: x['timestamp'], reverse=True)
+
+
+# ==================== Referral Program ====================
+
+def generate_referral_code(user_id):
+    """Generate unique referral code for user"""
+    # Use user_id hash for uniqueness
+    hash_val = hashlib.md5(f"{user_id}{datetime.utcnow()}".encode()).hexdigest()[:8]
+    return f"REF{hash_val.upper()}"
+
+
+def get_user_referral_info(user_id):
+    """Get or create user referral info"""
+    referral_file = BASE_DIR / 'data' / 'referrals.jsonl'
+    referrals = {}
+    
+    if referral_file.exists():
+        with open(referral_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        ref = json.loads(line)
+                        referrals[ref['user_id']] = ref
+                    except json.JSONDecodeError:
+                        continue
+    
+    if user_id not in referrals:
+        referral_code = generate_referral_code(user_id)
+        # Ensure code is unique
+        existing_codes = {r['code'] for r in referrals.values()}
+        while referral_code in existing_codes:
+            referral_code = generate_referral_code(user_id)
+        
+        referrals[user_id] = {
+            'user_id': user_id,
+            'code': referral_code,
+            'referred_by': None,
+            'referral_count': 0,
+            'total_earned': 0,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        # Save all referrals
+        with open(referral_file, 'w', encoding='utf-8') as f:
+            for ref in referrals.values():
+                f.write(json.dumps(ref, ensure_ascii=False) + '\n')
+    
+    return referrals[user_id]
+
+
+def apply_referral_code(user_id, referral_code):
+    """
+    Apply referral code when new user registers
+    
+    Returns:
+        bool: Success status
+    """
+    if not referral_code:
+        return False
+    
+    referral_file = BASE_DIR / 'data' / 'referrals.jsonl'
+    referrals = {}
+    
+    if referral_file.exists():
+        with open(referral_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        ref = json.loads(line)
+                        referrals[ref['user_id']] = ref
+                    except json.JSONDecodeError:
+                        continue
+    
+    # Find referrer
+    referrer_id = None
+    for uid, ref in referrals.items():
+        if ref['code'] == referral_code.upper():
+            referrer_id = uid
+            break
+    
+    if not referrer_id or referrer_id == user_id:
+        return False
+    
+    # Update referrer stats
+    referrals[referrer_id]['referral_count'] = referrals[referrer_id].get('referral_count', 0) + 1
+    
+    # Update new user's referred_by
+    if user_id in referrals:
+        referrals[user_id]['referred_by'] = referrer_id
+    
+    # Save
+    with open(referral_file, 'w', encoding='utf-8') as f:
+        for ref in referrals.values():
+            f.write(json.dumps(ref, ensure_ascii=False) + '\n')
+    
+    # Reward referrer with bonus points and wallet credit
+    reward_points = 100
+    reward_money = 50000  # 50k VND
+    
+    try:
+        # Add points
+        add_points(
+            referrer_id,
+            reward_points,
+            'referral_bonus',
+            f'Thưởng giới thiệu bạn mới'
+        )
+        
+        # Add wallet credit
+        add_wallet_transaction(
+            referrer_id,
+            reward_money,
+            'referral_bonus',
+            f'Thưởng giới thiệu người dùng mới',
+            reference_id=user_id
+        )
+        
+        # Update referral stats
+        referrals[referrer_id]['total_earned'] = referrals[referrer_id].get('total_earned', 0) + reward_money
+        with open(referral_file, 'w', encoding='utf-8') as f:
+            for ref in referrals.values():
+                f.write(json.dumps(ref, ensure_ascii=False) + '\n')
+        
+        # Notify referrer
+        create_notification(
+            user_id=referrer_id,
+            title='🎉 Thưởng giới thiệu!',
+            message=f'Bạn nhận {reward_points} điểm + {reward_money:,}đ từ việc giới thiệu bạn mới',
+            notification_type='success',
+            link='/profile'
+        )
+        
+        # Notify new user
+        create_notification(
+            user_id=user_id,
+            title='🎁 Chào mừng!',
+            message=f'Bạn đã nhận 50 điểm từ mã giới thiệu',
+            notification_type='success',
+            link='/profile'
+        )
+        
+    except Exception as e:
+        app.logger.error(f'Error rewarding referral: {e}')
+    
+    return True
+
+
+def get_referral_leaderboard(limit=10):
+    """Get top referrers"""
+    referral_file = BASE_DIR / 'data' / 'referrals.jsonl'
+    referrals = []
+    
+    if referral_file.exists():
+        with open(referral_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        referrals.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    # Sort by referral count
+    referrals.sort(key=lambda x: x.get('referral_count', 0), reverse=True)
+    
+    # Get user info for top referrers
+    users = load_users()
+    leaderboard = []
+    
+    for ref in referrals[:limit]:
+        if ref.get('referral_count', 0) > 0:
+            user = users.get(ref['user_id'], {})
+            leaderboard.append({
+                'user_id': ref['user_id'],
+                'username': user.get('username', 'Unknown'),
+                'display_name': user.get('display_name') or user.get('username', 'Unknown'),
+                'avatar': user.get('avatar'),
+                'referral_count': ref.get('referral_count', 0),
+                'total_earned': ref.get('total_earned', 0)
+            })
+    
+    return leaderboard
+
+
+# ==================== Enhanced Achievement System ====================
+
+# Extended achievement definitions
+ACHIEVEMENTS = {
+    # Disease Detection Achievements
+    'first_scan': {'name': '🔍 Lần đầu tiên', 'desc': 'Quét ảnh đầu tiên', 'points': 10},
+    'scan_10': {'name': '🎯 Người mới', 'desc': 'Quét 10 ảnh', 'points': 50},
+    'scan_50': {'name': '👨‍🔬 Chuyên gia tập sự', 'desc': 'Quét 50 ảnh', 'points': 200},
+    'scan_100': {'name': '🏆 Chuyên gia bệnh hại', 'desc': 'Quét 100 ảnh', 'points': 500},
+    'scan_streak_7': {'name': '🔥 Kiên trì 7 ngày', 'desc': 'Quét ảnh 7 ngày liên tiếp', 'points': 100},
+    
+    # Shopping Achievements
+    'first_purchase': {'name': '🛒 Khách hàng mới', 'desc': 'Hoàn thành đơn đầu tiên', 'points': 20},
+    'purchase_5': {'name': '💰 Khách quen', 'desc': 'Mua 5 đơn hàng', 'points': 100},
+    'purchase_10': {'name': '👑 VIP', 'desc': 'Mua 10 đơn hàng', 'points': 300},
+    'big_spender': {'name': '💎 Đại gia', 'desc': 'Tổng chi tiêu >1M', 'points': 500},
+    
+    # Community Achievements
+    'first_post': {'name': '✍️ Bài viết đầu tiên', 'desc': 'Đăng bài đầu tiên', 'points': 15},
+    'post_10': {'name': '📝 Người viết', 'desc': 'Đăng 10 bài viết', 'points': 75},
+    'popular_post': {'name': '⭐ Bài hot', 'desc': 'Bài viết có >20 likes', 'points': 100},
+    'first_comment': {'name': '💬 Bình luận đầu tiên', 'desc': 'Bình luận lần đầu', 'points': 10},
+    'active_commenter': {'name': '🗣️ Người hay bình luận', 'desc': 'Bình luận 50 lần', 'points': 100},
+    
+    # Game Achievements
+    'quiz_master': {'name': '🧠 Bậc thầy', 'desc': 'Hoàn thành quiz 10/10', 'points': 150},
+    'memory_pro': {'name': '🎮 Trí nhớ siêu hạng', 'desc': 'Memory game <20s', 'points': 100},
+    'farm_beginner': {'name': '🌱 Nông dân mới', 'desc': 'Thu hoạch 10 cây', 'points': 50},
+    'farm_expert': {'name': '🚜 Nông dân chuyên nghiệp', 'desc': 'Thu hoạch 100 cây', 'points': 300},
+    
+    # Referral Achievements
+    'first_referral': {'name': '🤝 Người giới thiệu', 'desc': 'Giới thiệu 1 người', 'points': 50},
+    'referral_5': {'name': '📢 Đại sứ thương hiệu', 'desc': 'Giới thiệu 5 người', 'points': 250},
+    'referral_10': {'name': '🌟 Super Referrer', 'desc': 'Giới thiệu 10 người', 'points': 600},
+    
+    # Loyalty Achievements
+    'loyal_30': {'name': '📅 Người dùng trung thành', 'desc': 'Dùng app 30 ngày', 'points': 200},
+    'loyal_90': {'name': '💪 Người dùng cống hiến', 'desc': 'Dùng app 90 ngày', 'points': 500},
+    'loyal_365': {'name': '👑 Huyền thoại', 'desc': 'Dùng app 1 năm', 'points': 1000}
+}
+
+
+def check_and_award_achievements(user_id, event_type, event_data=None):
+    """
+    Check and award achievements based on user activity
+    
+    Args:
+        user_id: User ID
+        event_type: Type of event (scan, purchase, post, comment, etc.)
+        event_data: Additional event data (optional)
+    
+    Returns:
+        list: List of newly unlocked achievements
+    """
+    users = load_users()
+    user = users.get(user_id, {})
+    
+    unlocked = user.get('achievements', [])
+    new_achievements = []
+    
+    # Get user stats
+    history = load_user_history(user_id)
+    orders = [o for o in load_orders() if o.get('user_id') == user_id and o.get('status') == 'completed']
+    posts = [p for p in load_posts() if p.get('author_id') == user_id]
+    comments = [c for c in load_post_comments() if c.get('user_id') == user_id]
+    referral_info = get_user_referral_info(user_id)
+    
+    # Check scan achievements
+    scan_count = len(history)
+    if scan_count >= 1 and 'first_scan' not in unlocked:
+        new_achievements.append('first_scan')
+    if scan_count >= 10 and 'scan_10' not in unlocked:
+        new_achievements.append('scan_10')
+    if scan_count >= 50 and 'scan_50' not in unlocked:
+        new_achievements.append('scan_50')
+    if scan_count >= 100 and 'scan_100' not in unlocked:
+        new_achievements.append('scan_100')
+    
+    # Check purchase achievements
+    purchase_count = len(orders)
+    total_spent = sum(o.get('total', 0) for o in orders)
+    
+    if purchase_count >= 1 and 'first_purchase' not in unlocked:
+        new_achievements.append('first_purchase')
+    if purchase_count >= 5 and 'purchase_5' not in unlocked:
+        new_achievements.append('purchase_5')
+    if purchase_count >= 10 and 'purchase_10' not in unlocked:
+        new_achievements.append('purchase_10')
+    if total_spent >= 1000000 and 'big_spender' not in unlocked:
+        new_achievements.append('big_spender')
+    
+    # Check community achievements
+    post_count = len(posts)
+    comment_count = len(comments)
+    
+    if post_count >= 1 and 'first_post' not in unlocked:
+        new_achievements.append('first_post')
+    if post_count >= 10 and 'post_10' not in unlocked:
+        new_achievements.append('post_10')
+    if comment_count >= 1 and 'first_comment' not in unlocked:
+        new_achievements.append('first_comment')
+    if comment_count >= 50 and 'active_commenter' not in unlocked:
+        new_achievements.append('active_commenter')
+    
+    # Check popular post
+    for post in posts:
+        if post.get('likes', 0) >= 20 and 'popular_post' not in unlocked:
+            new_achievements.append('popular_post')
+            break
+    
+    # Check referral achievements
+    referral_count = referral_info.get('referral_count', 0)
+    if referral_count >= 1 and 'first_referral' not in unlocked:
+        new_achievements.append('first_referral')
+    if referral_count >= 5 and 'referral_5' not in unlocked:
+        new_achievements.append('referral_5')
+    if referral_count >= 10 and 'referral_10' not in unlocked:
+        new_achievements.append('referral_10')
+    
+    # Check loyalty achievements
+    user_created = datetime.fromisoformat(user.get('created_at', datetime.utcnow().isoformat()))
+    days_since_join = (datetime.utcnow() - user_created).days
+    
+    if days_since_join >= 30 and 'loyal_30' not in unlocked:
+        new_achievements.append('loyal_30')
+    if days_since_join >= 90 and 'loyal_90' not in unlocked:
+        new_achievements.append('loyal_90')
+    if days_since_join >= 365 and 'loyal_365' not in unlocked:
+        new_achievements.append('loyal_365')
+    
+    # Award new achievements
+    if new_achievements:
+        user['achievements'] = unlocked + new_achievements
+        users[user_id] = user
+        save_users(users)
+        
+        # Award points and notifications
+        for ach in new_achievements:
+            ach_data = ACHIEVEMENTS.get(ach, {})
+            points = ach_data.get('points', 0)
+            
+            if points > 0:
+                add_points(user_id, points, 'achievement', f'Mở khóa: {ach_data.get("name", ach)}')
+            
+            create_notification(
+                user_id=user_id,
+                title=f'🏆 Achievement Unlocked!',
+                message=f'{ach_data.get("name", ach)} - {ach_data.get("desc", "")} (+{points} điểm)',
+                notification_type='success',
+                link='/profile'
+            )
+    
+    return new_achievements
+
+
+# ==================== Daily Quests System ====================
+
+DAILY_QUESTS = [
+    {'id': 'daily_scan_3', 'title': 'Quét 3 ảnh', 'desc': 'Quét 3 ảnh cà chua hôm nay', 'target': 3, 'reward': 30, 'type': 'scan'},
+    {'id': 'daily_post_1', 'title': 'Đăng bài', 'desc': 'Đăng 1 bài viết hôm nay', 'target': 1, 'reward': 25, 'type': 'post'},
+    {'id': 'daily_comment_2', 'title': 'Bình luận 2 lần', 'desc': 'Bình luận 2 bài viết hôm nay', 'target': 2, 'reward': 20, 'type': 'comment'},
+    {'id': 'daily_like_5', 'title': 'Like 5 bài', 'desc': 'Like 5 bài viết hôm nay', 'target': 5, 'reward': 15, 'type': 'like'},
+    {'id': 'daily_play_game', 'title': 'Chơi game', 'desc': 'Chơi 1 minigame bất kỳ', 'target': 1, 'reward': 20, 'type': 'game'}
+]
+
+
+def load_user_quest_progress(user_id, date_str=None):
+    """Load user's quest progress for a specific date"""
+    if date_str is None:
+        date_str = datetime.utcnow().strftime('%Y-%m-%d')
+    
+    quest_file = BASE_DIR / 'data' / 'quest_progress.jsonl'
+    
+    if quest_file.exists():
+        with open(quest_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        progress = json.loads(line)
+                        if progress['user_id'] == user_id and progress['date'] == date_str:
+                            return progress
+                    except json.JSONDecodeError:
+                        continue
+    
+    # Create new progress for today
+    return {
+        'user_id': user_id,
+        'date': date_str,
+        'quests': {q['id']: {'progress': 0, 'completed': False} for q in DAILY_QUESTS},
+        'updated_at': datetime.utcnow().isoformat()
+    }
+
+
+def update_quest_progress(user_id, quest_type, increment=1):
+    """Update progress for daily quests"""
+    date_str = datetime.utcnow().strftime('%Y-%m-%d')
+    progress = load_user_quest_progress(user_id, date_str)
+    
+    newly_completed = []
+    
+    # Update relevant quests
+    for quest in DAILY_QUESTS:
+        if quest['type'] == quest_type:
+            quest_id = quest['id']
+            if not progress['quests'][quest_id]['completed']:
+                progress['quests'][quest_id]['progress'] += increment
+                
+                # Check if completed
+                if progress['quests'][quest_id]['progress'] >= quest['target']:
+                    progress['quests'][quest_id]['completed'] = True
+                    newly_completed.append(quest)
+    
+    # Save progress
+    progress['updated_at'] = datetime.utcnow().isoformat()
+    quest_file = BASE_DIR / 'data' / 'quest_progress.jsonl'
+    
+    # Read all progress, update this user's today progress
+    all_progress = []
+    found = False
+    if quest_file.exists():
+        with open(quest_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        p = json.loads(line)
+                        if p['user_id'] == user_id and p['date'] == date_str:
+                            all_progress.append(progress)
+                            found = True
+                        else:
+                            all_progress.append(p)
+                    except json.JSONDecodeError:
+                        continue
+    
+    if not found:
+        all_progress.append(progress)
+    
+    with open(quest_file, 'w', encoding='utf-8') as f:
+        for p in all_progress:
+            f.write(json.dumps(p, ensure_ascii=False) + '\n')
+    
+    # Award rewards for completed quests
+    for quest in newly_completed:
+        add_points(user_id, quest['reward'], 'daily_quest', f'Hoàn thành: {quest["title"]}')
+        create_notification(
+            user_id=user_id,
+            title='✅ Quest hoàn thành!',
+            message=f'{quest["title"]} - +{quest["reward"]} điểm',
+            notification_type='success',
+            link='/game'
+        )
+    
+    return newly_completed
+
+
+def get_user_daily_quests(user_id):
+    """Get user's daily quests with progress"""
+    progress = load_user_quest_progress(user_id)
+    
+    quests_with_progress = []
+    for quest in DAILY_QUESTS:
+        q = quest.copy()
+        q['progress'] = progress['quests'][quest['id']]['progress']
+        q['completed'] = progress['quests'][quest['id']]['completed']
+        q['percentage'] = min(100, int(q['progress'] / q['target'] * 100))
+        quests_with_progress.append(q)
+    
+    return quests_with_progress
+
+
+# ==================== Farmer Dashboard Analytics ====================
+
+def get_farmer_dashboard_data(user_id):
+    """
+    Get comprehensive dashboard data for farmer
+    
+    Returns:
+        dict: Dashboard metrics and charts data
+    """
+    try:
+        # Load user data
+        history = load_user_history(user_id)
+        farm_progress = load_farm_progress(user_id)
+        
+        # Overall stats
+        total_scans = len(history)
+        
+        # Disease distribution
+        disease_counts = Counter([h.get('disease', 'Unknown') for h in history])
+        disease_distribution = [
+            {'disease': disease, 'count': count, 'percentage': round(count/total_scans*100, 1) if total_scans > 0 else 0}
+            for disease, count in disease_counts.most_common()
+        ]
+        
+        # Scan timeline (last 30 days)
+        today = datetime.utcnow()
+        timeline = []
+        for i in range(30):
+            date = (today - timedelta(days=29-i)).strftime('%Y-%m-%d')
+            scans = [h for h in history if h.get('timestamp', '').startswith(date)]
+            timeline.append({
+                'date': date,
+                'scans': len(scans),
+                'healthy': len([h for h in scans if h.get('disease') == 'Healthy']),
+                'diseased': len([h for h in scans if h.get('disease') != 'Healthy'])
+            })
+        
+        # Model performance
+        model_usage = Counter([h.get('model', 'Unknown') for h in history])
+        model_stats = [
+            {'model': model, 'usage': count}
+            for model, count in model_usage.most_common()
+        ]
+        
+        # Severity distribution
+        severity_counts = Counter([h.get('severity', 'Unknown') for h in history])
+        
+        # Health score (based on recent scans)
+        recent_scans = [h for h in history if (datetime.utcnow() - datetime.fromisoformat(h.get('timestamp', datetime.utcnow().isoformat()))).days <= 7]
+        healthy_count = len([h for h in recent_scans if h.get('disease') == 'Healthy'])
+        health_score = int((healthy_count / len(recent_scans) * 100)) if recent_scans else 100
+        
+        # Farm game stats
+        total_harvested = sum([p.get('harvested', 0) for p in farm_progress])
+        active_plants = len([p for p in farm_progress if p.get('stage', 0) < 4])
+        
+        # Calculate streak (consecutive days with scans)
+        streak = 0
+        current_date = today
+        while True:
+            date_str = current_date.strftime('%Y-%m-%d')
+            day_scans = [h for h in history if h.get('timestamp', '').startswith(date_str)]
+            if day_scans:
+                streak += 1
+                current_date -= timedelta(days=1)
+            else:
+                break
+        
+        return {
+            'overview': {
+                'total_scans': total_scans,
+                'health_score': health_score,
+                'scan_streak': streak,
+                'total_harvested': total_harvested,
+                'active_plants': active_plants
+            },
+            'disease_distribution': disease_distribution,
+            'scan_timeline': timeline,
+            'model_stats': model_stats,
+            'severity_distribution': [
+                {'severity': severity, 'count': count}
+                for severity, count in severity_counts.items()
+            ],
+            'recent_activities': [
+                {
+                    'id': h.get('id'),
+                    'disease': h.get('disease'),
+                    'confidence': h.get('confidence'),
+                    'severity': h.get('severity'),
+                    'timestamp': h.get('timestamp')
+                }
+                for h in sorted(history, key=lambda x: x.get('timestamp', ''), reverse=True)[:10]
+            ]
+        }
+    
+    except Exception as e:
+        app.logger.error(f'Error generating dashboard data: {e}')
+        return None
+
+
+# ==================== Care Calendar System ====================
+
+def load_care_schedule(user_id):
+    """Load user's care calendar schedule"""
+    schedule_file = BASE_DIR / 'data' / 'care_schedules.jsonl'
+    schedules = []
+    
+    if schedule_file.exists():
+        with open(schedule_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        schedule = json.loads(line)
+                        if schedule['user_id'] == user_id:
+                            schedules.append(schedule)
+                    except json.JSONDecodeError:
+                        continue
+    
+    return sorted(schedules, key=lambda x: x.get('next_due', ''))
+
+
+def save_care_schedule(schedule):
+    """Save care schedule entry"""
+    schedule_file = BASE_DIR / 'data' / 'care_schedules.jsonl'
+    
+    # Read existing schedules
+    schedules = []
+    if schedule_file.exists():
+        with open(schedule_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        schedules.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    # Update or add schedule
+    found = False
+    for i, s in enumerate(schedules):
+        if s['id'] == schedule['id']:
+            schedules[i] = schedule
+            found = True
+            break
+    
+    if not found:
+        schedules.append(schedule)
+    
+    # Save all
+    with open(schedule_file, 'w', encoding='utf-8') as f:
+        for s in schedules:
+            f.write(json.dumps(s, ensure_ascii=False) + '\n')
+
+
+def get_upcoming_care_tasks(user_id, days_ahead=7):
+    """Get upcoming care tasks for the next N days"""
+    schedules = load_care_schedule(user_id)
+    upcoming = []
+    
+    now = datetime.utcnow()
+    cutoff = now + timedelta(days=days_ahead)
+    
+    for schedule in schedules:
+        if not schedule.get('active', True):
+            continue
+        
+        next_due = datetime.fromisoformat(schedule.get('next_due', now.isoformat()))
+        
+        if now <= next_due <= cutoff:
+            days_until = (next_due - now).days
+            upcoming.append({
+                **schedule,
+                'days_until': days_until,
+                'overdue': False
+            })
+        elif next_due < now:
+            # Overdue task
+            days_overdue = (now - next_due).days
+            upcoming.append({
+                **schedule,
+                'days_until': -days_overdue,
+                'overdue': True
+            })
+    
+    return sorted(upcoming, key=lambda x: x['days_until'])
+
+
+# ==================== Smart Notification System ====================
+
+def schedule_care_reminders():
+    """
+    Background task to send care reminders to users
+    Should be called periodically (e.g., every hour)
+    """
+    try:
+        users = load_users()
+        
+        for user_id in users.keys():
+            upcoming = get_upcoming_care_tasks(user_id, days_ahead=1)
+            
+            for task in upcoming:
+                # Send notification for tasks due today
+                if task['days_until'] == 0 and not task.get('notified_today', False):
+                    create_notification(
+                        user_id=user_id,
+                        title=f'⏰ Nhắc nhở chăm sóc',
+                        message=f'{task["title"]} - {task.get("description", "")}',
+                        notification_type='reminder',
+                        link='/dashboard'
+                    )
+                    
+                    # Mark as notified
+                    task['notified_today'] = True
+                    save_care_schedule(task)
+        
+        app.logger.info('Care reminders sent successfully')
+        
+    except Exception as e:
+        app.logger.error(f'Error sending care reminders: {e}')
+
+
+def send_weather_alert(user_id, risk_level, city):
+    """Send weather-based disease risk alert"""
+    if risk_level == 'high':
+        create_notification(
+            user_id=user_id,
+            title='⚠️ Cảnh báo thời tiết',
+            message=f'Nguy cơ bệnh cao tại {city}. Kiểm tra cây của bạn!',
+            notification_type='warning',
+            link='/'
+        )
+
+
+def check_weather_alerts_for_users():
+    """Check weather and send alerts to users if high risk"""
+    try:
+        users = load_users()
+        
+        # Check weather for common cities
+        cities = ['Hanoi', 'Ho Chi Minh City', 'Da Nang', 'Can Tho', 'Hai Phong']
+        
+        for city in cities:
+            weather = fetch_weather_from_api(city=city)
+            if weather:
+                risk = assess_disease_risk_from_weather(weather)
+                
+                if risk['risk_level'] == 'high':
+                    # Send to all users (or filter by user's location if available)
+                    for user_id in users.keys():
+                        send_weather_alert(user_id, 'high', city)
+        
+        app.logger.info('Weather alerts checked')
+        
+    except Exception as e:
+        app.logger.error(f'Error checking weather alerts: {e}')
+
+
+# ==================== Wiki Knowledge Base ====================
+
+def load_wiki_articles():
+    """Load all wiki articles"""
+    articles = []
+    wiki_file = BASE_DIR / 'data' / 'wiki_articles.jsonl'
+    
+    if wiki_file.exists():
+        with open(wiki_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        articles.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return articles
+
+def get_wiki_article_by_id(article_id):
+    """Get wiki article by ID"""
+    articles = load_wiki_articles()
+    for article in articles:
+        if article['id'] == article_id:
+            return article
+    return None
+
+def get_wiki_article_by_slug(slug):
+    """Get wiki article by slug"""
+    articles = load_wiki_articles()
+    for article in articles:
+        if article['slug'] == slug:
+            return article
+    return None
+
+def save_wiki_articles(articles):
+    """Save all wiki articles"""
+    wiki_file = BASE_DIR / 'data' / 'wiki_articles.jsonl'
+    wiki_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(wiki_file, 'w', encoding='utf-8') as f:
+        for article in articles:
+            f.write(json.dumps(article, ensure_ascii=False) + '\n')
+
+def increment_wiki_views(article_id):
+    """Increment views count for a wiki article"""
+    try:
+        articles = load_wiki_articles()
+        for article in articles:
+            if article['id'] == article_id:
+                article['views'] = article.get('views', 0) + 1
+                break
+        save_wiki_articles(articles)
+    except Exception as e:
+        app.logger.error(f'Error incrementing wiki views: {e}')
+
+def update_wiki_article(updated_article):
+    """Update a specific wiki article"""
+    try:
+        articles = load_wiki_articles()
+        for i, article in enumerate(articles):
+            if article['id'] == updated_article['id']:
+                articles[i] = updated_article
+                break
+        save_wiki_articles(articles)
+        return True
+    except Exception as e:
+        app.logger.error(f'Error updating wiki article: {e}')
+        return False
+
+def toggle_wiki_like(article_id, user_id):
+    """Toggle like for a wiki article"""
+    try:
+        articles = load_wiki_articles()
+        for article in articles:
+            if article['id'] == article_id:
+                if 'liked_by' not in article:
+                    article['liked_by'] = []
+                
+                if user_id in article['liked_by']:
+                    article['liked_by'].remove(user_id)
+                    article['likes'] = len(article['liked_by'])
+                    liked = False
+                else:
+                    article['liked_by'].append(user_id)
+                    article['likes'] = len(article['liked_by'])
+                    liked = True
+                
+                break
+        
+        save_wiki_articles(articles)
+        return liked
+    except Exception as e:
+        app.logger.error(f'Error toggling wiki like: {e}')
+        return False
+
+def search_wiki_articles(query):
+    """Search wiki articles by title, content, tags, category"""
+    articles = load_wiki_articles()
+    query_lower = query.lower()
+    
+    results = []
+    for article in articles:
+        score = 0
+        
+        # Search in title (highest weight)
+        if query_lower in article.get('title', '').lower():
+            score += 10
+        
+        # Search in content
+        if query_lower in article.get('content', '').lower():
+            score += 5
+        
+        # Search in tags
+        for tag in article.get('tags', []):
+            if query_lower in tag.lower():
+                score += 3
+        
+        # Search in category
+        if query_lower in article.get('category', '').lower():
+            score += 2
+        
+        if score > 0:
+            article['search_score'] = score
+            results.append(article)
+    
+    # Sort by score (descending)
+    results.sort(key=lambda x: x['search_score'], reverse=True)
+    
+    return results
+
+def get_wiki_categories():
+    """Get all unique categories"""
+    articles = load_wiki_articles()
+    categories = set()
+    for article in articles:
+        if article.get('category'):
+            categories.add(article['category'])
+    return sorted(list(categories))
+
+def get_wiki_tags():
+    """Get all unique tags with counts as list of tuples"""
+    articles = load_wiki_articles()
+    tag_counts = {}
+    for article in articles:
+        for tag in article.get('tags', []):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    # Return list of tuples (tag_name, count) sorted by count descending
+    return sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
+
+@app.route('/wiki')
+def wiki_index():
+    """Wiki home page"""
+    try:
+        articles = load_wiki_articles()
+        
+        # Sort by views (popular) and featured
+        featured_articles = [a for a in articles if a.get('featured', False)]
+        popular_articles = sorted(articles, key=lambda x: x.get('views', 0), reverse=True)[:6]
+        recent_articles = sorted(articles, key=lambda x: x.get('created_at', ''), reverse=True)[:6]
+        
+        categories = get_wiki_categories()
+        tags = get_wiki_tags()
+        
+        # Get search query if exists
+        query = request.args.get('q', '').strip()
+        category = request.args.get('category', '').strip()
+        tag = request.args.get('tag', '').strip()
+        
+        if query:
+            articles = search_wiki_articles(query)
+        elif category:
+            articles = [a for a in articles if a.get('category') == category]
+        elif tag:
+            articles = [a for a in articles if tag in a.get('tags', [])]
+        
+        return render_template('wiki_index.html',
+                             articles=articles,
+                             featured_articles=featured_articles,
+                             popular_articles=popular_articles,
+                             recent_articles=recent_articles,
+                             categories=categories,
+                             tags=tags,
+                             query=query,
+                             category=category,
+                             tag=tag)
+    except Exception as e:
+        app.logger.error(f'Error loading wiki index: {e}')
+        flash('Lỗi khi tải trang wiki', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/wiki/<slug>')
+def wiki_article(slug):
+    """View a wiki article"""
+    try:
+        article = get_wiki_article_by_slug(slug)
+        
+        if not article:
+            flash('Không tìm thấy bài viết', 'warning')
+            return redirect(url_for('wiki_index'))
+        
+        # Increment views
+        increment_wiki_views(article['id'])
+        article['views'] = article.get('views', 0) + 1
+        
+        # Get user like status
+        user_liked = False
+        if 'user_id' in session:
+            user_liked = session['user_id'] in article.get('liked_by', [])
+        
+        # Get related articles (same category or tags)
+        all_articles = load_wiki_articles()
+        related = []
+        for a in all_articles:
+            if a['id'] != article['id']:
+                score = 0
+                if a.get('category') == article.get('category'):
+                    score += 5
+                common_tags = set(a.get('tags', [])) & set(article.get('tags', []))
+                score += len(common_tags) * 2
+                if score > 0:
+                    a['relevance_score'] = score
+                    related.append(a)
+        
+        related.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        related = related[:5]
+        
+        # Render markdown content
+        if markdown:
+            try:
+                article['content_html'] = markdown.markdown(article.get('content', ''))
+            except Exception:
+                # Fallback: simple newline to <br> conversion
+                article['content_html'] = article.get('content', '').replace('\n', '<br>')
+        else:
+            # Fallback: simple newline to <br> conversion with paragraph breaks
+            content = article.get('content', '')
+            content = content.replace('\n\n', '</p><p>')
+            content = content.replace('\n', '<br>')
+            article['content_html'] = f'<p>{content}</p>'
+        
+        return render_template('wiki_article.html',
+                             article=article,
+                             related_articles=related,
+                             user_liked=user_liked)
+    except Exception as e:
+        app.logger.error(f'Error loading wiki article: {e}')
+        flash('Lỗi khi tải bài viết', 'error')
+        return redirect(url_for('wiki_index'))
+
+@app.route('/api/wiki/<article_id>/like', methods=['POST'])
+def wiki_like(article_id):
+    """Toggle like for wiki article"""
+    try:
+        if 'user_id' not in session:
+            return {'success': False, 'message': 'Vui lòng đăng nhập'}, 401
+        
+        user_id = session['user_id']
+        liked = toggle_wiki_like(article_id, user_id)
+        
+        article = get_wiki_article_by_id(article_id)
+        likes = article.get('likes', 0) if article else 0
+        
+        return {
+            'success': True,
+            'liked': liked,
+            'likes': likes
+        }
+    except Exception as e:
+        app.logger.error(f'Error liking wiki article: {e}')
+        return {'success': False, 'message': str(e)}, 500
+
+@app.route('/api/wiki/<article_id>/feedback', methods=['POST'])
+def wiki_feedback(article_id):
+    """Record article helpfulness feedback"""
+    try:
+        data = request.get_json()
+        helpful = data.get('helpful', False)
+        
+        # Update article feedback count
+        article = get_wiki_article_by_id(article_id)
+        if article:
+            if 'helpful_count' not in article:
+                article['helpful_count'] = 0
+            if 'not_helpful_count' not in article:
+                article['not_helpful_count'] = 0
+            
+            if helpful:
+                article['helpful_count'] += 1
+            else:
+                article['not_helpful_count'] += 1
+            
+            update_wiki_article(article)
+        
+        return {'success': True}
+    except Exception as e:
+        app.logger.error(f'Error recording wiki feedback: {e}')
+        return {'success': False, 'message': str(e)}, 500
+
+@app.route('/admin/orders')
+@requires_admin_auth
+def admin_orders():
+    """Admin orders management page"""
+    try:
+        orders = load_orders()
+        
+        # Sort by timestamp descending
+        orders = sorted(orders, key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Calculate statistics
+        total_orders = len(orders)
+        total_revenue = sum(o.get('total', 0) for o in orders)
+        
+        pending_orders = [o for o in orders if o.get('status') == 'pending']
+        processing_orders = [o for o in orders if o.get('status') == 'processing']
+        shipped_orders = [o for o in orders if o.get('status') == 'shipped']
+        delivered_orders = [o for o in orders if o.get('status') == 'delivered']
+        
+        stats = {
+            'total': total_orders,
+            'revenue': total_revenue,
+            'pending': len(pending_orders),
+            'processing': len(processing_orders),
+            'shipped': len(shipped_orders),
+            'delivered': len(delivered_orders)
+        }
+        
+        return render_template('admin_orders.html', orders=orders, stats=stats)
+    except Exception as e:
+        app.logger.error(f'Error loading orders: {e}')
+        flash('Lỗi khi tải danh sách đơn hàng', 'error')
+        return redirect(url_for('profile'))
+
+@app.route('/admin/order/<order_id>')
+@requires_admin_auth
+def admin_order_detail(order_id):
+    """Admin order detail page"""
+    order = get_order_by_id(order_id)
+    if not order:
+        flash('Không tìm thấy đơn hàng', 'error')
+        return redirect(url_for('admin_orders'))
+    
+    return render_template('admin_order_detail.html', order=order)
+
+@app.route('/admin/order/<order_id>/update_status', methods=['POST'])
+@requires_admin_auth
+def admin_update_order_status(order_id):
+    """Update order status"""
+    try:
+        new_status = request.form.get('status')
+        admin_note = request.form.get('note', '')
+        
+        if update_order_status_new(order_id, new_status, admin_note):
+            flash(f'Đã cập nhật trạng thái đơn hàng #{order_id}', 'success')
+        else:
+            flash('Không tìm thấy đơn hàng', 'error')
+    except Exception as e:
+        app.logger.error(f'Error updating order status: {e}')
+        flash('Lỗi khi cập nhật trạng thái', 'error')
+    
+    return redirect(url_for('admin_order_detail', order_id=order_id))
+
+@app.route('/admin/products')
+@requires_admin_auth
+def admin_products():
+    """Admin products management page"""
+    try:
+        products = load_products()
+        products = sorted(products, key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        return render_template('admin_products.html', products=products)
+    except Exception as e:
+        app.logger.error(f'Error loading products: {e}')
+        flash('Lỗi khi tải danh sách sản phẩm', 'error')
+        return redirect(url_for('profile'))
+
+@app.route('/admin/product/add', methods=['GET', 'POST'])
+@requires_admin_auth
+def admin_add_product():
+    """Add new product"""
+    if request.method == 'POST':
+        try:
+            product_data = {
+                'name': request.form.get('name', '').strip(),
+                'category': request.form.get('category', 'pesticide'),
+                'price': int(request.form.get('price', 0)),
+                'description': request.form.get('description', '').strip(),
+                'image': request.form.get('image', 'images/tomato.jpg'),
+                'stock': int(request.form.get('stock', 0)),
+                'sold': 0,
+                'rating_avg': 0,
+                'rating_count': 0,
+                'status': 'active'
+            }
+            
+            save_product(product_data)
+            flash('Đã thêm sản phẩm thành công', 'success')
+            return redirect(url_for('admin_products'))
+        except Exception as e:
+            app.logger.error(f'Error adding product: {e}')
+            flash('Lỗi khi thêm sản phẩm', 'error')
+    
+    return render_template('admin_product_form.html', product=None)
+
+@app.route('/admin/product/<int:product_id>/edit', methods=['GET', 'POST'])
+@requires_admin_auth
+def admin_edit_product(product_id):
+    """Edit product"""
+    product = get_product_by_id(product_id)
+    if not product:
+        flash('Không tìm thấy sản phẩm', 'error')
+        return redirect(url_for('admin_products'))
+    
+    if request.method == 'POST':
+        try:
+            product['name'] = request.form.get('name', '').strip()
+            product['category'] = request.form.get('category', 'pesticide')
+            product['price'] = int(request.form.get('price', 0))
+            product['description'] = request.form.get('description', '').strip()
+            product['image'] = request.form.get('image', 'images/tomato.jpg')
+            product['stock'] = int(request.form.get('stock', 0))
+            product['status'] = request.form.get('status', 'active')
+            
+            save_product(product)
+            flash('Đã cập nhật sản phẩm thành công', 'success')
+            return redirect(url_for('admin_products'))
+        except Exception as e:
+            app.logger.error(f'Error updating product: {e}')
+            flash('Lỗi khi cập nhật sản phẩm', 'error')
+    
+    return render_template('admin_product_form.html', product=product)
+
+@app.route('/admin/product/<int:product_id>/delete', methods=['POST'])
+@requires_admin_auth
+def admin_delete_product(product_id):
+    """Delete product"""
+    try:
+        delete_product(product_id)
+        flash('Đã xóa sản phẩm', 'success')
+    except Exception as e:
+        app.logger.error(f'Error deleting product: {e}')
+        flash('Lỗi khi xóa sản phẩm', 'error')
+    
+    return redirect(url_for('admin_products'))
+
+
+# ==================== Review System ====================
+
+def load_reviews(product_id=None):
+    """Load reviews"""
+    reviews = []
+    reviews_file = BASE_DIR / 'data' / 'reviews.jsonl'
+    
+    if reviews_file.exists():
+        with open(reviews_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    review = json.loads(line)
+                    if product_id is None or review['product_id'] == product_id:
+                        reviews.append(review)
+    
+    return reviews
+
+def save_review(review_data):
+    """Save review"""
+    reviews_file = BASE_DIR / 'data' / 'reviews.jsonl'
+    
+    # Generate ID
+    reviews = load_reviews()
+    max_id = max([r.get('id', 0) for r in reviews], default=0)
+    review_data['id'] = max_id + 1
+    review_data['created_at'] = datetime.utcnow().isoformat()
+    review_data['status'] = 'approved'  # Auto-approve for now
+    
+    # Save
+    with open(reviews_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(review_data, ensure_ascii=False) + '\n')
+    
+    # Update product rating
+    product_id = review_data['product_id']
+    product_reviews = load_reviews(product_id)
+    avg_rating = sum(r['rating'] for r in product_reviews) / len(product_reviews)
+    
+    product = get_product_by_id(product_id)
+    if product:
+        product['rating_avg'] = round(avg_rating, 1)
+        product['rating_count'] = len(product_reviews)
+        save_product(product)
+    
+    return review_data
+
+@app.route('/api/product/<int:product_id>/reviews', methods=['GET'])
+def api_get_reviews(product_id):
+    """Get reviews for product"""
+    try:
+        reviews = load_reviews(product_id)
+        reviews = sorted(reviews, key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        return {'ok': True, 'reviews': reviews}
+    except Exception as e:
+        app.logger.error(f'Error loading reviews: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+@app.route('/api/product/<int:product_id>/review', methods=['POST'])
+@login_required
+def api_add_review(product_id):
+    """Add review for product with optional images"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể đánh giá sản phẩm'}, 403
+        
+        user_id = session.get('user_id')
+        user = get_user_by_id(user_id)
+        
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+            rating = int(data.get('rating', 5))
+            comment = data.get('comment', '').strip()
+            images = []
+        else:
+            rating = int(request.form.get('rating', 5))
+            comment = request.form.get('comment', '').strip()
+            
+            # Handle image uploads
+            images = []
+            uploaded_files = request.files.getlist('images')
+            
+            if uploaded_files:
+                review_images_dir = BASE_DIR / 'static' / 'uploaded' / 'reviews'
+                review_images_dir.mkdir(parents=True, exist_ok=True)
+                
+                for file in uploaded_files[:5]:  # Max 5 images per review
+                    if file and file.filename and allowed_file(file.filename):
+                        try:
+                            # Generate unique filename
+                            ext = file.filename.rsplit('.', 1)[1].lower()
+                            filename = f"review_{user_id}_{product_id}_{uuid4().hex[:8]}.{ext}"
+                            filepath = review_images_dir / filename
+                            
+                            # Save file
+                            file.save(str(filepath))
+                            
+                            # Store relative URL
+                            images.append(f"uploaded/reviews/{filename}")
+                        except Exception as e:
+                            app.logger.error(f'Error saving review image: {e}')
+        
+        if rating < 1 or rating > 5:
+            return {'ok': False, 'error': 'Đánh giá phải từ 1-5 sao'}, 400
+        
+        # Check if already reviewed
+        user_reviews = [r for r in load_reviews(product_id) if r['user_id'] == user_id]
+        if user_reviews:
+            return {'ok': False, 'error': 'Bạn đã đánh giá sản phẩm này rồi'}, 400
+        
+        review_data = {
+            'product_id': product_id,
+            'user_id': user_id,
+            'user_name': user.get('full_name', 'Anonymous'),
+            'rating': rating,
+            'comment': comment,
+            'images': images
+        }
+        
+        save_review(review_data)
+        
+        # Award points for review (more points if includes images)
+        try:
+            points = 20 if images else 15
+            add_points(user_id, points, 'review', f'Đánh giá sản phẩm #{product_id}')
+            user = get_user_by_id(user_id)
+            if user:
+                session['user_points'] = user.get('points', 0)
+        except Exception as e:
+            app.logger.error(f'Failed to award review points: {e}')
+        
+        return {'ok': True, 'message': 'Đã thêm đánh giá thành công', 'images_count': len(images)}
+    except Exception as e:
+        app.logger.error(f'Error adding review: {e}')
+        return {'ok': False, 'error': 'Lỗi khi thêm đánh giá'}, 500
+        return {'ok': False, 'error': 'Lỗi khi thêm đánh giá'}, 500
+
+
+# ==================== Multi-Language System ====================
+
+def load_translations():
+    """Load translations from JSON file"""
+    translations_file = BASE_DIR / 'data' / 'translations.json'
+    
+    if translations_file.exists():
+        with open(translations_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    
+    # Default fallback
+    return {'vi': {}, 'en': {}}
+
+# Load translations into memory
+TRANSLATIONS = load_translations()
+
+def get_translation(key, lang=None):
+    """Get translation for a key in specified language"""
+    if lang is None:
+        lang = session.get('language', 'vi')
+    
+    # Navigate nested keys like 'nav.home'
+    keys = key.split('.')
+    trans = TRANSLATIONS.get(lang, {})
+    
+    for k in keys:
+        if isinstance(trans, dict):
+            trans = trans.get(k, key)
+        else:
+            return key
+    
+    return trans if trans else key
+
+@app.context_processor
+def inject_language():
+    """Inject language utilities into all templates"""
+    current_lang = session.get('language', 'vi')
+    
+    def t(key):
+        """Translation helper function"""
+        return get_translation(key, current_lang)
+    
+    return {
+        'current_lang': current_lang,
+        't': t,
+        'get_translation': get_translation
+    }
+
+@app.route('/set_language/<lang>')
+def set_language(lang):
+    """Change language"""
+    if lang in ['vi', 'en']:
+        session['language'] = lang
+        flash(f'Ngôn ngữ đã được thay đổi / Language changed', 'success')
+    
+    # Redirect to referrer or home
+    return redirect(request.referrer or url_for('index'))
+
+
+# ==================== Loyalty Points System ====================
+
+def load_points_history(user_id=None):
+    """Load points history"""
+    history = []
+    points_file = BASE_DIR / 'data' / 'points_history.jsonl'
+    
+    if points_file.exists():
+        with open(points_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        entry = json.loads(line)
+                        if user_id is None or entry.get('user_id') == user_id:
+                            history.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+    
+    # Sort by created_at descending
+    history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return history
+
+def save_points_entry(entry):
+    """Save a points history entry"""
+    points_file = BASE_DIR / 'data' / 'points_history.jsonl'
+    points_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Generate ID if not exists
+    if 'id' not in entry:
+        history = load_points_history()
+        max_id = 0
+        for h in history:
+            if h.get('id', '').startswith('PH'):
+                try:
+                    num = int(h['id'][2:])
+                    max_id = max(max_id, num)
+                except:
+                    pass
+        entry['id'] = f"PH{max_id + 1:03d}"
+    
+    # Add timestamp if not exists
+    if 'created_at' not in entry:
+        entry['created_at'] = datetime.now().isoformat()
+    
+    with open(points_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
+def add_points(user_id, points, action, description):
+    """Add points to user and record history"""
+    try:
+        # Update user points
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return False
+        
+        users = []
+        updated = False
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    user = json.loads(line)
+                    if user['id'] == user_id:
+                        user['points'] = user.get('points', 0) + points
+                        updated = True
+                    users.append(user)
+        
+        if not updated:
+            return False
+        
+        # Save updated users
+        with open(users_file, 'w', encoding='utf-8') as f:
+            for user in users:
+                f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        
+        # Record history
+        save_points_entry({
+            'user_id': user_id,
+            'points': points,
+            'action': action,
+            'description': description
+        })
+        
+        app.logger.info(f'Added {points} points to user {user_id} for {action}')
+        return True
+    except Exception as e:
+        app.logger.error(f'Error adding points: {e}')
+        return False
+
+# Helper aliases and utility functions for Tier 1 features
+def load_users():
+    """Load all users from users.jsonl"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return []
+        
+        users = []
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    users.append(json.loads(line))
+        return users
+    except Exception as e:
+        app.logger.error(f'Error loading users: {e}')
+        return []
+
+def save_users(users):
+    """Save all users to users.jsonl"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        users_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(users_file, 'w', encoding='utf-8') as f:
+            for user in users:
+                f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        return True
+    except Exception as e:
+        app.logger.error(f'Error saving users: {e}')
+        return False
+
+def load_user_history(user_id):
+    """Load prediction history for user"""
+    try:
+        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        if not history_file.exists():
+            return []
+        
+        history = []
+        with open(history_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    entry = json.loads(line)
+                    if entry.get('user_id') == user_id:
+                        history.append(entry)
+        return sorted(history, key=lambda x: x.get('timestamp', ''), reverse=True)
+    except Exception as e:
+        app.logger.error(f'Error loading user history: {e}')
+        return []
+
+def load_farm_progress(user_id):
+    """Load farm game progress for user"""
+    try:
+        farm_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
+        if not farm_file.exists():
+            return None
+        
+        with open(farm_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    progress = json.loads(line)
+                    if progress.get('user_id') == user_id:
+                        return progress
+        return None
+    except Exception as e:
+        app.logger.error(f'Error loading farm progress: {e}')
+        return None
+
+
+def get_leaderboard(limit=10):
+    """Get top users by points"""
+    try:
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        if not users_file.exists():
+            return []
+        
+        users = []
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    user = json.loads(line)
+                    users.append({
+                        'user_id': user['id'],
+                        'full_name': user.get('full_name', 'Anonymous'),
+                        'email': user.get('email', ''),
+                        'points': user.get('points', 0)
+                    })
+        
+        # Sort by points descending
+        users.sort(key=lambda x: x['points'], reverse=True)
+        return users[:limit]
+    except Exception as e:
+        app.logger.error(f'Error getting leaderboard: {e}')
+        return []
+
+@app.route('/points')
+def points_dashboard():
+    """Points dashboard page"""
+    if 'user_id' not in session:
+        flash('Vui lòng đăng nhập để xem điểm thưởng', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        flash('Không tìm thấy thông tin người dùng', 'error')
+        return redirect(url_for('index'))
+    
+    # Get points history
+    history = load_points_history(user_id)
+    
+    # Get leaderboard
+    leaderboard = get_leaderboard(10)
+    
+    # Find user rank
+    user_rank = None
+    for idx, entry in enumerate(leaderboard, 1):
+        if entry['user_id'] == user_id:
+            user_rank = idx
+            break
+    
+    # Redemption options
+    redemption_options = [
+        {'id': 'coupon_5k', 'name': 'Mã giảm 5.000đ', 'points': 50, 'value': 5000},
+        {'id': 'coupon_10k', 'name': 'Mã giảm 10.000đ', 'points': 100, 'value': 10000},
+        {'id': 'coupon_15k', 'name': 'Mã giảm 15.000đ', 'points': 150, 'value': 15000},
+        {'id': 'coupon_20k', 'name': 'Mã giảm 20.000đ', 'points': 200, 'value': 20000},
+        {'id': 'coupon_30k', 'name': 'Mã giảm 30.000đ', 'points': 300, 'value': 30000},
+        {'id': 'coupon_50k', 'name': 'Mã giảm 50.000đ', 'points': 500, 'value': 50000},
+    ]
+    
+    return render_template('points.html', 
+                         user=user,
+                         history=history,
+                         leaderboard=leaderboard,
+                         user_rank=user_rank,
+                         redemption_options=redemption_options)
+
+@app.route('/api/points/redeem', methods=['POST'])
+def redeem_points():
+    """Redeem points for rewards"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Chưa đăng nhập'}, 401
+    
+    try:
+        data = request.get_json()
+        option_id = data.get('option_id')
+        
+        # Redemption options mapping
+        options = {
+            'coupon_5k': {'points': 50, 'value': 5000},
+            'coupon_10k': {'points': 100, 'value': 10000},
+            'coupon_15k': {'points': 150, 'value': 15000},
+            'coupon_20k': {'points': 200, 'value': 20000},
+            'coupon_30k': {'points': 300, 'value': 30000},
+            'coupon_50k': {'points': 500, 'value': 50000},
+        }
+        
+        if option_id not in options:
+            return {'ok': False, 'error': 'Lựa chọn không hợp lệ'}, 400
+        
+        user_id = session['user_id']
+        user = get_user_by_id(user_id)
+        
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
+        
+        option = options[option_id]
+        required_points = option['points']
+        coupon_value = option['value']
+        
+        # Check if user has enough points
+        if user.get('points', 0) < required_points:
+            return {'ok': False, 'error': 'Không đủ điểm'}, 400
+        
+        # Deduct points
+        success = add_points(user_id, -required_points, 'redeem_coupon', 
+                           f'Đổi điểm lấy mã giảm giá {coupon_value}đ')
+        
+        if not success:
+            return {'ok': False, 'error': 'Lỗi khi trừ điểm'}, 500
+        
+        # Generate coupon code
+        coupon_code = f"PTS{random.randint(100000, 999999)}"
+        
+        # Add coupon to user
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        users = []
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    u = json.loads(line)
+                    if u['id'] == user_id:
+                        if 'vouchers' not in u:
+                            u['vouchers'] = []
+                        u['vouchers'].append({
+                            'code': coupon_code,
+                            'value': coupon_value,
+                            'source': 'points_redemption',
+                            'created_at': datetime.now().isoformat(),
+                            'used': False,
+                            'expires_at': (datetime.now() + timedelta(days=30)).isoformat()
+                        })
+                    users.append(u)
+        
+        with open(users_file, 'w', encoding='utf-8') as f:
+            for u in users:
+                f.write(json.dumps(u, ensure_ascii=False) + '\n')
+        
+        return {
+            'ok': True, 
+            'message': 'Đổi điểm thành công!',
+            'coupon_code': coupon_code,
+            'remaining_points': user.get('points', 0) - required_points
+        }
+    except Exception as e:
+        app.logger.error(f'Error redeeming points: {e}')
+        return {'ok': False, 'error': 'Lỗi khi đổi điểm'}, 500
+
+@app.route('/api/points/checkin', methods=['POST'])
+def daily_checkin():
+    """Daily check-in to earn points"""
+    if 'user_id' not in session:
+        return {'ok': False, 'error': 'Chưa đăng nhập'}, 401
+    
+    try:
+        user_id = session['user_id']
+        user = get_user_by_id(user_id)
+        
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
+        
+        # Check if already checked in today
+        last_checkin = user.get('last_checkin')
+        today = datetime.now().date()
+        
+        if last_checkin:
+            last_checkin_date = datetime.fromisoformat(last_checkin).date()
+            if last_checkin_date == today:
+                return {'ok': False, 'error': 'Bạn đã check-in hôm nay rồi'}, 400
+        
+        # Add check-in points
+        checkin_points = 5
+        success = add_points(user_id, checkin_points, 'daily_checkin', 
+                           'Check-in hàng ngày')
+        
+        if not success:
+            return {'ok': False, 'error': 'Lỗi khi thêm điểm'}, 500
+        
+        # Update last_checkin
+        users_file = BASE_DIR / 'data' / 'users.jsonl'
+        users = []
+        with open(users_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    u = json.loads(line)
+                    if u['id'] == user_id:
+                        u['last_checkin'] = datetime.now().isoformat()
+                    users.append(u)
+        
+        with open(users_file, 'w', encoding='utf-8') as f:
+            for u in users:
+                f.write(json.dumps(u, ensure_ascii=False) + '\n')
+        
+        return {
+            'ok': True,
+            'message': f'Check-in thành công! +{checkin_points} điểm',
+            'points_earned': checkin_points,
+            'total_points': user.get('points', 0) + checkin_points
+        }
+    except Exception as e:
+        app.logger.error(f'Error during check-in: {e}')
+        return {'ok': False, 'error': 'Lỗi khi check-in'}, 500
+
+@app.route('/leaderboard')
+def leaderboard():
+    """Leaderboard page"""
+    leaders = get_leaderboard(50)
+    
+    user_rank = None
+    if 'user_id' in session:
+        user_id = session['user_id']
+        for idx, entry in enumerate(leaders, 1):
+            if entry['user_id'] == user_id:
+                user_rank = idx
+                break
+    
+    return render_template('leaderboard.html', 
+                         leaderboard=leaders,
+                         user_rank=user_rank)
+
+
+# ==================== Community & Social Network ====================
+
+def load_posts():
+    """Load all posts"""
+    posts = []
+    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
+    
+    if posts_file.exists():
+        with open(posts_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        posts.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return posts
+
+def save_post(post):
+    """Save a new post"""
+    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
+    posts_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Generate ID if not exists
+    if 'id' not in post:
+        posts = load_posts()
+        max_id = 0
+        for p in posts:
+            if p.get('id', '').startswith('POST'):
+                try:
+                    num = int(p['id'][4:])
+                    max_id = max(max_id, num)
+                except:
+                    pass
+        post['id'] = f"POST{max_id + 1:03d}"
+    
+    # Add timestamps
+    if 'created_at' not in post:
+        post['created_at'] = datetime.now().isoformat()
+    post['updated_at'] = datetime.now().isoformat()
+    
+    # Initialize counters
+    post.setdefault('likes', 0)
+    post.setdefault('comments', 0)
+    
+    with open(posts_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(post, ensure_ascii=False) + '\n')
+    
+    return post
+
+def update_post(post_id, updates):
+    """Update post"""
+    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
+    if not posts_file.exists():
+        return False
+    
+    posts = []
+    updated = False
+    with open(posts_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                post = json.loads(line)
+                if post['id'] == post_id:
+                    post.update(updates)
+                    post['updated_at'] = datetime.now().isoformat()
+                    updated = True
+                posts.append(post)
+    
+    if updated:
+        with open(posts_file, 'w', encoding='utf-8') as f:
+            for post in posts:
+                f.write(json.dumps(post, ensure_ascii=False) + '\n')
+    
+    return updated
+
+def delete_post(post_id):
+    """Delete post"""
+    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
+    if not posts_file.exists():
+        return False
+    
+    posts = []
+    deleted = False
+    with open(posts_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                post = json.loads(line)
+                if post['id'] == post_id:
+                    deleted = True
+                else:
+                    posts.append(post)
+    
+    if deleted:
+        with open(posts_file, 'w', encoding='utf-8') as f:
+            for post in posts:
+                f.write(json.dumps(post, ensure_ascii=False) + '\n')
+    
+    return deleted
+
+def load_post_comments(post_id=None):
+    """Load comments for a post"""
+    comments = []
+    comments_file = BASE_DIR / 'data' / 'post_comments.jsonl'
+    
+    if comments_file.exists():
+        with open(comments_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        comment = json.loads(line)
+                        if post_id is None or comment.get('post_id') == post_id:
+                            comments.append(comment)
+                    except json.JSONDecodeError:
+                        continue
+    
+    return comments
+
+def save_comment(comment):
+    """Save a new comment"""
+    comments_file = BASE_DIR / 'data' / 'post_comments.jsonl'
+    comments_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Generate ID if not exists
+    if 'id' not in comment:
+        comments = load_post_comments()
+        max_id = 0
+        for c in comments:
+            if c.get('id', '').startswith('CMT'):
+                try:
+                    num = int(c['id'][3:])
+                    max_id = max(max_id, num)
+                except:
+                    pass
+        comment['id'] = f"CMT{max_id + 1:03d}"
+    
+    if 'created_at' not in comment:
+        comment['created_at'] = datetime.now().isoformat()
+    
+    with open(comments_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(comment, ensure_ascii=False) + '\n')
+    
+    # Update post comment count
+    post_id = comment.get('post_id')
+    if post_id:
+        comments_count = len(load_post_comments(post_id))
+        update_post(post_id, {'comments': comments_count})
+    
+    return comment
+
+def load_post_likes():
+    """Load all post likes"""
+    likes = []
+    likes_file = BASE_DIR / 'data' / 'post_likes.jsonl'
+    
+    if likes_file.exists():
+        with open(likes_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        likes.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return likes
+
+def toggle_post_like(post_id, user_id):
+    """Toggle like on a post"""
+    likes_file = BASE_DIR / 'data' / 'post_likes.jsonl'
+    likes_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    likes = load_post_likes()
+    
+    # Check if already liked
+    existing_like = None
+    for like in likes:
+        if like.get('post_id') == post_id and like.get('user_id') == user_id:
+            existing_like = like
+            break
+    
+    if existing_like:
+        # Unlike - remove the like
+        likes.remove(existing_like)
+        liked = False
+    else:
+        # Like - add new like
+        likes.append({
+            'post_id': post_id,
+            'user_id': user_id,
+            'created_at': datetime.now().isoformat()
+        })
+        liked = True
+    
+    # Save updated likes
+    with open(likes_file, 'w', encoding='utf-8') as f:
+        for like in likes:
+            f.write(json.dumps(like, ensure_ascii=False) + '\n')
+    
+    # Update post like count
+    likes_count = len([l for l in likes if l.get('post_id') == post_id])
+    update_post(post_id, {'likes': likes_count})
+    
+    return liked, likes_count
+
+def load_user_follows():
+    """Load all user follows"""
+    follows = []
+    follows_file = BASE_DIR / 'data' / 'user_follows.jsonl'
+    
+    if follows_file.exists():
+        with open(follows_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        follows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return follows
+
+def toggle_follow(follower_id, following_id):
+    """Toggle follow relationship"""
+    follows_file = BASE_DIR / 'data' / 'user_follows.jsonl'
+    follows_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    follows = load_user_follows()
+    
+    # Check if already following
+    existing_follow = None
+    for follow in follows:
+        if (follow.get('follower_id') == follower_id and 
+            follow.get('following_id') == following_id):
+            existing_follow = follow
+            break
+    
+    if existing_follow:
+        # Unfollow
+        follows.remove(existing_follow)
+        is_following = False
+    else:
+        # Follow
+        follows.append({
+            'follower_id': follower_id,
+            'following_id': following_id,
+            'created_at': datetime.now().isoformat()
+        })
+        is_following = True
+    
+    # Save updated follows
+    with open(follows_file, 'w', encoding='utf-8') as f:
+        for follow in follows:
+            f.write(json.dumps(follow, ensure_ascii=False) + '\n')
+    
+    return is_following
+
+def get_user_stats(user_id):
+    """Get user statistics for profile"""
+    posts = load_posts()
+    follows = load_user_follows()
+    
+    user_posts = [p for p in posts if p.get('user_id') == user_id]
+    followers = [f for f in follows if f.get('following_id') == user_id]
+    following = [f for f in follows if f.get('follower_id') == user_id]
+    
+    total_likes = sum(p.get('likes', 0) for p in user_posts)
+    
+    return {
+        'posts_count': len(user_posts),
+        'followers_count': len(followers),
+        'following_count': len(following),
+        'total_likes': total_likes
+    }
+
+@app.route('/community')
+def community():
+    """Community feed page"""
+    posts = load_posts()
+    likes = load_post_likes()
+    follows = load_user_follows()
+    
+    # Sort by created_at descending
+    posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
+    # Add liked status for current user
+    current_user_id = session.get('user_id')
+    if current_user_id:
+        user_likes = {like['post_id'] for like in likes if like.get('user_id') == current_user_id}
+        for post in posts:
+            post['liked_by_user'] = post['id'] in user_likes
+    
+    # Get trending posts (most likes + comments in last 7 days)
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    trending = [p for p in posts if p.get('created_at', '') >= week_ago]
+    trending.sort(key=lambda x: x.get('likes', 0) + x.get('comments', 0), reverse=True)
+    trending = trending[:5]
+    
+    return render_template('community.html',
+                         posts=posts[:20],
+                         trending=trending,
+                         datetime=datetime)
+
+@app.route('/community/post/<post_id>')
+def post_detail(post_id):
+    """Single post detail page"""
+    posts = load_posts()
+    post = next((p for p in posts if p['id'] == post_id), None)
+    
+    if not post:
+        flash('Không tìm thấy bài viết', 'error')
+        return redirect(url_for('community'))
+    
+    # Get comments
+    comments = load_post_comments(post_id)
+    comments.sort(key=lambda x: x.get('created_at', ''))
+    
+    # Get liked status
+    current_user_id = session.get('user_id')
+    if current_user_id:
+        likes = load_post_likes()
+        user_likes = {like['post_id'] for like in likes if like.get('user_id') == current_user_id}
+        post['liked_by_user'] = post['id'] in user_likes
+    
+    return render_template('post_detail.html',
+                         post=post,
+                         comments=comments,
+                         datetime=datetime)
+
+@app.route('/api/community/post', methods=['POST'])
+@login_required
+def api_create_post():
+    """Create new post"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể đăng bài'}, 403
+        
+        user_id = session.get('user_id')
+        user = get_user_by_id(user_id)
+        
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        
+        if not content:
+            return {'ok': False, 'error': 'Nội dung không được để trống'}, 400
+        
+        if len(content) > 1000:
+            return {'ok': False, 'error': 'Nội dung quá dài (tối đa 1000 ký tự)'}, 400
+        
+        post = {
+            'user_id': user_id,
+            'user_name': user.get('full_name', 'Anonymous'),
+            'content': content,
+            'image': data.get('image')  # URL or base64 if needed
+        }
+        
+        saved_post = save_post(post)
+        
+        # Award points for creating post
+        try:
+            add_points(user_id, 5, 'create_post', 'Đăng bài viết cộng đồng')
+            
+            # Update quest progress
+            update_quest_progress(user_id, 'post', increment=1)
+            
+            # Check achievements
+            check_and_award_achievements(user_id, 'post', {'post_id': saved_post['id']})
+            
+            user = get_user_by_id(user_id)
+            if user:
+                session['user_points'] = user.get('points', 0)
+        except Exception as e:
+            app.logger.error(f'Failed to award post points: {e}')
+        
+        return {'ok': True, 'post': saved_post}
+    except Exception as e:
+        app.logger.error(f'Error creating post: {e}')
+        return {'ok': False, 'error': 'Lỗi khi tạo bài viết'}, 500
+
+@app.route('/api/community/post/<post_id>/comment', methods=['POST'])
+@login_required
+def api_add_comment(post_id):
+    """Add comment to post"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể bình luận'}, 403
+        
+        user_id = session.get('user_id')
+        user = get_user_by_id(user_id)
+        
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        
+        if not content:
+            return {'ok': False, 'error': 'Bình luận không được để trống'}, 400
+        
+        if len(content) > 500:
+            return {'ok': False, 'error': 'Bình luận quá dài (tối đa 500 ký tự)'}, 400
+        
+        comment = {
+            'post_id': post_id,
+            'user_id': user_id,
+            'user_name': user.get('full_name', 'Anonymous'),
+            'content': content
+        }
+        
+        saved_comment = save_comment(comment)
+        
+        # Update quest progress and check achievements
+        try:
+            update_quest_progress(user_id, 'comment', increment=1)
+            check_and_award_achievements(user_id, 'comment', {'post_id': post_id})
+        except Exception as e:
+            app.logger.error(f'Failed to update quest for comment: {e}')
+        
+        return {'ok': True, 'comment': saved_comment}
+    except Exception as e:
+        app.logger.error(f'Error adding comment: {e}')
+        return {'ok': False, 'error': 'Lỗi khi thêm bình luận'}, 500
+
+@app.route('/api/community/post/<post_id>/like', methods=['POST'])
+@login_required
+def api_toggle_like(post_id):
+    """Toggle like on post"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể like'}, 403
+        
+        user_id = session.get('user_id')
+        liked, likes_count = toggle_post_like(post_id, user_id)
+        
+        # Update quest if liked (not unliked)
+        if liked:
+            try:
+                update_quest_progress(user_id, 'like', increment=1)
+            except Exception as e:
+                app.logger.error(f'Failed to update quest for like: {e}')
+        
+        return {
+            'ok': True,
+            'liked': liked,
+            'likes_count': likes_count
+        }
+    except Exception as e:
+        app.logger.error(f'Error toggling like: {e}')
+        return {'ok': False, 'error': 'Lỗi khi like bài viết'}, 500
+
+@app.route('/api/community/post/<post_id>/delete', methods=['POST'])
+@login_required
+def api_delete_post(post_id):
+    """Delete post"""
+    try:
+        user_id = session.get('user_id')
+        is_admin = session.get('is_admin', False)
+        
+        # Get post
+        posts = load_posts()
+        post = next((p for p in posts if p['id'] == post_id), None)
+        
+        if not post:
+            return {'ok': False, 'error': 'Không tìm thấy bài viết'}, 404
+        
+        # Check permission
+        if post['user_id'] != user_id and not is_admin:
+            return {'ok': False, 'error': 'Bạn không có quyền xóa bài viết này'}, 403
+        
+        success = delete_post(post_id)
+        
+        if success:
+            return {'ok': True, 'message': 'Đã xóa bài viết'}
+        else:
+            return {'ok': False, 'error': 'Không thể xóa bài viết'}, 500
+    except Exception as e:
+        app.logger.error(f'Error deleting post: {e}')
+        return {'ok': False, 'error': 'Lỗi khi xóa bài viết'}, 500
+
+@app.route('/user/<user_id>')
+def user_profile_public(user_id):
+    """Public user profile"""
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        flash('Không tìm thấy người dùng', 'error')
+        return redirect(url_for('community'))
+    
+    # Get user stats
+    stats = get_user_stats(user_id)
+    
+    # Get user posts
+    posts = load_posts()
+    user_posts = [p for p in posts if p.get('user_id') == user_id]
+    user_posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
+    # Check if current user is following
+    is_following = False
+    current_user_id = session.get('user_id')
+    if current_user_id and current_user_id != user_id:
+        follows = load_user_follows()
+        is_following = any(
+            f.get('follower_id') == current_user_id and 
+            f.get('following_id') == user_id 
+            for f in follows
+        )
+    
+    return render_template('user_profile_public.html',
+                         user=user,
+                         stats=stats,
+                         posts=user_posts[:10],
+                         is_following=is_following,
+                         datetime=datetime)
+
+@app.route('/api/user/<user_id>/follow', methods=['POST'])
+@login_required
+def api_toggle_follow(user_id):
+    """Toggle follow user"""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể follow'}, 403
+        
+        current_user_id = session.get('user_id')
+        
+        if current_user_id == user_id:
+            return {'ok': False, 'error': 'Không thể follow chính mình'}, 400
+        
+        is_following = toggle_follow(current_user_id, user_id)
+        
+        return {
+            'ok': True,
+            'is_following': is_following
+        }
+    except Exception as e:
+        app.logger.error(f'Error toggling follow: {e}')
+        return {'ok': False, 'error': 'Lỗi khi follow người dùng'}, 500
+
 
 @app.route('/history/clear', methods=['POST'])
 def clear_history():
-    """Xóa toàn bộ lịch sử dự đoán"""
+    """Xóa lịch sử dự đoán"""
     try:
         history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
-        if history_file.exists():
-            history_file.unlink()
-            app.logger.info('Cleared prediction history')
+        
+        if not history_file.exists():
             flash('Đã xóa toàn bộ lịch sử dự đoán', 'success')
+            return redirect(url_for('history'))
+        
+        # Nếu là admin, xóa toàn bộ
+        if session.get('is_admin'):
+            history_file.unlink()
+            app.logger.info('Admin cleared all prediction history')
+            flash('Đã xóa toàn bộ lịch sử dự đoán', 'success')
+        else:
+            # User thường chỉ xóa lịch sử của mình
+            current_user_id = session.get('user_id')
+            current_user_email = session.get('user_email')
+            
+            # Đọc tất cả và chỉ giữ lại của user khác
+            remaining_entries = []
+            with open(history_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        # Giữ lại nếu không phải của user hiện tại
+                        if (entry.get('user_id') != current_user_id and 
+                            entry.get('user_email') != current_user_email):
+                            remaining_entries.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Ghi lại file
+            with open(history_file, 'w', encoding='utf-8') as f:
+                for entry in remaining_entries:
+                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            
+            app.logger.info(f'User {current_user_email} cleared their history')
+            flash('Đã xóa lịch sử của bạn', 'success')
+        
         return redirect(url_for('history'))
     except Exception as e:
         app.logger.exception('Error clearing history')
@@ -2284,12 +8260,25 @@ def view_prediction(prediction_id):
             flash('Không tìm thấy lịch sử dự đoán')
             return redirect(url_for('history'))
         
+        current_user_id = session.get('user_id')
+        current_user_email = session.get('user_email')
+        is_admin = session.get('is_admin')
+        
         # Tìm prediction theo ID
         with open(history_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     entry = json.loads(line.strip())
                     if entry.get('id') == prediction_id:
+                        # Kiểm tra quyền truy cập
+                        if not is_admin:
+                            # User thường chỉ xem được của mình
+                            if (entry.get('user_id') != current_user_id and 
+                                entry.get('user_email') != current_user_email and
+                                (entry.get('user_id') or entry.get('user_email'))):
+                                flash('Bạn không có quyền xem dự đoán này')
+                                return redirect(url_for('history'))
+                        
                         # Format timestamp
                         try:
                             ts = datetime.fromisoformat(entry.get('timestamp', ''))
@@ -2321,6 +8310,8 @@ def view_prediction(prediction_id):
 @app.route('/export/<prediction_id>')
 def export_prediction(prediction_id):
     """Export prediction report as PDF"""
+    app.logger.info(f"PDF export requested for prediction: {prediction_id}")
+    
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
@@ -2329,6 +8320,9 @@ def export_prediction(prediction_id):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        
+        app.logger.info("ReportLab libraries imported successfully")
         
         # Find prediction
         history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
@@ -2336,20 +8330,36 @@ def export_prediction(prediction_id):
             flash('Không tìm thấy lịch sử dự đoán', 'error')
             return redirect(url_for('history'))
         
+        current_user_id = session.get('user_id')
+        current_user_email = session.get('user_email')
+        is_admin = session.get('is_admin')
+        
         prediction = None
         with open(history_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     entry = json.loads(line.strip())
                     if entry.get('id') == prediction_id:
+                        # Kiểm tra quyền truy cập
+                        if not is_admin:
+                            # User thường chỉ export được của mình
+                            if (entry.get('user_id') != current_user_id and 
+                                entry.get('user_email') != current_user_email and
+                                (entry.get('user_id') or entry.get('user_email'))):
+                                flash('Bạn không có quyền xuất dự đoán này', 'error')
+                                return redirect(url_for('history'))
+                        
                         prediction = entry
                         break
                 except json.JSONDecodeError:
                     continue
         
         if not prediction:
+            app.logger.warning(f"Prediction not found: {prediction_id}")
             flash('Không tìm thấy dự đoán này', 'error')
             return redirect(url_for('history'))
+        
+        app.logger.info(f"Found prediction: {prediction_id}, label: {prediction.get('predicted_label')}")
         
         # Get disease info
         label = prediction.get('predicted_label', '')
@@ -2358,6 +8368,37 @@ def export_prediction(prediction_id):
             'definition': 'Không có thông tin',
             'prevention': []
         })
+        
+        # Register Vietnamese font - try multiple common fonts
+        font_registered = False
+        font_dirs = [
+            r'C:\Windows\Fonts',  # Windows
+            '/usr/share/fonts/truetype/dejavu',  # Linux
+            '/System/Library/Fonts',  # macOS
+        ]
+        
+        font_names = ['Arial.ttf', 'DejaVuSans.ttf', 'arial.ttf', 'arialuni.ttf']
+        
+        for font_dir in font_dirs:
+            if not Path(font_dir).exists():
+                continue
+            for font_file in font_names:
+                font_path = Path(font_dir) / font_file
+                if font_path.exists():
+                    try:
+                        pdfmetrics.registerFont(TTFont('Vietnamese', str(font_path)))
+                        font_registered = True
+                        app.logger.info(f"Registered font: {font_path}")
+                        break
+                    except Exception as e:
+                        app.logger.warning(f"Failed to register font {font_path}: {e}")
+                        continue
+            if font_registered:
+                break
+        
+        # Use registered font or fallback to default
+        base_font = 'Vietnamese' if font_registered else 'Helvetica'
+        base_font_bold = 'Vietnamese' if font_registered else 'Helvetica-Bold'
         
         # Create PDF
         buffer = io.BytesIO()
@@ -2375,9 +8416,10 @@ def export_prediction(prediction_id):
             fontSize=20,
             textColor=colors.HexColor('#2d5016'),
             spaceAfter=30,
-            alignment=1  # Center
+            alignment=TA_CENTER,
+            fontName=base_font_bold
         )
-        elements.append(Paragraph('BAO CAO DU DOAN BENH CA CHUA', title_style))
+        elements.append(Paragraph('BÁO CÁO DỰ ĐOÁN BỆNH CÀ CHUA', title_style))
         elements.append(Spacer(1, 10*mm))
         
         # Prediction info table
@@ -2388,12 +8430,12 @@ def export_prediction(prediction_id):
             formatted_time = prediction.get('timestamp', 'N/A')
         
         info_data = [
-            ['Ma du doan:', prediction.get('id', 'N/A')],
-            ['Thoi gian:', formatted_time],
+            ['Mã dự đoán:', prediction.get('id', 'N/A')],
+            ['Thời gian:', formatted_time],
             ['Model:', prediction.get('model_name', 'N/A')],
             ['Pipeline:', prediction.get('pipeline_key', 'N/A')],
-            ['Benh phat hien:', disease_info['name']],
-            ['Do tin cay:', f"{prediction.get('probability', 0) * 100:.1f}%"],
+            ['Bệnh phát hiện:', disease_info['name']],
+            ['Độ tin cậy:', f"{prediction.get('probability', 0) * 100:.1f}%"],
         ]
         
         info_table = Table(info_data, colWidths=[50*mm, 100*mm])
@@ -2401,7 +8443,8 @@ def export_prediction(prediction_id):
             ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (0, -1), base_font_bold),
+            ('FONTNAME', (1, 0), (1, -1), base_font),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 8),
@@ -2411,17 +8454,32 @@ def export_prediction(prediction_id):
         elements.append(Spacer(1, 10*mm))
         
         # Disease definition
-        elements.append(Paragraph('THONG TIN BENH:', styles['Heading2']))
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontName=base_font_bold,
+            fontSize=14,
+            textColor=colors.HexColor('#2d5016')
+        )
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['BodyText'],
+            fontName=base_font,
+            fontSize=11,
+            alignment=TA_LEFT
+        )
+        
+        elements.append(Paragraph('THÔNG TIN BỆNH:', heading_style))
         elements.append(Spacer(1, 3*mm))
-        elements.append(Paragraph(disease_info['definition'], styles['BodyText']))
+        elements.append(Paragraph(disease_info['definition'], body_style))
         elements.append(Spacer(1, 5*mm))
         
         # Prevention measures
         if disease_info.get('prevention'):
-            elements.append(Paragraph('BIEN PHAP PHONG NGUA:', styles['Heading2']))
+            elements.append(Paragraph('BIỆN PHÁP PHÒNG NGỪA:', heading_style))
             elements.append(Spacer(1, 3*mm))
             for i, measure in enumerate(disease_info['prevention'], 1):
-                elements.append(Paragraph(f"{i}. {measure}", styles['BodyText']))
+                elements.append(Paragraph(f"{i}. {measure}", body_style))
                 elements.append(Spacer(1, 2*mm))
         
         # Add image if available
@@ -2434,10 +8492,14 @@ def export_prediction(prediction_id):
             img_file = BASE_DIR / 'static' / image_path_str
             if img_file.exists():
                 elements.append(Spacer(1, 5*mm))
-                elements.append(Paragraph('ANH DA XU LY:', styles['Heading2']))
+                elements.append(Paragraph('ẢNH ĐÃ XỬ LÝ:', heading_style))
                 elements.append(Spacer(1, 3*mm))
-                img = RLImage(str(img_file), width=100*mm, height=100*mm)
-                elements.append(img)
+                try:
+                    img = RLImage(str(img_file), width=100*mm, height=100*mm)
+                    elements.append(img)
+                except Exception as e:
+                    app.logger.warning(f"Could not add image to PDF: {e}")
+                    elements.append(Paragraph(f"Không thể thêm ảnh: {str(e)}", body_style))
         
         # Footer
         elements.append(Spacer(1, 10*mm))
@@ -2446,22 +8508,24 @@ def export_prediction(prediction_id):
             parent=styles['Normal'],
             fontSize=8,
             textColor=colors.grey,
-            alignment=1
+            alignment=TA_CENTER,
+            fontName=base_font
         )
-        elements.append(Paragraph('Bao cao duoc tao tu dong boi Tomato AI System', footer_style))
-        elements.append(Paragraph(f'Ngay xuat: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', footer_style))
+        elements.append(Paragraph('Báo cáo được tạo tự động bởi Tomato AI System', footer_style))
+        elements.append(Paragraph(f'Ngày xuất: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}', footer_style))
         
         # Build PDF
+        app.logger.info(f"Building PDF with {len(elements)} elements...")
         doc.build(elements)
         buffer.seek(0)
         
         filename = f"tomato_report_{prediction_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
-        app.logger.info(f"Exported PDF report for prediction {prediction_id}")
+        app.logger.info(f"PDF built successfully. Size: {buffer.getbuffer().nbytes} bytes. Sending file: {filename}")
         return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
         
-    except ImportError:
-        app.logger.error('ReportLab not installed')
+    except ImportError as e:
+        app.logger.error(f'Required library not installed: {e}')
         flash('Chức năng xuất PDF chưa được cài đặt. Vui lòng cài reportlab: pip install reportlab', 'error')
         return redirect(url_for('history'))
     except Exception as e:
@@ -2783,6 +8847,166 @@ def admin_rebuild_samples():
         app.logger.exception('Error triggering rebuild of sample features')
         return {"ok": False, "message": str(e)}, 500
 
+# ==================== Admin Wiki Management ====================
+
+@app.route('/admin/wiki')
+@requires_admin_auth
+def admin_wiki():
+    """Admin page to manage wiki articles"""
+    try:
+        articles = load_wiki_articles()
+        categories = get_wiki_categories()
+        tags = get_wiki_tags()
+        
+        # Sort by created_at (newest first)
+        articles.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        return render_template('admin_wiki.html',
+                             articles=articles,
+                             categories=categories,
+                             tags=tags)
+    except Exception as e:
+        app.logger.error(f'Error loading admin wiki: {e}')
+        flash('Lỗi khi tải trang quản lý wiki', 'error')
+        return redirect(url_for('admin_stats'))
+
+@app.route('/admin/wiki/add', methods=['GET', 'POST'])
+@requires_admin_auth
+def admin_wiki_add():
+    """Add new wiki article"""
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            slug = request.form.get('slug', '').strip()
+            category = request.form.get('category', '').strip()
+            content = request.form.get('content', '').strip()
+            tags = request.form.get('tags', '').strip()
+            featured = request.form.get('featured') == 'on'
+            
+            if not title or not slug or not content:
+                flash('Vui lòng điền đầy đủ thông tin', 'warning')
+                return render_template('admin_wiki_form.html')
+            
+            # Check if slug already exists
+            if get_wiki_article_by_slug(slug):
+                flash('Slug đã tồn tại, vui lòng chọn slug khác', 'warning')
+                return render_template('admin_wiki_form.html')
+            
+            # Parse tags
+            tags_list = [t.strip() for t in tags.split(',') if t.strip()]
+            
+            # Create article
+            article = {
+                'id': str(uuid4())[:12],
+                'title': title,
+                'slug': slug,
+                'category': category,
+                'content': content,
+                'author': session.get('username', 'Admin'),
+                'views': 0,
+                'likes': 0,
+                'liked_by': [],
+                'created_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat(),
+                'tags': tags_list,
+                'featured': featured
+            }
+            
+            articles = load_wiki_articles()
+            articles.append(article)
+            save_wiki_articles(articles)
+            
+            flash('Đã thêm bài viết wiki thành công', 'success')
+            return redirect(url_for('admin_wiki'))
+            
+        except Exception as e:
+            app.logger.error(f'Error adding wiki article: {e}')
+            flash('Lỗi khi thêm bài viết', 'error')
+            return render_template('admin_wiki_form.html')
+    
+    return render_template('admin_wiki_form.html', article=None)
+
+@app.route('/admin/wiki/<article_id>/edit', methods=['GET', 'POST'])
+@requires_admin_auth
+def admin_wiki_edit(article_id):
+    """Edit wiki article"""
+    article = get_wiki_article_by_id(article_id)
+    
+    if not article:
+        flash('Không tìm thấy bài viết', 'warning')
+        return redirect(url_for('admin_wiki'))
+    
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            slug = request.form.get('slug', '').strip()
+            category = request.form.get('category', '').strip()
+            content = request.form.get('content', '').strip()
+            tags = request.form.get('tags', '').strip()
+            featured = request.form.get('featured') == 'on'
+            
+            if not title or not slug or not content:
+                flash('Vui lòng điền đầy đủ thông tin', 'warning')
+                return render_template('admin_wiki_form.html', article=article)
+            
+            # Check if slug changed and conflicts with another article
+            if slug != article['slug']:
+                existing = get_wiki_article_by_slug(slug)
+                if existing and existing['id'] != article_id:
+                    flash('Slug đã tồn tại, vui lòng chọn slug khác', 'warning')
+                    return render_template('admin_wiki_form.html', article=article)
+            
+            # Parse tags
+            tags_list = [t.strip() for t in tags.split(',') if t.strip()]
+            
+            # Update article
+            articles = load_wiki_articles()
+            for a in articles:
+                if a['id'] == article_id:
+                    a['title'] = title
+                    a['slug'] = slug
+                    a['category'] = category
+                    a['content'] = content
+                    a['tags'] = tags_list
+                    a['featured'] = featured
+                    a['updated_at'] = datetime.utcnow().isoformat()
+                    break
+            
+            save_wiki_articles(articles)
+            
+            flash('Đã cập nhật bài viết thành công', 'success')
+            return redirect(url_for('admin_wiki'))
+            
+        except Exception as e:
+            app.logger.error(f'Error editing wiki article: {e}')
+            flash('Lỗi khi cập nhật bài viết', 'error')
+            return render_template('admin_wiki_form.html', article=article)
+    
+    # Convert tags list to comma-separated string for form
+    if article.get('tags'):
+        article['tags_str'] = ', '.join(article['tags'])
+    else:
+        article['tags_str'] = ''
+    
+    return render_template('admin_wiki_form.html', article=article)
+
+@app.route('/admin/wiki/<article_id>/delete', methods=['POST'])
+@requires_admin_auth
+def admin_wiki_delete(article_id):
+    """Delete wiki article"""
+    try:
+        articles = load_wiki_articles()
+        articles = [a for a in articles if a['id'] != article_id]
+        save_wiki_articles(articles)
+        
+        flash('Đã xóa bài viết thành công', 'success')
+        return redirect(url_for('admin_wiki'))
+        
+    except Exception as e:
+        app.logger.error(f'Error deleting wiki article: {e}')
+        flash('Lỗi khi xóa bài viết', 'error')
+        return redirect(url_for('admin_wiki'))
+
 @app.route('/chat')
 def chat():
     """Render chat page"""
@@ -2806,7 +9030,7 @@ def api_chat():
     if len(CHAT_RATE_LIMITER[user_ip]) >= CHAT_RATE_LIMIT_PER_MINUTE:
         app.logger.warning(f"Rate limit exceeded for IP: {user_ip}")
         return {
-            "answer": "⚠️ Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.",
+            "answer": "[!] Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.",
             "error": "rate_limit"
         }, 429
     
@@ -2826,7 +9050,7 @@ def api_chat():
     
     if len(user_q_raw) > CHAT_MAX_QUESTION_LENGTH:
         return {
-            "answer": f"⚠️ Câu hỏi quá dài. Vui lòng giới hạn trong {CHAT_MAX_QUESTION_LENGTH} ký tự.",
+            "answer": f"[!] Câu hỏi quá dài. Vui lòng giới hạn trong {CHAT_MAX_QUESTION_LENGTH} ký tự.",
             "error": "question_too_long"
         }
     
@@ -2873,7 +9097,7 @@ def api_chat():
     except Exception as e:
         app.logger.exception(f"Error in api_chat: {e}")
         return {
-            "answer": "⚠️ Đã xảy ra lỗi. Vui lòng thử lại sau.",
+            "answer": "[!] Đã xảy ra lỗi. Vui lòng thử lại sau.",
             "error": "internal_error"
         }, 500
 
@@ -3116,19 +9340,19 @@ def assess_image_quality_with_suggestions(img_bgr):
         # Add general suggestions if no specific issues
         if not suggestions:
             suggestions = [
-                '✅ Chất lượng ảnh tốt!',
-                '💡 Tips: Chụp khi lá đang khô để tránh phản quang'
+                '[OK] Chất lượng ảnh tốt!',
+                '[TIP] Tips: Chụp khi lá đang khô để tránh phản quang'
             ]
         
         # Create warning message for poor quality
         if quality_score < 50:
             warning_message = (
-                f"⚠️ Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
+                f"[!] Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
                 "Kết quả dự đoán có thể không chính xác. Đề nghị chụp lại ảnh tốt hơn."
             )
         elif quality_score < 70:
             warning_message = (
-                f"⚡ Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
+                f"[!] Chất lượng ảnh {quality_level.lower()} (điểm: {quality_score:.0f}/100). "
                 "Có thể cải thiện để được kết quả chính xác hơn."
             )
         
@@ -3369,6 +9593,8 @@ def save_prediction_history(prediction_data):
         entry = {
             'id': prediction_id,
             'timestamp': datetime.utcnow().isoformat(),
+            'user_id': prediction_data.get('user_id'),  # Thêm user_id
+            'user_email': prediction_data.get('user_email'),  # Thêm user_email
             'model_name': prediction_data.get('model_name'),
             'pipeline_key': prediction_data.get('pipeline_key'),
             'predicted_label': prediction_data.get('predicted_label'),
@@ -3598,6 +9824,8 @@ def batch_predict():
                 
                 # Save to history
                 prediction_id = save_prediction_history({
+                    'user_id': session.get('user_id'),
+                    'user_email': session.get('user_email'),
                     'model_name': model_name,
                     'pipeline_key': pipeline_key,
                     'predicted_label': pred_results['label'],
@@ -3918,6 +10146,8 @@ def predict():
         # Bước 9: Lưu lịch sử dự đoán
         app.logger.info("[%s] Step 9: Saving prediction history", request_id)
         prediction_id = save_prediction_history({
+            'user_id': session.get('user_id'),
+            'user_email': session.get('user_email'),
             'model_name': params['model_name'],
             'pipeline_key': params['pipeline_key'],
             'predicted_label': results['label'],
@@ -3927,6 +10157,24 @@ def predict():
             'image_path': image_path,
             'severity': severity
         })
+        
+        # Award points for prediction
+        if 'user_id' in session and session.get('user_id') != 'admin':
+            try:
+                user_id = session['user_id']
+                add_points(user_id, 10, 'prediction', 'Dự đoán bệnh cà chua')
+                
+                # Update quest progress
+                update_quest_progress(user_id, 'scan', increment=1)
+                
+                # Check for new achievements
+                check_and_award_achievements(user_id, 'scan', {'disease': results['label']})
+                
+                user = get_user_by_id(user_id)
+                if user:
+                    session['user_points'] = user.get('points', 0)
+            except Exception as e:
+                app.logger.error(f'Failed to award prediction points: {e}')
         
         # Step 10: Render result
         app.logger.info(
@@ -4445,7 +10693,7 @@ if __name__ == "__main__":
             if cert_file.exists() and key_file.exists():
                 ssl_context = (str(cert_file), str(key_file))
                 protocol = 'https'
-                app.logger.info("✓ HTTPS enabled with certificates:")
+                app.logger.info("[OK] HTTPS enabled with certificates:")
                 app.logger.info(f"  Certificate: {cert_file}")
                 app.logger.info(f"  Private Key: {key_file}")
             else:
@@ -4454,7 +10702,7 @@ if __name__ == "__main__":
                     ssl_context = 'adhoc'
                     protocol = 'https'
                     app.logger.warning("Certificate files not found. Using adhoc SSL (auto-generated self-signed certificate)")
-                    app.logger.warning("⚠️  For production, please use proper SSL certificates!")
+                    app.logger.warning("[WARNING] For production, please use proper SSL certificates!")
                     app.logger.info("To generate certificate files, run:")
                     app.logger.info("  mkdir certs")
                     app.logger.info("  openssl req -x509 -newkey rsa:4096 -nodes -out certs/cert.pem -keyout certs/key.pem -days 365 -subj '/CN=localhost'")
@@ -4492,13 +10740,18 @@ if __name__ == "__main__":
         
         if use_https:
             app.logger.info("=" * 60)
-            app.logger.info("🔒 HTTPS MODE ENABLED")
+            app.logger.info("[HTTPS] HTTPS MODE ENABLED")
             app.logger.info("=" * 60)
             if ssl_context == 'adhoc':
-                app.logger.warning("⚠️  Using self-signed certificate - browsers will show security warning")
-                app.logger.info("Click 'Advanced' → 'Proceed to localhost' to continue")
+                app.logger.warning("[WARNING] Using self-signed certificate - browsers will show security warning")
+                app.logger.info("Click 'Advanced' -> 'Proceed to localhost' to continue")
         
-        app.run(host='0.0.0.0', port=5000, debug=True, ssl_context=ssl_context)
+        # Khi chạy với VS Code debugger, không dùng Flask debug mode (gây conflict)
+        # VS Code debugger sẽ tự động enable debugging
+        debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
+        use_reloader = os.environ.get('WERKZEUG_RUN_MAIN') != 'true'  # Disable reloader trong debugger
+        
+        app.run(host='0.0.0.0', port=5000, debug=debug_mode, use_reloader=False, ssl_context=ssl_context)
     except KeyboardInterrupt:
         app.logger.info("Server stopped by user")
     except Exception as e:
