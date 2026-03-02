@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Bảng xếp hạng - {{ t('site_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 40px auto;">
+  <div class="leaderboard-header" style="text-align: center; margin-bottom: 40px;">
+    <h1 style="color: var(--tomato-700); margin-bottom: 10px;">
+      <span style="font-size: 2.5em;">🏆</span>
+      {{ t('points.leaderboard') if current_lang else 'Bảng xếp hạng' }}
+    </h1>
+    <p style="color: #666; font-size: 1.1em;">Top người dùng có điểm thưởng cao nhất</p>
+  </div>
+
+  {% if user_rank %}
+  <div class="user-rank-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); color: white; padding: 25px; border-radius: 20px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(255,107,107,0.3); text-align: center;">
+    <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Hạng của bạn</div>
+    <div style="font-size: 3em; font-weight: 700; margin: 10px 0;">#{{ user_rank }}</div>
+    <div style="font-size: 0.9em; opacity: 0.9;">
+      {% if user_rank == 1 %}
+        🥇 Bạn là người dẫn đầu!
+      {% elif user_rank <= 3 %}
+        🥈 Xuất sắc! Tiếp tục phấn đấu!
+      {% elif user_rank <= 10 %}
+        🥉 Tốt! Cố gắng lên top 3!
+      {% else %}
+        💪 Tiếp tục tích điểm để lên top!
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="leaderboard-table" style="background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden;">
+    {% if leaderboard %}
+      {% for entry in leaderboard %}
+      <div class="leaderboard-entry" style="display: flex; align-items: center; padding: 20px 25px; border-bottom: 1px solid #f0f0f0; {% if loop.index <= 3 %}background: linear-gradient(90deg, {% if loop.index == 1 %}#fff9e6{% elif loop.index == 2 %}#f5f5f5{% else %}#ffeaa7{% endif %} 0%, white 100%);{% endif %} {% if session.get('user_id') == entry.user_id %}border-left: 4px solid var(--tomato-600); background: #fff5f5;{% endif %} transition: all 0.3s; position: relative;">
+        
+        <!-- Rank -->
+        <div class="rank" style="font-size: 1.5em; font-weight: 700; width: 60px; text-align: center; flex-shrink: 0;">
+          {% if loop.index == 1 %}
+            <span style="font-size: 2em;">🥇</span>
+          {% elif loop.index == 2 %}
+            <span style="font-size: 2em;">🥈</span>
+          {% elif loop.index == 3 %}
+            <span style="font-size: 2em;">🥉</span>
+          {% else %}
+            <span style="color: #999;">{{ loop.index }}</span>
+          {% endif %}
+        </div>
+
+        <!-- Avatar -->
+        <div class="avatar" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5em; font-weight: 600; margin: 0 20px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+          {{ entry.full_name[0]|upper if entry.full_name else '?' }}
+        </div>
+
+        <!-- User Info -->
+        <div class="user-info" style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; font-size: 1.1em; color: #333; margin-bottom: 3px; {% if session.get('user_id') == entry.user_id %}color: var(--tomato-700);{% endif %}">
+            {{ entry.full_name or 'Anonymous' }}
+            {% if session.get('user_id') == entry.user_id %}
+              <span style="background: var(--tomato-600); color: white; font-size: 0.7em; padding: 2px 8px; border-radius: 10px; margin-left: 8px;">Bạn</span>
+            {% endif %}
+          </div>
+          <div style="font-size: 0.85em; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ entry.email[:30] }}{% if entry.email|length > 30 %}...{% endif %}
+          </div>
+        </div>
+
+        <!-- Points -->
+        <div class="points" style="text-align: right; margin-left: 20px; flex-shrink: 0;">
+          <div style="font-size: 1.8em; font-weight: 700; color: var(--tomato-600);">
+            {{ entry.points }}
+          </div>
+          <div style="font-size: 0.85em; color: #888;">điểm</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 60px 20px; color: #999;">
+        <div style="font-size: 4em; margin-bottom: 15px;">👥</div>
+        <div style="font-size: 1.2em;">Chưa có dữ liệu xếp hạng</div>
+        <div style="font-size: 0.9em; margin-top: 10px;">Hãy bắt đầu tích điểm để xuất hiện ở đây!</div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if not session.get('user_id') %}
+  <div style="text-align: center; margin-top: 30px; padding: 30px; background: #fff3cd; border-radius: 15px; border-left: 4px solid #ffc107;">
+    <div style="font-size: 1.2em; color: #856404; font-weight: 600; margin-bottom: 10px;">
+      🔒 Đăng nhập để tích điểm
+    </div>
+    <div style="color: #856404; margin-bottom: 20px;">
+      Tham gia hệ thống tích điểm và cạnh tranh với người dùng khác!
+    </div>
+    <div>
+      <a href="{{ url_for('login') }}" style="display: inline-block; padding: 12px 30px; background: var(--tomato-600); color: white; text-decoration: none; border-radius: 10px; font-weight: 600; transition: all 0.3s;">
+        Đăng nhập ngay
+      </a>
+    </div>
+  </div>
+  {% else %}
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="{{ url_for('points_dashboard') }}" style="display: inline-block; padding: 15px 40px; background: var(--tomato-600); color: white; text-decoration: none; border-radius: 15px; font-weight: 600; font-size: 1.1em; box-shadow: 0 4px 15px rgba(255,107,107,0.3); transition: all 0.3s;">
+      📊 Xem điểm của tôi
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .leaderboard-entry:hover {
+    background: #f8f9fa !important;
+    transform: translateX(5px);
+  }
+  
+  [data-theme="dark"] .leaderboard-table {
+    background: var(--bg-secondary);
+  }
+  
+  [data-theme="dark"] .leaderboard-entry {
+    border-bottom-color: #333;
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .leaderboard-entry .user-info > div:first-child {
+    color: var(--text-primary) !important;
+  }
+  
+  [data-theme="dark"] .leaderboard-entry:hover {
+    background: var(--bg-primary) !important;
+  }
+</style>
+{% endblock %}

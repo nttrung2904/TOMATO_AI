@@ -1,0 +1,589 @@
+{% extends 'base.html' %}
+
+{% block title %}Knowledge Base - Tomato Disease Detection{% endblock %}
+
+{% block content %}
+<style>
+  .kb-hero {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    color: white;
+    padding: 60px 20px;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  [data-theme="dark"] .kb-hero {
+    background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  }
+  
+  .kb-hero h1 {
+    font-size: 2.5em;
+    margin: 0 0 15px 0;
+    font-weight: 700;
+  }
+  
+  .kb-hero p {
+    font-size: 1.1em;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto 30px;
+  }
+  
+  .kb-search {
+    max-width: 600px;
+    margin: 0 auto;
+    position: relative;
+  }
+  
+  .kb-search input {
+    width: 100%;
+    padding: 16px 60px 16px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.05em;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  }
+  
+  .kb-search button {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--tomato-600);
+    border: none;
+    padding: 11px 25px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  
+  .kb-search button:hover {
+    background: var(--tomato-700);
+  }
+  
+  .kb-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 40px;
+  }
+  
+  .kb-sidebar {
+    position: sticky;
+    top: 90px;
+    height: fit-content;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+  }
+  
+  .sidebar-section {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+  }
+  
+  [data-theme="dark"] .sidebar-section {
+    background: var(--bg-secondary);
+  }
+  
+  .sidebar-title {
+    font-size: 0.8em;
+    font-weight: 700;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 15px;
+  }
+  
+  .category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .category-list li {
+    margin-bottom: 6px;
+  }
+  
+  .category-list a {
+    display: block;
+    color: #555;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+  
+  [data-theme="dark"] .category-list a {
+    color: #999;
+  }
+  
+  .category-list a:hover {
+    background: #f8f9fa;
+    color: var(--tomato-600);
+    border-left-color: var(--tomato-600);
+  }
+  
+  .category-list a.active {
+    background: var(--tomato-50);
+    color: var(--tomato-700);
+    font-weight: 600;
+    border-left-color: var(--tomato-600);
+  }
+  
+  .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .tag-cloud a {
+    background: white;
+    color: #666;
+    padding: 5px 12px;
+    border-radius: 15px;
+    text-decoration: none;
+    font-size: 0.85em;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s;
+  }
+  
+  [data-theme="dark"] .tag-cloud a {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: #999;
+  }
+  
+  .tag-cloud a:hover {
+    background: var(--tomato-600);
+    color: white;
+    border-color: var(--tomato-600);
+  }
+  
+  .kb-main {
+    min-width: 0;
+  }
+  
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e5e5e5;
+  }
+  
+  [data-theme="dark"] .section-header {
+    border-bottom-color: var(--border-color);
+  }
+  
+  .section-header h2 {
+    font-size: 1.8em;
+    color: #1a1a1a;
+    margin: 0;
+    font-weight: 700;
+  }
+  
+  [data-theme="dark"] .section-header h2 {
+    color: #f5f5f5;
+  }
+  
+  .section-count {
+    background: #f0f0f0;
+    color: #666;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+  
+  [data-theme="dark"] .section-count {
+    background: var(--bg-tertiary);
+    color: #999;
+  }
+  
+  /* List View */
+  .article-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 40px;
+  }
+  
+  .article-item {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s;
+    border-left: 4px solid transparent;
+    display: block;
+  }
+  
+  [data-theme="dark"] .article-item {
+    background: var(--bg-secondary);
+  }
+  
+  .article-item:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transform: translateX(5px);
+    border-left-color: var(--tomato-600);
+  }
+  
+  .article-item-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 12px;
+  }
+  
+  .article-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    background: var(--tomato-100);
+    color: var(--tomato-700);
+    border-radius: 6px;
+    font-size: 0.75em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  
+  [data-theme="dark"] .article-badge {
+    background: var(--tomato-900);
+    color: var(--tomato-400);
+  }
+  
+  .article-item-content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .article-title {
+    font-size: 1.3em;
+    color: #1a1a1a;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+  }
+  
+  [data-theme="dark"] .article-title {
+    color: #f5f5f5;
+  }
+  
+  .article-excerpt {
+    color: #666;
+    font-size: 0.95em;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  
+  [data-theme="dark"] .article-excerpt {
+    color: #999;
+  }
+  
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    color: #999;
+    font-size: 0.85em;
+  }
+  
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .featured-badge {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    color: #333;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #999;
+  }
+  
+  .empty-state-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+    opacity: 0.3;
+  }
+  
+  @media (max-width: 1024px) {
+    .kb-container {
+      grid-template-columns: 1fr;
+    }
+    
+    .kb-sidebar {
+      position: static;
+      max-height: none;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .kb-hero h1 {
+      font-size: 2em;
+    }
+    
+    .article-item {
+      padding: 20px;
+    }
+    
+    .article-item-header {
+      flex-direction: column;
+      gap: 10px;
+    }
+  }
+</style>
+
+<div class="kb-hero">
+  <h1>📚 {{ t('wiki.kb_title') if t else 'Knowledge Base' }}</h1>
+  <p>{{ t('wiki.kb_subtitle') if t else 'Comprehensive guides for tomato plant care, disease management, and cultivation techniques' }}</p>
+  
+  <form action="{{ url_for('wiki_index') }}" method="get" class="kb-search">
+    <input type="text" name="q" placeholder="{{ t('wiki.search_placeholder') if t else 'Search articles...' }}" value="{{ query }}" />
+    <button type="submit">{{ t('wiki.search_button') if t else 'Search' }}</button>
+  </form>
+</div>
+
+<div class="kb-container">
+  <!-- Sidebar -->
+  <aside class="kb-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">{{ t('wiki.categories') if t else 'Categories' }}</div>
+      <ul class="category-list">
+        <li><a href="{{ url_for('wiki_index') }}" {% if not category %}class="active"{% endif %}>{{ t('wiki.all_articles') if t else 'All Articles' }}</a></li>
+        {% for cat in categories %}
+        <li>
+          <a href="{{ url_for('wiki_index', category=cat) }}" {% if category == cat %}class="active"{% endif %}>
+            {{ cat }}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    
+    <div class="sidebar-section">
+      <div class="sidebar-title">{{ t('wiki.popular_tags') if t else 'Popular Tags' }}</div>
+      <div class="tag-cloud">
+        {% for tag_name, count in tags[:10] %}
+        <a href="{{ url_for('wiki_index', tag=tag_name) }}">
+          {{ tag_name }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+  
+  <!-- Main Content -->
+  <main class="kb-main">
+    {% if query %}
+    <!-- Search Results -->
+    <div class="section-header">
+      <h2>{{ t('wiki.search_results') if t else 'Search Results for' }} "{{ query }}"</h2>
+      {% if articles %}
+      <span class="section-count">{{ articles|length }} {{ t('wiki.articles_count') if t else 'articles' }}</span>
+      {% endif %}
+    </div>
+    
+    {% if articles %}
+    <div class="article-list">
+      {% for article in articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">
+              {{ article.title }}
+              {% if article.featured %}
+              <span class="featured-badge">{{ t('wiki.featured') if t else 'Featured' }}</span>
+              {% endif %}
+            </h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🔍</div>
+      <h3>{{ t('wiki.no_articles') if t else 'No articles found' }}</h3>
+      <p>{{ t('wiki.no_articles_message') if t else 'Try different keywords or browse by category' }}</p>
+    </div>
+    {% endif %}
+    
+    {% elif category %}
+    <!-- Category View -->
+    <div class="section-header">
+      <h2>{{ category }}</h2>
+      <span class="section-count">{{ articles|length }} {{ t('wiki.articles_count') if t else 'articles' }}</span>
+    </div>
+    
+    <div class="article-list">
+      {% for article in articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">
+              {{ article.title }}
+              {% if article.featured %}
+              <span class="featured-badge">Featured</span>
+              {% endif %}
+            </h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    
+    {% elif tag %}
+    <!-- Tag View -->
+    <div class="section-header">
+      <h2>{{ t('wiki.tags') if t else 'Tagged with' }} "{{ tag }}"</h2>
+      <span class="section-count">{{ articles|length }} {{ t('wiki.articles_count') if t else 'articles' }}</span>
+    </div>
+    
+    <div class="article-list">
+      {% for article in articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">
+              {{ article.title }}
+              {% if article.featured %}
+              <span class="featured-badge">{{ t('wiki.featured') if t else 'Featured' }}</span>
+              {% endif %}
+            </h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    
+    {% else %}
+    <!-- Home View -->
+    {% if featured_articles %}
+    <div class="section-header">
+      <h2>{{ t('wiki.featured_articles') if t else 'Featured Articles' }}</h2>
+      <span class="section-count">{{ featured_articles|length }}</span>
+    </div>
+    
+    <div class="article-list">
+      {% for article in featured_articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">
+              {{ article.title }}
+              <span class="featured-badge">{{ t('wiki.featured') if t else 'Featured' }}</span>
+            </h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Popular Articles -->
+    <div class="section-header">
+      <h2>{{ t('wiki.popular_articles') if t else 'Popular Articles' }}</h2>
+      <span class="section-count">{{ popular_articles|length }}</span>
+    </div>
+    
+    <div class="article-list">
+      {% for article in popular_articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">{{ article.title }}</h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    
+    <!-- Recent Articles -->
+    <div class="section-header">
+      <h2>{{ t('wiki.recent_articles') if t else 'Recent Articles' }}</h2>
+      <span class="section-count">{{ recent_articles|length }}</span>
+    </div>
+    
+    <div class="article-list">
+      {% for article in recent_articles %}
+      <a href="{{ url_for('wiki_article', slug=article.slug) }}" class="article-item">
+        <div class="article-item-header">
+          <span class="article-badge">{{ article.category }}</span>
+          <div class="article-item-content">
+            <h3 class="article-title">{{ article.title }}</h3>
+          </div>
+        </div>
+        <p class="article-excerpt">{{ article.content[:200] }}...</p>
+        <div class="article-meta">
+          <span class="meta-item">{{ t('wiki.by') if t else 'By' }} {{ article.author }}</span>
+          <span class="meta-item">{{ article.views }} {{ t('wiki.views') if t else 'views' }}</span>
+          <span class="meta-item">{{ article.created_at[:10] }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </main>
+</div>
+
+{% endblock %}

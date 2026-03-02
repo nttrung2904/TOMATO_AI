@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Cộng đồng - {{ t('site_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 40px auto;">
+  <div class="community-header" style="text-align: center; margin-bottom: 40px;">
+    <h1 style="color: var(--tomato-700); margin-bottom: 10px;">
+      <span style="font-size: 2.5em;">👥</span>
+      Cộng đồng Cà Chua
+    </h1>
+    <p style="color: #666; font-size: 1.1em;">Chia sẻ kinh nghiệm, kết nối với các nhà nông trại</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 30px;">
+    <!-- Main Feed -->
+    <div class="feed-column">
+      <!-- Create Post Box -->
+      {% if session.get('user_id') and not session.get('is_admin') %}
+      <div class="create-post-box" style="background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <div style="display: flex; align-items: flex-start; gap: 15px;">
+          <div class="user-avatar" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5em; font-weight: 600; flex-shrink: 0;">
+            {{ session.get('user_name', 'U')[0]|upper }}
+          </div>
+          <div style="flex: 1;">
+            <textarea id="postContent" placeholder="Bạn đang nghĩ gì về cà chua?" style="width: 100%; min-height: 80px; padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 1em; resize: vertical; font-family: inherit;"></textarea>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+              <div style="color: #999; font-size: 0.9em;">
+                <span id="charCount">0</span>/1000
+              </div>
+              <button onclick="createPost()" style="padding: 12px 30px; background: var(--tomato-600); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 1em; transition: all 0.3s;">
+                📝 Đăng bài
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Posts Feed -->
+      <div class="posts-feed">
+        {% if posts %}
+          {% for post in posts %}
+          <div class="post-card" data-post-id="{{ post.id }}" style="background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 25px;">
+            <!-- Post Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <a href="{{ url_for('user_profile_public', user_id=post.user_id) }}" style="text-decoration: none;">
+                  <div class="user-avatar" style="width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.3em; font-weight: 600;">
+                    {{ post.user_name[0]|upper if post.user_name else '?' }}
+                  </div>
+                </a>
+                <div>
+                  <a href="{{ url_for('user_profile_public', user_id=post.user_id) }}" style="text-decoration: none; color: #333; font-weight: 600; font-size: 1.05em;">
+                    {{ post.user_name }}
+                  </a>
+                  <div style="font-size: 0.85em; color: #999;">
+                    {{ datetime.fromisoformat(post.created_at).strftime('%d/%m/%Y %H:%M') if post.created_at else '' }}
+                  </div>
+                </div>
+              </div>
+              {% if session.get('user_id') == post.user_id or session.get('is_admin') %}
+              <button onclick="deletePost('{{ post.id }}')" style="background: none; border: none; color: #999; cursor: pointer; padding: 5px 10px; font-size: 1.2em;" title="Xóa bài viết">
+                🗑️
+              </button>
+              {% endif %}
+            </div>
+
+            <!-- Post Content -->
+            <div style="margin-bottom: 20px; line-height: 1.6; color: #333; white-space: pre-wrap;">{{ post.content }}</div>
+
+            <!-- Post Actions -->
+            <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+              <button onclick="toggleLike('{{ post.id }}')" class="like-btn" data-post-id="{{ post.id }}" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 15px; border-radius: 8px; transition: all 0.3s; {% if post.get('liked_by_user') %}color: var(--tomato-600);{% else %}color: #666;{% endif %}" {% if not session.get('user_id') or session.get('is_admin') %}disabled{% endif %}>
+                <span style="font-size: 1.3em;">{% if post.get('liked_by_user') %}❤️{% else %}🤍{% endif %}</span>
+                <span class="likes-count" style="font-weight: 600;">{{ post.likes }}</span>
+              </button>
+              
+              <a href="{{ url_for('post_detail', post_id=post.id) }}" style="text-decoration: none; color: #666; display: flex; align-items: center; gap: 8px; padding: 8px 15px; border-radius: 8px; transition: all 0.3s;">
+                <span style="font-size: 1.3em;">💬</span>
+                <span style="font-weight: 600;">{{ post.comments }}</span>
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <div style="font-size: 4em; margin-bottom: 15px;">📭</div>
+            <div style="font-size: 1.2em; color: #666; margin-bottom: 10px;">Chưa có bài viết nào</div>
+            <div style="font-size: 0.9em; color: #999;">Hãy là người đầu tiên chia sẻ!</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-column">
+      <!-- User Info -->
+      {% if session.get('user_id') and not session.get('is_admin') %}
+      <div class="user-card" style="background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 25px; text-align: center;">
+        <div class="user-avatar" style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 2.5em; font-weight: 600; margin: 0 auto 15px;">
+          {{ session.get('user_name', 'U')[0]|upper }}
+        </div>
+        <div style="font-weight: 600; font-size: 1.1em; margin-bottom: 5px;">{{ session.get('user_name', 'User') }}</div>
+        <div style="font-size: 0.9em; color: #999; margin-bottom: 15px;">{{ session.get('user_email', '') }}</div>
+        <div style="display: flex; justify-content: center; gap: 15px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+          <div style="text-align: center;">
+            <div style="font-weight: 700; font-size: 1.3em; color: var(--tomato-600);">{{ session.get('user_points', 0) }}</div>
+            <div style="font-size: 0.85em; color: #999;">Điểm</div>
+          </div>
+        </div>
+        <a href="{{ url_for('profile') }}" style="display: block; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 10px; text-decoration: none; color: #666; font-weight: 600; transition: all 0.3s;">
+          Xem hồ sơ
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- Trending Posts -->
+      {% if trending %}
+      <div class="trending-card" style="background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        <h3 style="color: var(--tomato-700); margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3em;">🔥</span>
+          Bài viết nổi bật
+        </h3>
+        {% for post in trending %}
+        <a href="{{ url_for('post_detail', post_id=post.id) }}" style="display: block; padding: 15px; background: #f8f9fa; border-radius: 12px; margin-bottom: 12px; text-decoration: none; color: #333; transition: all 0.3s;">
+          <div style="font-weight: 600; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            {{ post.content[:80] }}{% if post.content|length > 80 %}...{% endif %}
+          </div>
+          <div style="display: flex; gap: 15px; font-size: 0.85em; color: #999;">
+            <span>❤️ {{ post.likes }}</span>
+            <span>💬 {{ post.comments }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .like-btn:hover:not(:disabled) {
+    background: #f8f9fa;
+  }
+  
+  .post-card:hover {
+    box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+  }
+  
+  [data-theme="dark"] .post-card,
+  [data-theme="dark"] .create-post-box,
+  [data-theme="dark"] .user-card,
+  [data-theme="dark"] .trending-card {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] #postContent {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: #444;
+  }
+  
+  #postContent:focus {
+    outline: none;
+    border-color: var(--tomato-600);
+  }
+</style>
+
+<script>
+// Character counter
+document.getElementById('postContent')?.addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.value.length;
+});
+
+// Create post
+function createPost() {
+  const content = document.getElementById('postContent').value.trim();
+  
+  if (!content) {
+    alert('Vui lòng nhập nội dung bài viết');
+    return;
+  }
+  
+  if (content.length > 1000) {
+    alert('Nội dung quá dài (tối đa 1000 ký tự)');
+    return;
+  }
+  
+  fetch('/api/community/post', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ content: content })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✓ Đăng bài thành công!');
+      location.reload();
+    } else {
+      alert('⚠️ ' + data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Create post error:', err);
+    alert('Lỗi khi đăng bài');
+  });
+}
+
+// Toggle like
+function toggleLike(postId) {
+  fetch(`/api/community/post/${postId}/like`, {
+    method: 'POST'
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      const btn = document.querySelector(`.like-btn[data-post-id="${postId}"]`);
+      const heart = btn.querySelector('span:first-child');
+      const count = btn.querySelector('.likes-count');
+      
+      if (data.liked) {
+        heart.textContent = '❤️';
+        btn.style.color = 'var(--tomato-600)';
+      } else {
+        heart.textContent = '🤍';
+        btn.style.color = '#666';
+      }
+      
+      count.textContent = data.likes_count;
+    } else {
+      alert('⚠️ ' + data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Toggle like error:', err);
+    alert('Lỗi khi like bài viết');
+  });
+}
+
+// Delete post
+function deletePost(postId) {
+  if (!confirm('Bạn có chắc muốn xóa bài viết này?')) return;
+  
+  fetch(`/api/community/post/${postId}/delete`, {
+    method: 'POST'
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✓ Đã xóa bài viết');
+      location.reload();
+    } else {
+      alert('⚠️ ' + data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Delete post error:', err);
+    alert('Lỗi khi xóa bài viết');
+  });
+}
+</script>
+{% endblock %}

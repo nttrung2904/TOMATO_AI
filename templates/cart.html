@@ -250,6 +250,100 @@
     gap: 8px;
   }
   
+  .coupon-input-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .coupon-input {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    text-transform: uppercase;
+  }
+  
+  [data-theme="dark"] .coupon-input {
+    background: var(--bg-tertiary);
+    color: #ddd;
+    border-color: var(--bg-tertiary);
+  }
+  
+  .coupon-btn {
+    padding: 10px 20px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s;
+    white-space: nowrap;
+  }
+  
+  .coupon-btn:hover {
+    background: var(--tomato-600);
+  }
+  
+  .coupon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .coupon-applied {
+    background: #e8f5e9;
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 0;
+    border: 1px solid #4caf50;
+  }
+  
+  [data-theme="dark"] .coupon-applied {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.3);
+  }
+  
+  .coupon-info {
+    color: #2e7d32;
+    font-weight: 600;
+  }
+  
+  [data-theme="dark"] .coupon-info {
+    color: #81c784;
+  }
+  
+  .coupon-remove {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 0 5px;
+  }
+  
+  [data-theme="dark"] .coupon-remove {
+    color: #999;
+  }
+  
+  .discount-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    color: #4caf50;
+    font-weight: 600;
+  }
+  
+  [data-theme="dark"] .discount-row {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
   [data-theme="dark"] .form-section-title {
     color: #ccc;
   }
@@ -557,8 +651,10 @@
 let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
 const user = {{ user | tojson | safe }};
 const addresses = {{ addresses | tojson | safe }};
+const defaultImage = '{{ url_for('static', filename='images/tomato.jpg') }}';
 let selectedAddress = null;
 let selectedPayment = 'cod';
+let appliedCoupon = null;
 
 // Select default address
 if (addresses && addresses.length > 0) {
@@ -574,7 +670,17 @@ function updateQuantity(itemId, change) {
   if (!item) return;
   
   const newQty = item.quantity + change;
-  if (newQty < 1 || newQty > item.maxStock) return;
+  
+  // Check if reached limits
+  if (newQty < 1) {
+    showToast('Số lượng tối thiểu là 1', 'warning');
+    return;
+  }
+  
+  if (newQty > item.maxStock) {
+    showToast('Đã đạt số lượng tối đa trong kho!', 'warning');
+    return;
+  }
   
   item.quantity = newQty;
   saveCart();
@@ -618,12 +724,24 @@ function renderCart() {
   }
   
   const total = calculateTotal();
-  const shipping = total > 500000 ? 0 : 30000;
-  const finalTotal = total + shipping;
+  let shipping = total > 500000 ? 0 : 30000;
+  
+  // Calculate discount
+  let discount = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discount_type === 'shipping') {
+      discount = shipping; // Free shipping
+      shipping = 0;
+    } else {
+      discount = appliedCoupon.discount_amount;
+    }
+  }
+  
+  const finalTotal = total + shipping - discount;
   
   const cartItemsHtml = cart.map(item => `
     <div class="cart-item">
-      <img src="{{ url_for('static', filename='images/tomato.jpg') }}" 
+      <img src="${item.image || defaultImage}" 
            alt="${item.name}" 
            class="item-image">
       <div class="item-details">
@@ -715,6 +833,50 @@ function renderCart() {
     `;
   }
   
+  // Render coupon section
+  let couponSection = '';
+  let discountRow = '';
+  
+  if (appliedCoupon) {
+    couponSection = `
+      <div class="coupon-applied">
+        <div class="coupon-info">
+          🎟️ ${appliedCoupon.code}
+          <div style="font-size: 0.85em; font-weight: normal; color: #666;">
+            ${appliedCoupon.description}
+          </div>
+        </div>
+        <button type="button" class="coupon-remove" onclick="removeCoupon()" title="Xóa mã">✕</button>
+      </div>
+    `;
+    
+    // Calculate final discount
+    let discountAmount = 0;
+    if (appliedCoupon.discount_type === 'shipping') {
+      discountAmount = shipping; // Free shipping
+    } else {
+      discountAmount = appliedCoupon.discount_amount;
+    }
+    
+    discountRow = `
+      <div class="discount-row">
+        <span>🎉 Giảm giá</span>
+        <span>-${formatPrice(discountAmount)}</span>
+      </div>
+    `;
+  } else {
+    couponSection = `
+      <div class="coupon-input-group">
+        <input type="text" 
+               id="coupon-input" 
+               class="coupon-input" 
+               placeholder="Nhập mã giảm giá"
+               maxlength="20">
+        <button type="button" class="coupon-btn" onclick="applyCoupon()">Áp dụng</button>
+      </div>
+    `;
+  }
+  
   container.innerHTML = `
     <div class="cart-content">
       <div class="cart-items">
@@ -729,6 +891,10 @@ function renderCart() {
           <span>Tạm tính</span>
           <span>${formatPrice(total)}</span>
         </div>
+        
+        ${couponSection}
+        
+        ${discountRow}
         
         <div class="summary-row">
           <span>Phí vận chuyển</span>
@@ -763,21 +929,21 @@ function renderCart() {
                 </div>
               </label>
               
-              <label class="payment-option" onclick="selectPayment('bank')">
-                <input type="radio" name="payment" value="bank">
-                <div class="payment-icon">🏦</div>
+              <label class="payment-option" onclick="selectPayment('vnpay')">
+                <input type="radio" name="payment" value="vnpay">
+                <div class="payment-icon">💳</div>
                 <div class="payment-info">
-                  <div class="payment-name">Chuyển khoản ngân hàng</div>
-                  <div class="payment-desc">Chuyển trước khi giao hàng</div>
+                  <div class="payment-name">VNPay</div>
+                  <div class="payment-desc">Thẻ ATM/Visa/Mastercard/QR Code</div>
                 </div>
               </label>
               
-              <label class="payment-option" onclick="selectPayment('card')">
-                <input type="radio" name="payment" value="card">
-                <div class="payment-icon">💳</div>
+              <label class="payment-option" onclick="selectPayment('momo')">
+                <input type="radio" name="payment" value="momo">
+                <div class="payment-icon">🎀</div>
                 <div class="payment-info">
-                  <div class="payment-name">Thẻ tín dụng/ghi nợ</div>
-                  <div class="payment-desc">Visa, Mastercard, JCB</div>
+                  <div class="payment-name">Ví MoMo</div>
+                  <div class="payment-desc">Thanh toán qua ví điện tử MoMo</div>
                 </div>
               </label>
             </div>
@@ -819,12 +985,80 @@ function selectPayment(method) {
   event.currentTarget.classList.add('selected');
 }
 
+// ========== Coupon Functions ==========
+
+async function applyCoupon() {
+  const input = document.getElementById('coupon-input');
+  const code = input.value.trim().toUpperCase();
+  
+  if (!code) {
+    showToast('Vui lòng nhập mã giảm giá', 'warning');
+    return;
+  }
+  
+  const total = calculateTotal();
+  
+  try {
+    const response = await fetch('/api/coupon/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        code: code,
+        order_total: total
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      appliedCoupon = result.coupon;
+      showToast(`Đã áp dụng mã giảm giá "${code}"!`, 'success');
+      renderCart();
+    } else {
+      showToast(result.error || 'Mã giảm giá không hợp lệ', 'error');
+    }
+  } catch (error) {
+    console.error('Error applying coupon:', error);
+    showToast('Có lỗi xảy ra khi áp dụng mã', 'error');
+  }
+}
+
+function removeCoupon() {
+  appliedCoupon = null;
+  showToast('Đã xóa mã giảm giá', 'info');
+  renderCart();
+}
+
+function calculateDiscount(total, shipping) {
+  if (!appliedCoupon) return 0;
+  
+  if (appliedCoupon.discount_type === 'shipping') {
+    return shipping; // Free shipping discount
+  } else {
+    return appliedCoupon.discount_amount;
+  }
+}
+
+// ========== Checkout Function ==========
+
 async function checkout(event) {
   event.preventDefault();
   
   const total = calculateTotal();
-  const shipping = total > 500000 ? 0 : 30000;
-  const finalTotal = total + shipping;
+  let shipping = total > 500000 ? 0 : 30000;
+  
+  // Calculate discount
+  let discount = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discount_type === 'shipping') {
+      discount = shipping; // Free shipping
+      shipping = 0;
+    } else {
+      discount = appliedCoupon.discount_amount;
+    }
+  }
+  
+  const finalTotal = total + shipping - discount;
   
   let customerName, customerPhone, customerAddress;
   
@@ -863,6 +1097,8 @@ async function checkout(event) {
     items: cart,
     subtotal: total,
     shipping: shipping,
+    discount: discount,
+    coupon_code: appliedCoupon ? appliedCoupon.code : '',
     total: finalTotal,
     payment_method: selectedPayment
   };
@@ -877,30 +1113,53 @@ async function checkout(event) {
     const result = await response.json();
     
     if (result.ok) {
-      let message = 'Đặt hàng thành công!';
+      const orderId = result.order_id;
       
-      if (selectedPayment === 'bank') {
-        message += '\n\nThông tin chuyển khoản:\nNgân hàng: Vietcombank\nSTK: 1234567890\nChủ TK: Tomato AI\nNội dung: ' + result.order_id;
-      } else if (selectedPayment === 'card') {
-        message += '\n\nBạn sẽ được chuyển đến trang thanh toán...';
-      }
-      
-      alert(message);
-      
-      // Clear cart
-      cart = [];
-      saveCart();
-      
-      // Redirect after 1 second
-      setTimeout(() => {
-        if (user) {
-          window.location.href = '{{ url_for("profile") }}';
+      // Handle online payment (VNPay, MoMo)
+      if (selectedPayment === 'vnpay' || selectedPayment === 'momo') {
+        // Create payment transaction
+        const paymentResponse = await fetch('/api/payment/create', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            payment_method: selectedPayment,
+            order_id: orderId,
+            amount: finalTotal,
+            order_info: `Thanh toán đơn hàng #${orderId} - Tomato AI`
+          })
+        });
+        
+        const paymentResult = await paymentResponse.json();
+        
+        if (paymentResult.ok && paymentResult.payment_url) {
+          // Redirect to payment gateway
+          alert(`Đơn hàng #${orderId} đã được tạo. Bạn sẽ được chuyển đến trang thanh toán ${selectedPayment === 'vnpay' ? 'VNPay' : 'MoMo'}...`);
+          
+          // Don't clear cart yet - will clear after successful payment
+          window.location.href = paymentResult.payment_url;
         } else {
-          window.location.href = '{{ url_for("shop") }}';
+          alert('Không thể tạo giao dịch thanh toán. Vui lòng chọn phương thức khác hoặc thử lại!');
         }
-      }, 1000);
+      } 
+      // Handle COD
+      else if (selectedPayment === 'cod') {
+        alert('Đặt hàng thành công! Đơn hàng #' + orderId + ' đã được tạo.\n\nBạn sẽ thanh toán khi nhận hàng.');
+        
+        // Clear cart for COD orders
+        cart = [];
+        saveCart();
+        
+        // Redirect after 1 second
+        setTimeout(() => {
+          if (user) {
+            window.location.href = '{{ url_for("profile") }}';
+          } else {
+            window.location.href = '{{ url_for("shop") }}';
+          }
+        }, 1000);
+      }
     } else {
-      alert('Có lỗi xảy ra. Vui lòng thử lại!');
+      alert('Có lỗi xảy ra: ' + (result.error || 'Vui lòng thử lại!'));
     }
   } catch (error) {
     console.error('Checkout error:', error);
@@ -910,8 +1169,21 @@ async function checkout(event) {
 
 function showToast(message, type = 'info') {
   if (window.toast) {
-    window.toast.show(message, type);
+    switch(type) {
+      case 'success':
+        window.toast.success(message);
+        break;
+      case 'error':
+        window.toast.error(message);
+        break;
+      case 'warning':
+        window.toast.warning(message);
+        break;
+      default:
+        window.toast.info(message);
+    }
   } else {
+    console.log('Toast:', message, type);
     alert(message);
   }
 }

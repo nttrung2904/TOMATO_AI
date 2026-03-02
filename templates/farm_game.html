@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌱 Nông Trại Cà Chua - Advanced RPG | Tomato AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      overflow: hidden;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #000;
+    }
+    
+    .game-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    
+    .game-header {
+      background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+      padding: 8px 20px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.7);
+      z-index: 1000;
+      position: relative;
+    }
+    
+    .game-title {
+      font-size: 1.2em;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .header-stats {
+      display: flex;
+      gap: 10px;
+      font-size: 0.9em;
+    }
+    
+    .stat-item {
+      background: rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: bold;
+      backdrop-filter: blur(5px);
+    }
+    
+    .time-weather {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-size: 0.95em;
+    }
+    
+    .back-btn {
+      background: rgba(231,76,60,0.8);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    
+    .back-btn:hover {
+      background: rgba(231,76,60,1);
+      transform: scale(1.05);
+    }
+    
+    .canvas-wrapper {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    #gameCanvas {
+      display: block;
+      background: #2d5016;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    }
+    
+    /* Mini-map */
+    .mini-map {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 200px;
+      height: 160px;
+      background: rgba(0,0,0,0.8);
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    #miniMapCanvas {
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+    
+    /* Energy/Stamina bar */
+    .player-status {
+      position: absolute;
+      bottom: 80px;
+      left: 20px;
+      background: rgba(0,0,0,0.85);
+      padding: 15px;
+      border-radius: 10px;
+      min-width: 250px;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    
+    .status-bar {
+      margin: 8px 0;
+    }
+    
+    .status-label {
+      font-size: 0.85em;
+      color: #fff;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .bar {
+      width: 100%;
+      height: 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .bar-fill {
+      height: 100%;
+      transition: width 0.3s, background 0.3s;
+      border-radius: 6px;
+    }
+    
+    .bar-fill.energy {
+      background: linear-gradient(90deg, #f39c12, #f1c40f);
+    }
+    
+    .bar-fill.health {
+      background: linear-gradient(90deg, #e74c3c, #c0392b);
+    }
+    
+    /* Quest panel */
+    .quest-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.85);
+      padding: 12px;
+      border-radius: 10px;
+      max-width: 280px;
+      border: 2px solid rgba(52,152,219,0.5);
+      color: white;
+    }
+    
+    .quest-panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 1em;
+      color: #3498db;
+    }
+    
+    .quest-item {
+      background: rgba(255,255,255,0.1);
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 5px;
+      font-size: 0.85em;
+      border-left: 3px solid #3498db;
+    }
+    
+    .quest-item.completed {
+      opacity: 0.6;
+      border-left-color: #2ecc71;
+    }
+    
+    .quest-progress {
+      color: #f39c12;
+      font-weight: bold;
+    }
+    
+    /* Inventory panel */
+    .inventory-panel {
+      position: absolute;
+      bottom: 80px;
+      right: 20px;
+      background: rgba(0,0,0,0.85);
+      padding: 12px;
+      border-radius: 10px;
+      min-width: 220px;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    
+    .inventory-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 1em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+    
+    .inventory-slot {
+      background: rgba(255,255,255,0.1);
+      padding: 8px;
+      border-radius: 5px;
+      text-align: center;
+      font-size: 1.2em;
+      position: relative;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    
+    .inventory-slot:hover {
+      background: rgba(255,255,255,0.2);
+      transform: scale(1.05);
+    }
+    
+    .inventory-slot .count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 0.6em;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 4px;
+      border-radius: 3px;
+      color: #fff;
+    }
+    
+    /* Tool bar */
+    .tool-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      padding: 10px 15px;
+      border-radius: 10px;
+      display: flex;
+      gap: 10px;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    
+    .tool-slot {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8em;
+      cursor: pointer;
+      transition: 0.2s;
+      position: relative;
+    }
+    
+    .tool-slot:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-3px);
+    }
+    
+    .tool-slot.active {
+      background: rgba(52,152,219,0.5);
+      border: 2px solid #3498db;
+      box-shadow: 0 0 15px rgba(52,152,219,0.5);
+    }
+    
+    .tool-slot .hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 0.4em;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 4px;
+      border-radius: 3px;
+      color: #fff;
+    }
+    
+    /* Message overlay */
+    .message-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 20px 40px;
+      border-radius: 15px;
+      font-size: 1.2em;
+      text-align: center;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.8);
+      border: 3px solid #3498db;
+      display: none;
+      z-index: 2000;
+      animation: fadeIn 0.3s;
+    }
+    
+    .message-overlay.show {
+      display: block;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -60%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+    
+    /* Dialog box */
+    .dialog-box {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.95);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 15px;
+      max-width: 600px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.8);
+      border: 3px solid #56ab2f;
+      display: none;
+    }
+    
+    .dialog-box.show {
+      display: block;
+      animation: slideUp 0.3s;
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(50px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    
+    .dialog-box .speaker {
+      font-weight: bold;
+      color: #a8e063;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    
+    .dialog-box .text {
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+    
+    .dialog-box .choices {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .dialog-choice {
+      flex: 1;
+      padding: 10px;
+      background: rgba(52,152,219,0.3);
+      border: 2px solid #3498db;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: 0.2s;
+    }
+    
+    .dialog-choice:hover {
+      background: rgba(52,152,219,0.5);
+      transform: translateY(-2px);
+    }
+    
+    /* Weather effects */
+    .weather-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+    
+    .raindrop {
+      position: absolute;
+      width: 2px;
+      height: 15px;
+      background: linear-gradient(transparent, rgba(255,255,255,0.6));
+      animation: rain linear infinite;
+    }
+    
+    @keyframes rain {
+      0% { transform: translateY(-100px) translateX(0); }
+      100% { transform: translateY(100vh) translateX(20px); }
+    }
+    
+    /* Achievement notification */
+    .achievement {
+      position: absolute;
+      top: 80px;
+      right: -400px;
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      animation: slideInAchievement 0.5s forwards, slideOutAchievement 0.5s 3s forwards;
+      z-index: 3000;
+      min-width: 300px;
+      border: 2px solid #fff;
+    }
+    
+    @keyframes slideInAchievement {
+      to { right: 20px; }
+    }
+    
+    @keyframes slideOutAchievement {
+      to { right: -400px; }
+    }
+    
+    .achievement-title {
+      font-weight: bold;
+      font-size: 1.1em;
+      margin-bottom: 5px;
+    }
+    
+    .achievement-desc {
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+    
+    /* Loading screen */
+    .loading-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      z-index: 9999;
+    }
+    
+    .loading-screen.hidden {
+      display: none;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
+    
+    /* Scrollbar style */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.3);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <!-- Loading screen -->
+    <div class="loading-screen" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Đang tải nông trại...</div>
+      <div class="loading-text" id="loadingProgress" style="font-size: 0.9em; margin-top: 10px; opacity: 0.8;">0%</div>
+    </div>
+    
+    <!-- Header -->
+    <div class="game-header">
+      <div class="game-title">🌱 Tomato Farm RPG</div>
+      <div class="time-weather">
+        <span id="time-display">08:00</span>
+        <span id="day-display">Ngày 1</span>
+        <span id="season-display">🌸 Xuân</span>
+        <span id="weather-display">☀️ Nắng</span>
+      </div>
+      <div class="header-stats">
+        <div class="stat-item">💰 <span id="coins">{{ progress.coins }}</span></div>
+        <div class="stat-item">🍅 <span id="harvested">{{ progress.total_harvested }}</span></div>
+        <div class="stat-item">⭐ Lv.<span id="level">{{ progress.level }}</span></div>
+      </div>
+      <button class="back-btn" onclick="window.location.href='/game'">↩ Menu</button>
+    </div>
+    
+    <!-- Canvas -->
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas"></canvas>
+      
+      <!-- Weather overlay -->
+      <div class="weather-overlay" id="weather-overlay"></div>
+      
+      <!-- Mini-map -->
+      <div class="mini-map">
+        <canvas id="miniMapCanvas" width="200" height="160"></canvas>
+      </div>
+      
+      <!-- Quest panel -->
+      <div class="quest-panel">
+        <h3>📜 Nhiệm vụ</h3>
+        <div id="quest-list"></div>
+      </div>
+      
+      <!-- Player status -->
+      <div class="player-status">
+        <div class="status-bar">
+          <div class="status-label">
+            <span>⚡ Năng lượng</span>
+            <span id="energy-value">100/100</span>
+          </div>
+          <div class="bar">
+            <div class="bar-fill energy" id="energy-bar" style="width: 100%"></div>
+          </div>
+        </div>
+        <div class="status-bar">
+          <div class="status-label">
+            <span>❤️ Sức khỏe</span>
+            <span id="health-value">100/100</span>
+          </div>
+          <div class="bar">
+            <div class="bar-fill health" id="health-bar" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Inventory -->
+      <div class="inventory-panel">
+        <h3>🎒 Kho đồ</h3>
+        <div class="inventory-grid" id="inventory-grid"></div>
+      </div>
+      
+      <!-- Tool bar -->
+      <div class="tool-bar" id="tool-bar"></div>
+      
+      <!-- Dialog box -->
+      <div class="dialog-box" id="dialog-box">
+        <div class="speaker"></div>
+        <div class="text"></div>
+        <div class="choices" id="dialog-choices"></div>
+      </div>
+      
+      <!-- Message overlay -->
+      <div class="message-overlay" id="message-overlay"></div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== ERROR HANDLING ====================
+    window.addEventListener('error', function(e) {
+      console.error('Game Error:', e.error);
+      document.getElementById('loading').classList.add('hidden');
+      alert('Lỗi: ' + e.error.message + '\n\nVui lòng F5 để tải lại!');
+    });
+    
+    // Force hide loading after 3 seconds max
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('hidden');
+    }, 3000);
+    
+    // ==================== GAME DATA ====================
+    let gameData = {{ progress | tojson | safe }};
+    const diseases = {{ diseases | tojson | safe }};
+    const items = {{ items | tojson | safe }};
+    
+    console.log('Game Data Loaded:', gameData);
+    console.log('Diseases:', diseases);
+    console.log('Items:', items);
+    
+    // ==================== GAME STATE ====================
+    const gameState = {
+      time: 8 * 60, // minutes from midnight (8:00 AM)
+      day: 1,
+      season: 0, // 0=Spring, 1=Summer, 2=Fall, 3=Winter
+      weather: 'sunny', // sunny, rainy, cloudy
+      energy: 100,
+      maxEnergy: 100,
+      health: 100,
+      maxHealth: 100,
+      selectedTool: 0,
+      quests: [],
+      achievements: [],
+      particles: [],
+      weatherTimer: 0,
+      paused: false
+    };
+    
+    // ==================== CANVAS SETUP ====================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const miniMapCanvas = document.getElementById('miniMapCanvas');
+    const miniCtx = miniMapCanvas.getContext('2d');
+    
+    const TILE_SIZE = 32;
+    const CANVAS_WIDTH = Math.min(window.innerWidth - 40, 1400);
+    const CANVAS_HEIGHT = window.innerHeight - 60;
+    const WORLD_WIDTH = 60;
+    const WORLD_HEIGHT = 50;
+    
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    
+    // ==================== TILE TYPES ====================
+    const TILES = {
+      GRASS: 0,
+      DIRT: 1,
+      WATER: 2,
+      STONE: 3,
+      FARMLAND: 4,
+      SHOP: 5,
+      HOUSE: 6,
+      TREE: 7,
+      FENCE: 8,
+      ROAD: 9,
+      FLOWERS: 10,
+      SAND: 11
+    };
+    
+    const TILE_COLORS = {
+      [TILES.GRASS]: '#5a9216',
+      [TILES.DIRT]: '#8b6f47',
+      [TILES.WATER]: '#4a90e2',
+      [TILES.STONE]: '#7f8c8d',
+      [TILES.FARMLAND]: '#654321',
+      [TILES.SHOP]: '#e74c3c',
+      [TILES.HOUSE]: '#f39c12',
+      [TILES.TREE]: '#27ae60',
+      [TILES.FENCE]: '#95a5a6',
+      [TILES.ROAD]: '#bdc3c7',
+      [TILES.FLOWERS]: '#e91e63',
+      [TILES.SAND]: '#f4d03f'
+    };
+    
+    // ==================== TOOLS ====================
+    const TOOLS = [
+      { id: 'hand', icon: '✋', name: 'Tay không', energy: 0 },
+      { id: 'hoe', icon: '⛏️', name: 'Cuốc', energy: 2 },
+      { id: 'water', icon: '💧', name: 'Bình tưới', energy: 1 },
+      { id: 'seeds', icon: '🌰', name: 'Hạt giống', energy: 3 },
+      { id: 'fertilizer', icon: '🌾', name: 'Phân bón', energy: 1 },
+      { id: 'medicine', icon: '💊', name: 'Thuốc', energy: 1 }
+    ];
+    
+    // ==================== WORLD GENERATION ====================
+    function generateWorld() {
+      const world = [];
+      for (let y = 0; y < WORLD_HEIGHT; y++) {
+        world[y] = [];
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+          let tile = TILES.GRASS;
+          
+          // Farm area with roads
+          if (x >= 12 && x <= 35 && y >= 18 && y <= 38) {
+            if (x === 23 || y === 28) {
+              tile = TILES.ROAD;
+            } else {
+              tile = TILES.FARMLAND;
+            }
+          }
+          
+          // Fence
+          if ((x === 11 || x === 36) && y >= 17 && y <= 39) tile = TILES.FENCE;
+          if ((y === 17 || y === 39) && x >= 11 && x <= 36) tile = TILES.FENCE;
+          
+          // Water/river
+          if (y < 6 || (x < 8 && y < 15)) tile = TILES.WATER;
+          
+          // Beach
+          if (y === 6) tile = TILES.SAND;
+          
+          // Shop area
+          if (x >= 42 && x <= 47 && y >= 20 && y <= 25) {
+            tile = TILES.SHOP;
+          }
+          
+          // House
+          if (x >= 14 && x <= 19 && y >= 10 && y <= 14) {
+            tile = TILES.HOUSE;
+          }
+          
+          // Flower garden
+          if (x >= 22 && x <= 28 && y >= 12 && y <= 14) {
+            tile = TILES.FLOWERS;
+          }
+          
+          // Random trees
+          if (Math.random() < 0.08 && tile === TILES.GRASS) {
+            if (!(x >= 10 && x <= 50 && y >= 15 && y <= 40)) {
+              tile = TILES.TREE;
+            }
+          }
+          
+          // Roads
+          if ((x === 10 && y >= 15) || (y === 15 && x <= 20)) {
+            tile = TILES.ROAD;
+          }
+          
+          world[y][x] = tile;
+        }
+      }
+      return world;
+    }
+    
+    const world = generateWorld();
+    
+    // ==================== PLAYER ====================
+    const player = {
+      x: 16,
+      y: 13,
+      speed: 0.12,
+      size: TILE_SIZE * 0.7,
+      direction: 'down',
+      moving: false,
+      animFrame: 0,
+      animTimer: 0
+    };
+    
+    // Camera
+    const camera = { x: 0, y: 0 };
+    
+    // ==================== NPCs ====================
+    const npcs = [
+      {
+        x: 44.5, y: 22.5,
+        name: 'Bà Chủ Shop',
+        color: '#e74c3c',
+        type: 'shop',
+        dialog: [
+          'Chào em! Cần mua gì không?',
+          'Hạt giống tốt nhất ở đây đó!',
+          'Phân bón giúp cây lớn nhanh 200%!',
+          'Thuốc chữa bệnh rất quan trọng đấy!'
+        ],
+        dialogIndex: 0,
+        quests: [
+          { id: 'quest_harvest_5', title: 'Thu hoạch 5 cà chua', reward: 100, target: 5, progress: 0 }
+        ]
+      },
+      {
+        x: 20, y: 25,
+        name: 'Ông Nông Dân',
+        color: '#27ae60',
+        type: 'farmer',
+        dialog: [
+          'Chào cháu! Làm ruộng vất vả lắm!',
+          'Cháu nhớ tưới nước đều đặn nhé!',
+          'Mùa xuân này cà chua sẽ tốt lắm!',
+          'Ông trồng cà chua 40 năm rồi đấy!'
+        ],
+        dialogIndex: 0,
+        moving: true,
+        path: [[20,25],[25,25],[25,30],[20,30]],
+        pathIndex: 0,
+        moveTimer: 0
+      },
+      {
+        x: 17, y: 12,
+        name: 'Bà Nội',
+        color: '#9b59b6',
+        type: 'family',
+        dialog: [
+          'Con yêu! Ăn cơm chưa?',
+          'Làm việc đừng quên nghỉ ngơi nhé!',
+          'Bà nấu phở cho con đây!',
+          'Sức khỏe là vốn quý nhất con ạ!'
+        ],
+        dialogIndex: 0,
+        quests: [
+          { id: 'quest_energy', title: 'Về nhà nghỉ ngơi', reward: 50, action: 'rest' }
+        ]
+      }
+    ];
+    
+    // ==================== PLANTS ====================
+    const worldPlants = [];
+    
+    // ==================== PARTICLES ====================
+    class Particle {
+      constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'water', 'sparkle', 'leaf', 'coin'
+        this.life = 1;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = -Math.random() * 3 - 1;
+        this.size = Math.random() * 6 + 4;
+      }
+      
+      update() {
+        this.vy += 0.1; // gravity
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.02;
+        return this.life > 0;
+      }
+      
+      draw(ctx, camera) {
+        const screenX = this.x * TILE_SIZE - camera.x;
+        const screenY = this.y * TILE_SIZE - camera.y;
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.font = `${this.size}px Arial`;
+        ctx.textAlign = 'center';
+        
+        const icons = {
+          water: '💧',
+          sparkle: '✨',
+          leaf: '🍃',
+          coin: '💰',
+          heart: '❤️'
+        };
+        
+        ctx.fillText(icons[this.type] || '✨', screenX, screenY);
+        ctx.restore();
+      }
+    }
+    
+    // ==================== KEYBOARD ====================
+    const keys = {};
+    
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      
+      // Tool selection (1-6)
+      if (e.key >= '1' && e.key <= '6') {
+        gameState.selectedTool = parseInt(e.key) - 1;
+        updateToolBar();
+      }
+      
+      // Interaction
+      if (e.key === 'e' || e.key === 'E' || e.key === ' ') {
+        handleInteraction();
+      }
+      
+      // Rest at home
+      if (e.key === 'r' || e.key === 'R') {
+        restAtHome();
+      }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+    
+    // ==================== GAME LOGIC ====================
+    
+    function isSolid(x, y) {
+      const tx = Math.floor(x);
+      const ty = Math.floor(y);
+      if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) return true;
+      const tile = world[ty][tx];
+      return tile === TILES.WATER || tile === TILES.STONE || 
+             tile === TILES.SHOP || tile === TILES.FENCE;
+    }
+    
+    function updatePlayer() {
+      let dx = 0, dy = 0;
+      player.moving = false;
+      
+      if (keys['w'] || keys['arrowup']) {
+        dy = -player.speed;
+        player.direction = 'up';
+        player.moving = true;
+      }
+      if (keys['s'] || keys['arrowdown']) {
+        dy = player.speed;
+        player.direction = 'down';
+        player.moving = true;
+      }
+      if (keys['a'] || keys['arrowleft']) {
+        dx = -player.speed;
+        player.direction = 'left';
+        player.moving = true;
+      }
+      if (keys['d'] || keys['arrowright']) {
+        dx = player.speed;
+        player.direction = 'right';
+        player.moving = true;
+      }
+      
+      // Animation
+      if (player.moving) {
+        player.animTimer++;
+        if (player.animTimer > 10) {
+          player.animFrame = (player.animFrame + 1) % 4;
+          player.animTimer = 0;
+        }
+        
+        // Energy drain (very slow when walking)
+        if (Math.random() < 0.005) {
+          gameState.energy = Math.max(0, gameState.energy - 0.1);
+        }
+      }
+      
+      const newX = player.x + dx;
+      const newY = player.y + dy;
+      
+      if (!isSolid(newX, player.y)) player.x = newX;
+      if (!isSolid(player.x, newY)) player.y = newY;
+      
+      // Camera follow
+      camera.x = player.x * TILE_SIZE - CANVAS_WIDTH / 2;
+      camera.y = player.y * TILE_SIZE - CANVAS_HEIGHT / 2;
+      camera.x = Math.max(0, Math.min(camera.x, WORLD_WIDTH * TILE_SIZE - CANVAS_WIDTH));
+      camera.y = Math.max(0, Math.min(camera.y, WORLD_HEIGHT * TILE_SIZE - CANVAS_HEIGHT));
+    }
+    
+    function updateNPCs() {
+      for (const npc of npcs) {
+        if (npc.moving && npc.path) {
+          npc.moveTimer++;
+          if (npc.moveTimer > 120) {
+            npc.pathIndex = (npc.pathIndex + 1) % npc.path.length;
+            const target = npc.path[npc.pathIndex];
+            npc.x = target[0];
+            npc.y = target[1];
+            npc.moveTimer = 0;
+          }
+        }
+      }
+    }
+    
+    function updateTime() {
+      gameState.time += 0.5; // 0.5 minutes per frame (fast day/night)
+      
+      if (gameState.time >= 24 * 60) {
+        gameState.time = 0;
+        gameState.day++;
+        
+        // New day events
+        gameState.energy = gameState.maxEnergy;
+        showMessage('🌅 Ngày mới! Năng lượng đã hồi phục!');
+        
+        // Change season every 28 days
+        if (gameState.day % 28 === 0) {
+          gameState.season = (gameState.season + 1) % 4;
+          const seasons = ['🌸 Xuân', '☀️ Hạ', '🍂 Thu', '❄️ Đông'];
+          showMessage(`${seasons[gameState.season]} đã đến!`);
+        }
+      }
+      
+      // Weather changes
+      gameState.weatherTimer++;
+      if (gameState.weatherTimer > 600) {
+        changeWeather();
+        gameState.weatherTimer = 0;
+      }
+      
+      // Update UI
+      const hours = Math.floor(gameState.time / 60);
+      const minutes = Math.floor(gameState.time % 60);
+      document.getElementById('time-display').textContent = 
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      document.getElementById('day-display').textContent = `Ngày ${gameState.day}`;
+      
+      const seasons = ['🌸 Xuân', '☀️ Hạ', '🍂 Thu', '❄️ Đông'];
+      document.getElementById('season-display').textContent = seasons[gameState.season];
+    }
+    
+    function changeWeather() {
+      const weathers = ['sunny', 'cloudy', 'rainy'];
+      const newWeather = weathers[Math.floor(Math.random() * weathers.length)];
+      
+      if (newWeather !== gameState.weather) {
+        gameState.weather = newWeather;
+        updateWeather();
+      }
+    }
+    
+    function updateWeather() {
+      const overlay = document.getElementById('weather-overlay');
+      overlay.innerHTML = '';
+      
+      const icons = { sunny: '☀️', cloudy: '☁️', rainy: '🌧️' };
+      document.getElementById('weather-display').textContent = icons[gameState.weather] + ' ' + 
+        (gameState.weather === 'sunny' ? 'Nắng' : gameState.weather === 'cloudy' ? 'Nhiều mây' : 'Mưa');
+      
+      if (gameState.weather === 'rainy') {
+        // Create rain effect
+        for (let i = 0; i < 100; i++) {
+          const drop = document.createElement('div');
+          drop.className = 'raindrop';
+          drop.style.left = Math.random() * 100 + '%';
+          drop.style.animationDuration = Math.random() * 0.5 + 0.5 + 's';
+          drop.style.animationDelay = Math.random() * 2 + 's';
+          overlay.appendChild(drop);
+        }
+        
+        // Rain waters plants automatically
+        for (const plant of worldPlants) {
+          if (Math.random() < 0.01) {
+            plant.data.water_level = Math.min(100, plant.data.water_level + 1);
+          }
+        }
+      }
+    }
+    
+    function updateParticles() {
+      gameState.particles = gameState.particles.filter(p => p.update());
+    }
+    
+    function spawnParticles(x, y, type, count = 5) {
+      for (let i = 0; i < count; i++) {
+        gameState.particles.push(new Particle(x, y, type));
+      }
+    }
+    
+    function handleInteraction() {
+      // Check NPCs
+      for (const npc of npcs) {
+        const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
+        if (dist < 2) {
+          if (npc.type === 'shop') {
+            openShop();
+          } else {
+            showNPCDialog(npc);
+          }
+          return;
+        }
+      }
+      
+      // Use selected tool
+      const tool = TOOLS[gameState.selectedTool];
+      const tile = world[Math.floor(player.y)][Math.floor(player.x)];
+      
+      if (gameState.energy < tool.energy) {
+        showMessage('⚡ Không đủ năng lượng!');
+        return;
+      }
+      
+      // Tool actions
+      if (tool.id === 'seeds' && tile === TILES.FARMLAND) {
+        plantSeed();
+      } else if (tool.id === 'water') {
+        waterNearbyPlants();
+      } else if (tool.id === 'hoe' && tile === TILES.GRASS) {
+        till Soil();
+      } else {
+        // Interact with plants
+        for (const plant of worldPlants) {
+          const dist = Math.hypot(player.x - plant.x, player.y - plant.y);
+          if (dist < 1.2) {
+            interactWithPlant(plant);
+            return;
+          }
+        }
+      }
+    }
+    
+    async function plantSeed() {
+      if (gameData.coins < 20) {
+        showMessage('💰 Không đủ xu! (Cần 20 xu)');
+        return;
+      }
+      
+      const existing = worldPlants.find(p => 
+        Math.floor(p.x) === Math.floor(player.x) && 
+        Math.floor(p.y) === Math.floor(player.y)
+      );
+      
+      if (existing) {
+        showMessage('⚠️ Đã có cây ở đây!');
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/farm/plant', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          gameData.plants.push(data.plant);
+          gameData.coins = data.coins;
+          
+          worldPlants.push({
+            id: data.plant.id,
+            x: Math.floor(player.x) + 0.5,
+            y: Math.floor(player.y) + 0.5,
+            data: data.plant
+          });
+          
+          gameState.energy -= TOOLS[gameState.selectedTool].energy;
+          spawnParticles(player.x, player.y, 'sparkle', 8);
+          updateUI();
+          showMessage('🌱 Đã trồng cây!');
+          playSound('plant');
+          
+          // Update quest
+          updateQuestProgress('plant', 1);
+        }
+      } catch (err) {
+        showMessage('❌ Lỗi: ' + err.message);
+      }
+    }
+    
+    function waterNearbyPlants() {
+      if (gameData.inventory.water <= 0) {
+        showMessage('💧 Hết nước!');
+        return;
+      }
+      
+      let watered = 0;
+      for (const plant of worldPlants) {
+        const dist = Math.hypot(player.x - plant.x, player.y - plant.y);
+        if (dist < 2 && plant.data.water_level < 100) {
+          waterPlant(plant.id);
+          watered++;
+        }
+      }
+      
+      if (watered > 0) {
+        spawnParticles(player.x, player.y, 'water', 10);
+      }
+    }
+    
+    async function waterPlant(plantId) {
+      try {
+        const res = await fetch(`/api/farm/water/${plantId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          updatePlantData(plantId, data.plant);
+          gameData.inventory = data.inventory;
+          gameState.energy -= 1;
+          updateUI();
+        }
+      } catch (err) {}
+    }
+    
+    function tillSoil() {
+      const x = Math.floor(player.x);
+      const y = Math.floor(player.y);
+      
+      if (world[y][x] === TILES.GRASS) {
+        world[y][x] = TILES.FARMLAND;
+        gameState.energy -= 2;
+        spawnParticles(player.x, player.y, 'leaf', 5);
+        updateUI();
+        showMessage('⛏️ Đã làm đất!');
+      }
+    }
+    
+    function interactWithPlant(plant) {
+      const data = plant.data;
+      
+      if (data.stage === 'fruiting' && !data.disease) {
+        harvestPlant(plant.id);
+      } else if (data.disease) {
+        treatPlant(plant.id);
+      } else {
+        showMessage(`🌱 ${getPlantStageText(data.stage)} - ❤️${Math.round(data.health)}% 💧${data.water_level}%`);
+      }
+    }
+    
+    async function harvestPlant(plantId) {
+      try {
+        const res = await fetch(`/api/farm/harvest/${plantId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          const index = worldPlants.findIndex(p => p.id === plantId);
+          if (index !== -1) {
+            const plant = worldPlants[index];
+            spawnParticles(plant.x, plant.y, 'coin', 12);
+            worldPlants.splice(index, 1);
+          }
+          
+          gameData.plants = gameData.plants.filter(p => p.id !== plantId);
+          gameData.coins = data.coins;
+          gameData.total_harvested = data.total_harvested;
+          
+          updateUI();
+          showMessage(`🍅 +${data.yield} xu!` + (data.leveled_up ? ` 🎉 Lên Lv.${data.level}!` : ''));
+          
+          updateQuestProgress('harvest', 1);
+          checkAchievements();
+        }
+      } catch (err) {}
+    }
+    
+    async function treatPlant(plantId) {
+      const plant = worldPlants.find(p => p.id === plantId);
+      if (!plant || !plant.data.disease) return;
+      
+      const disease = diseases.find(d => d.id === plant.data.disease);
+      if (!disease) return;
+      
+      const treatmentMap = {
+        'Thuốc trừ nấm': 'fungicide',
+        'Thuốc trừ sâu': 'pesticide',
+        'Thuốc kháng sinh': 'antibiotic'
+      };
+      
+      const required = treatmentMap[disease.treatment];
+      if (!required || gameData.inventory[required] <= 0) {
+        showMessage(`💊 Cần ${disease.treatment}!`);
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/farm/treat/${plantId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({treatment: required})
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          updatePlantData(plantId, data.plant);
+          gameData.inventory = data.inventory;
+          gameState.energy -= 1;
+          spawnParticles(plant.x, plant.y, 'sparkle', 10);
+          updateUI();
+          showMessage('💊 Đã chữa bệnh!');
+        }
+      } catch (err) {}
+    }
+    
+    function updatePlantData(plantId, newData) {
+      const plant = worldPlants.find(p => p.id === plantId);
+      if (plant) plant.data = newData;
+      
+      const dataPlant = gameData.plants.find(p => p.id === plantId);
+      if (dataPlant) Object.assign(dataPlant, newData);
+    }
+    
+    function openShop() {
+      const shopData = [
+        { key: 'water', name: 'Nước (x10)', icon: '💧', price: 0, qty: 10 },
+        { key: 'fertilizer', name: 'Phân bón', icon: '🌾', price: 50, qty: 1 },
+        { key: 'fungicide', name: 'Thuốc trừ nấm', icon: '🍄', price: 100, qty: 1 },
+        { key: 'pesticide', name: 'Thuốc trừ sâu', icon: '🦗', price: 100, qty: 1 },
+        { key: 'antibiotic', name: 'Thuốc kháng sinh', icon: '💉', price: 150, qty: 1 }
+      ];
+      
+      const message = '🏪 CỬA HÀNG\n\n' + shopData.map((item, i) => 
+        `${i+1}. ${item.icon} ${item.name} - ${item.price} xu`
+      ).join('\n') + '\n\nNhập số (1-5):';
+      
+      const choice = prompt(message);
+      if (choice) {
+        const idx = parseInt(choice) - 1;
+        if (idx >= 0 && idx < shopData.length) {
+          buyItem(shopData[idx].key, shopData[idx].qty);
+        }
+      }
+    }
+    
+    async function buyItem(key, qty) {
+      try {
+        const res = await fetch('/api/farm/buy', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({item: key, quantity: qty})
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          gameData.inventory = data.inventory;
+          gameData.coins = data.coins;
+          updateUI();
+          showMessage(`✅ Đã mua ${items[key].name}!`);
+        } else {
+          showMessage('❌ ' + data.error);
+        }
+      } catch (err) {}
+    }
+    
+    function restAtHome() {
+      const dist = Math.hypot(player.x - 16, player.y - 12);
+      if (dist < 5) {
+        gameState.energy = gameState.maxEnergy;
+        gameState.health = gameState.maxHealth;
+        spawnParticles(player.x, player.y, 'heart', 10);
+        updateUI();
+        showMessage('😴 Đã nghỉ ngơi! Năng lượng hồi phục!');
+        updateQuestProgress('rest', 1);
+      } else {
+        showMessage('🏠 Phải về nhà (gần nhà vàng) để nghỉ!');
+      }
+    }
+    
+    function showNPCDialog(npc) {
+      const dialogBox = document.getElementById('dialog-box');
+      dialogBox.querySelector('.speaker').textContent = npc.name + ':';
+      dialogBox.querySelector('.text').textContent = npc.dialog[npc.dialogIndex];
+      
+      const choicesDiv = document.getElementById('dialog-choices');
+      choicesDiv.innerHTML = '';
+      
+      // Show quests if available
+      if (npc.quests && npc.quests.length > 0) {
+        npc.quests.forEach(quest => {
+          const choice = document.createElement('div');
+          choice.className = 'dialog-choice';
+          choice.textContent = `📜 ${quest.title}`;
+          choice.onclick = () => {
+            acceptQuest(quest);
+            dialogBox.classList.remove('show');
+          };
+          choicesDiv.appendChild(choice);
+        });
+      }
+      
+      const closeBtn = document.createElement('div');
+      closeBtn.className = 'dialog-choice';
+      closeBtn.textContent = '👋 Tạm biệt';
+      closeBtn.onclick = () => dialogBox.classList.remove('show');
+      choicesDiv.appendChild(closeBtn);
+      
+      dialogBox.classList.add('show');
+      npc.dialogIndex = (npc.dialogIndex + 1) % npc.dialog.length;
+    }
+    
+    function acceptQuest(quest) {
+      if (!gameState.quests.find(q => q.id === quest.id)) {
+        gameState.quests.push({...quest, progress: 0, completed: false});
+        updateQuestUI();
+        showMessage(`📜 Nhận nhiệm vụ: ${quest.title}`);
+      }
+    }
+    
+    function updateQuestProgress(type, amount) {
+      for (const quest of gameState.quests) {
+        if (quest.completed) continue;
+        
+        if ((type === 'harvest' && quest.id === 'quest_harvest_5') ||
+            (type === 'plant' && quest.id.includes('plant')) ||
+            (type === 'rest' && quest.id === 'quest_energy')) {
+          quest.progress += amount;
+          
+          if (quest.progress >= quest.target || quest.action === type) {
+            quest.completed = true;
+            gameData.coins += quest.reward;
+            showMessage(`✅ Hoàn thành: ${quest.title}! +${quest.reward} xu`);
+            checkAchievements();
+          }
+          
+          updateQuestUI();
+        }
+      }
+    }
+    
+    function updateQuestUI() {
+      const list = document.getElementById('quest-list');
+      list.innerHTML = '';
+      
+      if (gameState.quests.length === 0) {
+        list.innerHTML = '<div style="opacity: 0.6;">Chưa có nhiệm vụ. Nói chuyện với NPCs!</div>';
+        return;
+      }
+      
+      gameState.quests.forEach(quest => {
+        const div = document.createElement('div');
+        div.className = 'quest-item' + (quest.completed ? ' completed' : '');
+        div.innerHTML = quest.completed ? 
+          `✅ ${quest.title}` :
+          `${quest.title}<br><span class="quest-progress">${quest.progress || 0}/${quest.target || '?'}</span>`;
+        list.appendChild(div);
+      });
+    }
+    
+    function checkAchievements() {
+      const achievements = [
+        { id: 'first_plant', name: 'Nông Dân Mới', desc: 'Trồng cây đầu tiên', check: () => gameData.plants.length > 0 },
+        { id: 'harvest_10', name: 'Thợ Thu Hoạch', desc: 'Thu hoạch 10 cà chua', check: () => gameData.total_harvested >= 10 },
+        { id: 'rich', name: 'Triệu Phú', desc: 'Có 1000 xu', check: () => gameData.coins >= 1000 },
+        { id: 'level_5', name: 'Cao Thủ', desc: 'Đạt cấp độ 5', check: () => gameData.level >= 5 }
+      ];
+      
+      achievements.forEach(ach => {
+        if (!gameState.achievements.includes(ach.id) && ach.check()) {
+          gameState.achievements.push(ach.id);
+          showAchievement(ach);
+        }
+      });
+    }
+    
+    function showAchievement(ach) {
+      const div = document.createElement('div');
+      div.className = 'achievement';
+      div.innerHTML = `
+        <div class="achievement-title">🏆 ${ach.name}</div>
+        <div class="achievement-desc">${ach.desc}</div>
+      `;
+      document.body.appendChild(div);
+      
+      setTimeout(() => div.remove(), 4000);
+    }
+    
+    function getPlantStageText(stage) {
+      const stages = {
+        seed: 'Hạt giống',
+        sprout: 'Mầm non',
+        growing: 'Đang lớn',
+        mature: 'Trưởng thành',
+        fruiting: 'Ra quả'
+      };
+      return stages[stage] || stage;
+    }
+    
+    // ==================== RENDERING ====================
+    
+    function render() {
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      
+      // Time-based lighting
+      const hour = gameState.time / 60;
+      let darknessLevel = 0;
+      
+      if (hour < 6) darknessLevel = 0.7;
+      else if (hour < 7) darknessLevel = 0.4;
+      else if (hour < 19) darknessLevel = 0;
+      else if (hour < 20) darknessLevel = 0.3;
+      else darknessLevel = 0.6;
+      
+      // Draw tiles
+      const startX = Math.floor(camera.x / TILE_SIZE);
+      const startY = Math.floor(camera.y / TILE_SIZE);
+      const endX = Math.ceil((camera.x + CANVAS_WIDTH) / TILE_SIZE);
+      const endY = Math.ceil((camera.y + CANVAS_HEIGHT) / TILE_SIZE);
+      
+      for (let y = Math.max(0, startY); y < Math.min(WORLD_HEIGHT, endY); y++) {
+        for (let x = Math.max(0, startX); x < Math.min(WORLD_WIDTH, endX); x++) {
+          const screenX = x * TILE_SIZE - camera.x;
+          const screenY = y * TILE_SIZE - camera.y;
+          
+          const tile = world[y][x];
+          ctx.fillStyle = TILE_COLORS[tile];
+          ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+          
+          // Tile borders
+          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+          
+          // Icons
+          ctx.font = `${TILE_SIZE * 0.6}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          const icons = {
+            [TILES.SHOP]: '🏪',
+            [TILES.HOUSE]: '🏠',
+            [TILES.TREE]: '🌳',
+            [TILES.FLOWERS]: '🌺'
+          };
+          
+          if (icons[tile]) {
+            ctx.fillText(icons[tile], screenX + TILE_SIZE/2, screenY + TILE_SIZE/2);
+          }
+        }
+      }
+      
+      // Draw plants
+      for (const plant of worldPlants) {
+        const screenX = plant.x * TILE_SIZE - camera.x;
+        const screenY = plant.y * TILE_SIZE - camera.y;
+        
+        const plantIcons = {
+          seed: '🌰',
+          sprout: '🌱',
+          growing: '🌿',
+          mature: '🌳',
+          fruiting: '🍅'
+        };
+        
+        // Health bar
+        if (plant.data.health < 100) {
+          const barW = TILE_SIZE * 0.8;
+          const barH = 4;
+          ctx.fillStyle = '#000';
+          ctx.fillRect(screenX - barW/2, screenY - TILE_SIZE/2 - 6, barW, barH);
+          ctx.fillStyle = plant.data.health > 50 ? '#2ecc71' : '#e74c3c';
+          ctx.fillRect(screenX - barW/2, screenY - TILE_SIZE/2 - 6, barW * (plant.data.health / 100), barH);
+        }
+        
+        ctx.font = `${TILE_SIZE * 0.9}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(plantIcons[plant.data.stage] || '🌱', screenX, screenY);
+        
+        if (plant.data.disease) {
+          ctx.font = `${TILE_SIZE * 0.4}px Arial`;
+          ctx.fillText('🦠', screenX + TILE_SIZE/3, screenY - TILE_SIZE/3);
+        }
+      }
+      
+      // Draw NPCs
+      for (const npc of npcs) {
+        const screenX = npc.x * TILE_SIZE - camera.x;
+        const screenY = npc.y * TILE_SIZE - camera.y;
+        
+        ctx.fillStyle = npc.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, TILE_SIZE * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.strokeText(npc.name, screenX, screenY - TILE_SIZE * 0.8);
+        ctx.fillText(npc.name, screenX, screenY - TILE_SIZE * 0.8);
+      }
+      
+      // Draw player
+      const playerScreenX = player.x * TILE_SIZE - camera.x;
+      const playerScreenY = player.y * TILE_SIZE - camera.y;
+      
+      ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Player sprite (simple animation)
+      const playerSprite = player.moving ? 
+        (player.animFrame % 2 === 0 ? '🚶' : '🏃') : '🧍';
+      
+      ctx.fillText(playerSprite, playerScreenX, playerScreenY);
+      
+      // Draw particles
+      for (const particle of gameState.particles) {
+        particle.draw(ctx, camera);
+      }
+      
+      // Apply darkness overlay
+      if (darknessLevel > 0) {
+        ctx.fillStyle = `rgba(0, 0, 20, ${darknessLevel})`;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
+      
+      // Mini-map
+      renderMiniMap();
+    }
+    
+    function renderMiniMap() {
+      miniCtx.clearRect(0, 0, 200, 160);
+      
+      const scaleX = 200 / WORLD_WIDTH;
+      const scaleY = 160 / WORLD_HEIGHT;
+      
+      // Draw world
+      for (let y = 0; y < WORLD_HEIGHT; y++) {
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+          const tile = world[y][x];
+          miniCtx.fillStyle = TILE_COLORS[tile];
+          miniCtx.fillRect(x * scaleX, y * scaleY, scaleX, scaleY);
+        }
+      }
+      
+      // Draw player
+      miniCtx.fillStyle = '#ff6b6b';
+      miniCtx.fillRect(player.x * scaleX - 2, player.y * scaleY - 2, 4, 4);
+      
+      // Draw NPCs
+      miniCtx.fillStyle = '#3498db';
+      for (const npc of npcs) {
+        miniCtx.fillRect(npc.x * scaleX - 1, npc.y * scaleY - 1, 2, 2);
+      }
+    }
+    
+    // ==================== UI UPDATES ====================
+    
+    function updateUI() {
+      try {
+        document.getElementById('coins').textContent = gameData.coins || 0;
+        document.getElementById('harvested').textContent = gameData.total_harvested || 0;
+        document.getElementById('level').textContent = gameData.level || 1;
+        
+        // Energy
+        const energyPercent = (gameState.energy / gameState.maxEnergy) * 100;
+        document.getElementById('energy-bar').style.width = energyPercent + '%';
+        document.getElementById('energy-value').textContent = 
+          `${Math.round(gameState.energy)}/${gameState.maxEnergy}`;
+        
+        // Health
+        const healthPercent = (gameState.health / gameState.maxHealth) * 100;
+        document.getElementById('health-bar').style.width = healthPercent + '%';
+        document.getElementById('health-value').textContent = 
+          `${Math.round(gameState.health)}/${gameState.maxHealth}`;
+        
+        // Inventory
+        const grid = document.getElementById('inventory-grid');
+        grid.innerHTML = '';
+        
+        if (!gameData.inventory) {
+          gameData.inventory = {
+            water: 10,
+            fertilizer: 0,
+            fungicide: 0,
+            pesticide: 0,
+            antibiotic: 0,
+            premium_fertilizer: 0
+          };
+        }
+        
+        Object.entries(items).forEach(([key, item]) => {
+          const count = gameData.inventory[key] || 0;
+          const slot = document.createElement('div');
+          slot.className = 'inventory-slot';
+          slot.innerHTML = `${item.icon}<div class="count">${count}</div>`;
+          slot.title = item.name;
+          grid.appendChild(slot);
+        });
+        
+        // Tool bar
+        updateToolBar();
+      } catch (err) {
+        console.error('Update UI Error:', err);
+      }
+    }
+    
+    function updateToolBar() {
+      const bar = document.getElementById('tool-bar');
+      bar.innerHTML = '';
+      
+      TOOLS.forEach((tool, i) => {
+        const slot = document.createElement('div');
+        slot.className = 'tool-slot' + (gameState.selectedTool === i ? ' active' : '');
+        slot.innerHTML = `${tool.icon}<div class="hotkey">${i+1}</div>`;
+        slot.title = tool.name;
+        slot.onclick = () => {
+          gameState.selectedTool = i;
+          updateToolBar();
+        };
+        bar.appendChild(slot);
+      });
+    }
+    
+    function showMessage(text) {
+      const overlay = document.getElementById('message-overlay');
+      overlay.textContent = text;
+      overlay.classList.add('show');
+      
+      setTimeout(() => {
+        overlay.classList.remove('show');
+      }, 3000);
+    }
+    
+    // ==================== SERVER SYNC ====================
+    
+    async function syncWithServer() {
+      try {
+        const res = await fetch('/api/farm/update', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          gameData = data.progress;
+          
+          // Sync plants
+          for (const serverPlant of gameData.plants) {
+            const worldPlant = worldPlants.find(p => p.id === serverPlant.id);
+            if (worldPlant) {
+              worldPlant.data = serverPlant;
+            }
+          }
+          
+          updateUI();
+        }
+      } catch (err) {
+        console.error('Sync error:', err);
+      }
+    }
+    
+    // ==================== SOUND (PLACEHOLDER) ====================
+    
+    function playSound(type) {
+      // Placeholder for sound effects
+      // Can add Web Audio API sounds here
+      console.log('Sound:', type);
+    }
+    
+    // ==================== INIT & GAME LOOP ====================
+    
+    function initWorldPlants() {
+      if (!gameData.plants || gameData.plants.length === 0) {
+        console.log('No plants to initialize');
+        return;
+      }
+      
+      let farmX = 13, farmY = 19;
+      
+      for (const plant of gameData.plants) {
+        worldPlants.push({
+          id: plant.id,
+          x: farmX + 0.5,
+          y: farmY + 0.5,
+          data: plant
+        });
+        
+        farmX += 2;
+        if (farmX > 34 || world[farmY][farmX] !== TILES.FARMLAND) {
+          farmX = 13;
+          farmY += 2;
+          while (farmY < 38 && world[farmY][farmX] !== TILES.FARMLAND) farmY++;
+        }
+      }
+      console.log('Initialized', worldPlants.length, 'plants');
+    }
+    
+    function gameLoop() {
+      if (!gameState.paused) {
+        updatePlayer();
+        updateNPCs();
+        updateTime();
+        updateParticles();
+        render();
+      }
+      
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Initialize
+    async function initGame() {
+      try {
+        const loadingText = document.getElementById('loadingText');
+        const loadingProgress = document.getElementById('loadingProgress');
+        
+        console.log('Initializing game...');
+        
+        // Step 1: World generation (already done)
+        loadingText.textContent = 'Đang tạo thế giới...';
+        loadingProgress.textContent = '20%';
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Step 2: Init plants
+        loadingText.textContent = 'Đang khởi tạo cây trồng...';
+        loadingProgress.textContent = '40%';
+        initWorldPlants();
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Step 3: Update UI
+        loadingText.textContent = 'Đang tải giao diện...';
+        loadingProgress.textContent = '60%';
+        updateUI();
+        updateQuestUI();
+        updateWeather();
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Step 4: Sync with server
+        loadingText.textContent = 'Đang đồng bộ dữ liệu...';
+        loadingProgress.textContent = '80%';
+        await syncWithServer();
+        setInterval(syncWithServer, 5000);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Step 5: Start game
+        loadingText.textContent = 'Hoàn tất!';
+        loadingProgress.textContent = '100%';
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        // Hide loading screen
+        document.getElementById('loading').classList.add('hidden');
+        console.log('Game loaded successfully!');
+        
+        // Start game loop
+        gameLoop();
+        
+        // Welcome message
+        setTimeout(() => {
+          showMessage('🌱 Chào mừng đến Tomato Farm RPG! Nhấn R tại nhà để nghỉ ngơi.');
+        }, 1000);
+      } catch (err) {
+        console.error('Initialization Error:', err);
+        document.getElementById('loading').classList.add('hidden');
+        alert('Lỗi khởi động game: ' + err.message + '\n\nVui lòng F5 để thử lại!');
+      }
+    }
+    
+    // Start initialization
+    initGame();
+  </script>
+</body>
+</html>

@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+
+{% block title %}Theo dõi đơn hàng #{{ tracking.order.id }} | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .tracking-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  /* Header */
+  .tracking-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  }
+  
+  .tracking-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .tracking-header p {
+    margin: 5px 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-left: 15px;
+  }
+  
+  .status-badge.pending {
+    background: #ffc107;
+    color: #000;
+  }
+  
+  .status-badge.processing {
+    background: #2196f3;
+    color: white;
+  }
+  
+  .status-badge.shipped {
+    background: #ff9800;
+    color: white;
+  }
+  
+  .status-badge.delivered {
+    background: #4caf50;
+    color: white;
+  }
+  
+  .status-badge.cancelled {
+    background: #f44336;
+    color: white;
+  }
+  
+  /* Main Content */
+  .tracking-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+  }
+  
+  @media (max-width: 968px) {
+    .tracking-content {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Card Styles */
+  .tracking-card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  [data-theme="dark"] .tracking-card {
+    background: #2d2d2d;
+  }
+  
+  .tracking-card h2 {
+    margin: 0 0 25px 0;
+    color: #2d5016;
+    font-size: 1.5em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  [data-theme="dark"] .tracking-card h2 {
+    color: #a8d08d;
+  }
+  
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 40px;
+  }
+  
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #4caf50, #e0e0e0);
+  }
+  
+  .milestone {
+    position: relative;
+    margin-bottom: 35px;
+    padding-bottom: 20px;
+  }
+  
+  .milestone:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  
+  .milestone-icon {
+    position: absolute;
+    left: -38px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    background: white;
+    border: 3px solid #e0e0e0;
+    z-index: 2;
+  }
+  
+  .milestone.completed .milestone-icon {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: white;
+  }
+  
+  .milestone.active .milestone-icon {
+    background: #2196f3;
+    border-color: #2196f3;
+    color: white;
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(33, 150, 243, 0);
+    }
+  }
+  
+  .milestone-content {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .milestone-content {
+    background: #3a3a3a;
+  }
+  
+  .milestone.completed .milestone-content {
+    border-color: #4caf50;
+    background: #f1f8f4;
+  }
+  
+  [data-theme="dark"] .milestone.completed .milestone-content {
+    background: #1e3a2e;
+  }
+  
+  .milestone.active .milestone-content {
+    border-color: #2196f3;
+    background: #e3f2fd;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+  }
+  
+  [data-theme="dark"] .milestone.active .milestone-content {
+    background: #1a2f4a;
+  }
+  
+  .milestone-title {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin: 0 0 8px 0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .milestone-title {
+    color: #e0e0e0;
+  }
+  
+  .milestone-desc {
+    margin: 0;
+    color: #666;
+    font-size: 0.95em;
+  }
+  
+  [data-theme="dark"] .milestone-desc {
+    color: #999;
+  }
+  
+  .milestone.completed .milestone-title,
+  .milestone.completed .milestone-desc {
+    opacity: 0.8;
+  }
+  
+  /* Order Summary */
+  .order-info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 0;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  [data-theme="dark"] .order-info-row {
+    border-bottom-color: #444;
+  }
+  
+  .order-info-row:last-child {
+    border-bottom: none;
+  }
+  
+  .info-label {
+    color: #666;
+    font-weight: 500;
+  }
+  
+  [data-theme="dark"] .info-label {
+    color: #999;
+  }
+  
+  .info-value {
+    color: #333;
+    font-weight: 600;
+  }
+  
+  [data-theme="dark"] .info-value {
+    color: #e0e0e0;
+  }
+  
+  .order-items {
+    margin-top: 20px;
+  }
+  
+  .order-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  
+  [data-theme="dark"] .order-item {
+    background: #3a3a3a;
+  }
+  
+  .item-name {
+    font-weight: 600;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .item-name {
+    color: #e0e0e0;
+  }
+  
+  .item-qty {
+    color: #666;
+    font-size: 0.9em;
+  }
+  
+  [data-theme="dark"] .item-qty {
+    color: #999;
+  }
+  
+  /* Estimated Delivery */
+  .estimated-delivery {
+    background: linear-gradient(135deg, #4caf50 0%, #8bc34a 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    margin-top: 20px;
+  }
+  
+  .estimated-delivery .date {
+    font-size: 2em;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+  
+  .estimated-delivery .label {
+    font-size: 0.9em;
+    opacity: 0.9;
+  }
+  
+  /* Timeline History */
+  .timeline-history {
+    margin-top: 30px;
+  }
+  
+  .timeline-event {
+    padding: 15px;
+    background: #f8f9fa;
+    border-left: 4px solid #2196f3;
+    border-radius: 8px;
+    margin-bottom: 15px;
+  }
+  
+  [data-theme="dark"] .timeline-event {
+    background: #3a3a3a;
+  }
+  
+  .timeline-event-time {
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 5px;
+  }
+  
+  [data-theme="dark"] .timeline-event-time {
+    color: #999;
+  }
+  
+  .timeline-event-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+  }
+  
+  [data-theme="dark"] .timeline-event-title {
+    color: #e0e0e0;
+  }
+  
+  .timeline-event-note {
+    color: #666;
+    font-size: 0.9em;
+  }
+  
+  [data-theme="dark"] .timeline-event-note {
+    color: #999;
+  }
+  
+  /* Action Buttons */
+  .action-buttons {
+    margin-top: 25px;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  
+  .btn-action {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+  }
+  
+  .btn-primary {
+    background: #4caf50;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+  }
+  
+  .btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .btn-secondary {
+    background: #444;
+    color: #e0e0e0;
+  }
+  
+  .btn-secondary:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+  }
+  
+  [data-theme="dark"] .btn-secondary:hover {
+    background: #555;
+  }
+  
+  /* Contact Support */
+  .support-box {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+  }
+  
+  [data-theme="dark"] .support-box {
+    background: #3a3020;
+    border-color: #8b6f00;
+  }
+  
+  .support-box h3 {
+    margin: 0 0 10px 0;
+    color: #856404;
+    font-size: 1.2em;
+  }
+  
+  [data-theme="dark"] .support-box h3 {
+    color: #ffc107;
+  }
+  
+  .support-box p {
+    margin: 5px 0;
+    color: #856404;
+  }
+  
+  [data-theme="dark"] .support-box p {
+    color: #d4a000;
+  }
+</style>
+
+<div class="tracking-container">
+  <!-- Header -->
+  <div class="tracking-header">
+    <h1>
+      📦 Theo dõi đơn hàng
+      <span class="status-badge {{ tracking.current_status }}">
+        {{ tracking.current_status|upper }}
+      </span>
+    </h1>
+    <p><strong>Mã đơn hàng:</strong> #{{ tracking.order.id }}</p>
+    <p><strong>Khách hàng:</strong> {{ tracking.order.customer_name }}</p>
+    {% if tracking.estimated_delivery_formatted %}
+    <p><strong>Dự kiến giao:</strong> {{ tracking.estimated_delivery_formatted }}</p>
+    {% endif %}
+  </div>
+  
+  <div class="tracking-content">
+    <!-- Timeline (Left) -->
+    <div class="tracking-card">
+      <h2>🚚 Trạng thái vận chuyển</h2>
+      
+      <div class="timeline">
+        {% for milestone in tracking.milestones %}
+        <div class="milestone {% if milestone.completed %}completed{% endif %} {% if milestone.active %}active{% endif %}">
+          <div class="milestone-icon">{{ milestone.icon }}</div>
+          <div class="milestone-content">
+            <div class="milestone-title">{{ milestone.title }}</div>
+            <div class="milestone-desc">{{ milestone.description }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      
+      {% if tracking.estimated_delivery_formatted and tracking.current_status not in ['delivered', 'cancelled'] %}
+      <div class="estimated-delivery">
+        <div class="label">Dự kiến giao hàng</div>
+        <div class="date">{{ tracking.estimated_delivery_formatted }}</div>
+        <div class="label">⏰ Theo dõi thường xuyên để cập nhật mới nhất</div>
+      </div>
+      {% endif %}
+      
+      <!-- Timeline History -->
+      {% if tracking.timeline and tracking.timeline|length > 1 %}
+      <div class="timeline-history">
+        <h3>📋 Lịch sử cập nhật</h3>
+        {% for event in tracking.timeline|reverse %}
+        <div class="timeline-event">
+          <div class="timeline-event-time">
+            {% if event.timestamp %}
+              {{ datetime.fromisoformat(event.timestamp).strftime('%d/%m/%Y %H:%M:%S') }}
+            {% endif %}
+          </div>
+          <div class="timeline-event-title">{{ event.title }}</div>
+          {% if event.note %}
+          <div class="timeline-event-note">{{ event.note }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    
+    <!-- Order Summary (Right) -->
+    <div>
+      <div class="tracking-card">
+        <h2>📝 Chi tiết đơn hàng</h2>
+        
+        <div class="order-info-row">
+          <span class="info-label">Tổng tiền:</span>
+          <span class="info-value">{{ "{:,.0f}".format(tracking.order.total) }} đ</span>
+        </div>
+        
+        <div class="order-info-row">
+          <span class="info-label">Phương thức:</span>
+          <span class="info-value">
+            {% if tracking.order.payment_method == 'cod' %}
+            💵 COD (Thanh toán khi nhận hàng)
+            {% elif tracking.order.payment_method == 'vnpay' %}
+            💳 VNPay
+            {% elif tracking.order.payment_method == 'momo' %}
+            🎀 MoMo
+            {% else %}
+            {{ tracking.order.payment_method|upper }}
+            {% endif %}
+          </span>
+        </div>
+        
+        <div class="order-info-row">
+          <span class="info-label">Điện thoại:</span>
+          <span class="info-value">{{ tracking.order.customer_phone }}</span>
+        </div>
+        
+        <div class="order-info-row">
+          <span class="info-label">Địa chỉ:</span>
+          <span class="info-value" style="text-align: right; max-width: 60%;">
+            {{ tracking.order.customer_address }}
+          </span>
+        </div>
+        
+        {% if tracking.order.order_note %}
+        <div class="order-info-row">
+          <span class="info-label">Ghi chú:</span>
+          <span class="info-value" style="text-align: right; max-width: 60%;">
+            {{ tracking.order.order_note }}
+          </span>
+        </div>
+        {% endif %}
+        
+        {% if tracking.order.coupon_code %}
+        <div class="order-info-row">
+          <span class="info-label">Mã giảm giá:</span>
+          <span class="info-value">{{ tracking.order.coupon_code }}</span>
+        </div>
+        {% endif %}
+        
+        <!-- Order Items -->
+        <div class="order-items">
+          <h3 style="margin: 20px 0 15px 0; font-size: 1.1em;">Sản phẩm:</h3>
+          {% for item in tracking.order.items %}
+          <div class="order-item">
+            <div>
+              <div class="item-name">{{ item.name }}</div>
+              <div class="item-qty">Số lượng: {{ item.quantity }}</div>
+            </div>
+            <div class="info-value">{{ "{:,.0f}".format(item.price * item.quantity) }} đ</div>
+          </div>
+          {% endfor %}
+        </div>
+        
+        <!-- Pricing Breakdown -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+          <div class="order-info-row">
+            <span class="info-label">Tạm tính:</span>
+            <span class="info-value">{{ "{:,.0f}".format(tracking.order.subtotal) }} đ</span>
+          </div>
+          
+          {% if tracking.order.discount > 0 %}
+          <div class="order-info-row">
+            <span class="info-label">Giảm giá:</span>
+            <span class="info-value" style="color: #f44336;">-{{ "{:,.0f}".format(tracking.order.discount) }} đ</span>
+          </div>
+          {% endif %}
+          
+          <div class="order-info-row">
+            <span class="info-label">Phí vận chuyển:</span>
+            <span class="info-value">
+              {% if tracking.order.shipping > 0 %}
+              {{ "{:,.0f}".format(tracking.order.shipping) }} đ
+              {% else %}
+              Miễn phí
+              {% endif %}
+            </span>
+          </div>
+          
+          <div class="order-info-row" style="font-size: 1.2em; border-top: 2px solid #e0e0e0; padding-top: 15px; margin-top: 10px;">
+            <span class="info-label" style="color: #333;"><strong>Tổng cộng:</strong></span>
+            <span class="info-value" style="color: #4caf50; font-size: 1.3em;">
+              {{ "{:,.0f}".format(tracking.order.total) }} đ
+            </span>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <a href="{{ url_for('profile') }}" class="btn-action btn-secondary">
+            👤 Về trang cá nhân
+          </a>
+          {% if tracking.current_status == 'pending' %}
+          <button class="btn-action btn-secondary" onclick="cancelOrder('{{ tracking.order.id }}')">
+            ❌ Hủy đơn hàng
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Contact Support -->
+      <div class="support-box">
+        <h3>💬 Cần hỗ trợ?</h3>
+        <p><strong>Hotline:</strong> 1900-xxxx (8:00 - 22:00)</p>
+        <p><strong>Email:</strong> support@tomatoai.com</p>
+        <p>Hoặc <a href="{{ url_for('chat') }}" style="color: #856404; font-weight: 600;">chat với chúng tôi</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function cancelOrder(orderId) {
+    if (!confirm('Bạn có chắc muốn hủy đơn hàng này?')) {
+      return;
+    }
+    
+    fetch(`/api/order/${orderId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        alert('Đơn hàng đã được hủy');
+        location.reload();
+      } else {
+        alert('Lỗi: ' + (data.error || 'Không thể hủy đơn hàng'));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Có lỗi xảy ra khi hủy đơn hàng');
+    });
+  }
+  
+  // Auto refresh every 30 seconds if order is in transit
+  {% if tracking.current_status in ['processing', 'shipped'] %}
+  setTimeout(() => {
+    location.reload();
+  }, 30000);
+  {% endif %}
+</script>
+{% endblock %}

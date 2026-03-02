@@ -5,103 +5,353 @@
 {% block content %}
 <style>
   .profile-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
   }
   
+  /* Header Section */
   .profile-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 30px;
-    border-radius: 16px;
+    padding: 40px;
+    border-radius: 20px;
     margin-bottom: 30px;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  }
+  
+  .header-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 30px;
   }
   
-  .profile-info h1 {
-    margin: 0 0 5px 0;
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  .user-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 2em;
+    border: 3px solid white;
   }
   
-  .profile-info p {
+  .user-details h1 {
+    margin: 0 0 5px 0;
+    font-size: 1.8em;
+  }
+  
+  .user-details p {
     margin: 0;
     opacity: 0.9;
+    font-size: 1.1em;
   }
   
   .logout-btn {
-    padding: 10px 25px;
+    padding: 12px 30px;
     background: rgba(255,255,255,0.2);
     color: white;
     border: 2px solid white;
-    border-radius: 8px;
+    border-radius: 12px;
     text-decoration: none;
     font-weight: 600;
     transition: all 0.3s;
+    backdrop-filter: blur(10px);
   }
   
   .logout-btn:hover {
     background: white;
     color: #667eea;
+    transform: translateY(-2px);
   }
   
+  /* Admin Badge */
+  .admin-badge {
+    display: inline-block;
+    background: #ffd700;
+    color: #333;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 700;
+    margin-top: 10px;
+  }
+  
+  /* Membership Card */
+  .membership-card {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 25px;
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .tier-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 15px;
+  }
+  
+  .tier-progress {
+    margin-top: 15px;
+  }
+  
+  .tier-progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+  }
+  
+  .progress-bar-container {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #ffd700, #ffed4e);
+    border-radius: 10px;
+    transition: width 0.5s ease;
+  }
+  
+  /* Quick Stats */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  }
+  
+  .stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  }
+  
+  .stat-icon {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+  }
+  
+  .stat-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--tomato-600);
+    margin: 5px 0;
+  }
+  
+  .stat-label {
+    color: #666;
+    font-size: 0.95em;
+  }
+  
+  /* Main Content */
   .profile-content {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 280px 1fr;
     gap: 30px;
+    position: relative;
+    isolation: isolate;
+  }
+  
+  /* Ensure no overflow issues */
+  .profile-content > * {
+    min-width: 0;
   }
   
   .profile-menu {
     background: white;
     border-radius: 16px;
-    padding: 20px;
+    padding: 10px;
     height: fit-content;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   }
   
   .menu-item {
-    padding: 12px 15px;
+    padding: 15px 20px;
     margin: 5px 0;
-    border-radius: 8px;
-    cursor: pointer;
+    border-radius: 12px;
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     color: #555;
+    font-weight: 500;
+    user-select: none;
+    cursor: pointer;
+    pointer-events: auto;
   }
   
   .menu-item:hover {
-    background: #f5f5f5;
+    background: #f8f9fa;
   }
   
   .menu-item.active {
     background: var(--tomato-500);
     color: white;
+    font-weight: 600;
+  }
+  
+  .menu-item:hover {
+    background: #f8f9fa;
+  }
+  
+  .menu-item.active {
+    background: var(--tomato-500);
+    color: white;
+    font-weight: 600;
+  }
+  
+  .menu-icon {
+    font-size: 1.3em;
   }
   
   .profile-main {
     background: white;
     border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 35px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    min-height: 600px;
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Ensure sections don't overlay menu */
+  .profile-main::before,
+  .profile-main::after {
+    display: none !important;
   }
   
   .section {
     display: none;
+    position: relative;
+    z-index: 1;
   }
   
   .section.active {
     display: block;
+    animation: fadeIn 0.3s;
   }
   
-  .section h2 {
-    margin: 0 0 20px 0;
+  .section::before,
+  .section::after {
+    display: none !important;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .section-title {
+    font-size: 1.8em;
+    margin: 0 0 25px 0;
     color: var(--tomato-700);
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   
+  /* Vouchers */
+  .vouchers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  
+  .voucher-card {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(238, 90, 111, 0.3);
+  }
+  
+  .voucher-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+  }
+  
+  .voucher-code {
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+  }
+  
+  .voucher-value {
+    font-size: 2em;
+    font-weight: 800;
+    margin: 10px 0;
+  }
+  
+  .voucher-source {
+    font-size: 0.9em;
+    opacity: 0.9;
+    margin-bottom: 5px;
+  }
+  
+  .voucher-expires {
+    font-size: 0.85em;
+    opacity: 0.8;
+  }
+  
+  .voucher-btn {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: white;
+    color: #ff6b6b;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .voucher-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Addresses */
   .addresses-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -110,89 +360,62 @@
   }
   
   .address-card {
-    border: 2px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 16px;
+    padding: 25px;
     position: relative;
-    transition: border 0.3s;
+    transition: all 0.3s;
   }
   
   .address-card:hover {
     border-color: var(--tomato-500);
+    box-shadow: 0 4px 12px rgba(249, 105, 14, 0.15);
   }
   
   .address-card.default {
     border-color: var(--tomato-500);
-    background: #fff5f5;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%);
   }
   
   .default-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 15px;
+    right: 15px;
     background: var(--tomato-500);
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
+    padding: 5px 12px;
+    border-radius: 20px;
     font-size: 0.75em;
-    font-weight: 600;
+    font-weight: 700;
   }
   
   .address-name {
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 1.1em;
     color: #333;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
   }
   
   .address-phone {
     color: #666;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   
   .address-detail {
     color: #555;
-    line-height: 1.5;
+    line-height: 1.6;
   }
   
   .address-actions {
-    margin-top: 15px;
+    margin-top: 20px;
     display: flex;
     gap: 10px;
   }
   
-  .btn-sm {
-    padding: 6px 14px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: all 0.2s;
-  }
-  
-  .btn-delete {
-    background: #f44336;
-    color: white;
-  }
-  
-  .btn-delete:hover {
-    background: #d32f2f;
-  }
-  
-  .add-address-btn {
-    padding: 14px 30px;
-    background: var(--tomato-500);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s;
-  }
-  
-  .add-address-btn:hover {
-    background: var(--tomato-600);
-  }
-  
+  /* Orders */
   .orders-list {
     display: flex;
     flex-direction: column;
@@ -200,30 +423,43 @@
   }
   
   .order-card {
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 16px;
+    padding: 25px;
+    transition: all 0.3s;
+  }
+  
+  .order-card:hover {
+    border-color: var(--tomato-400);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   }
   
   .order-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f8f9fa;
   }
   
   .order-id {
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 1.1em;
     color: #333;
   }
   
+  .order-date {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+  }
+  
   .order-status {
-    padding: 5px 12px;
-    border-radius: 12px;
-    font-size: 0.85em;
-    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 700;
   }
   
   .order-status.pending {
@@ -231,115 +467,47 @@
     color: #856404;
   }
   
+  .order-status.completed {
+    background: #d4edda;
+    color: #155724;
+  }
+  
   .order-items {
-    margin: 15px 0;
+    margin: 20px 0;
   }
   
   .order-item {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
-    color: #666;
+    padding: 12px 0;
+    color: #555;
+    border-bottom: 1px solid #f8f9fa;
+  }
+  
+  .order-item:last-child {
+    border-bottom: none;
   }
   
   .order-total {
     display: flex;
     justify-content: space-between;
-    padding-top: 15px;
-    margin-top: 15px;
-    border-top: 1px solid #f0f0f0;
-    font-weight: 600;
-    font-size: 1.1em;
+    padding-top: 20px;
+    margin-top: 20px;
+    border-top: 2px solid #f8f9fa;
+    font-weight: 700;
+    font-size: 1.3em;
     color: var(--tomato-600);
   }
   
-  .modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .modal.active {
-    display: flex;
-  }
-  
-  .modal-content {
-    background: white;
-    border-radius: 16px;
-    padding: 30px;
-    max-width: 500px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-  
-  .modal-header h3 {
-    margin: 0;
-    color: var(--tomato-700);
-  }
-  
-  .close-modal {
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    cursor: pointer;
-    color: #999;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 600;
-    color: #555;
-  }
-  
-  .form-group input,
-  .form-group select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 0.95em;
-  }
-  
-  .form-group input:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: var(--tomato-500);
-  }
-  
-  .form-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-  }
-  
+  /* Buttons */
   .btn {
-    flex: 1;
-    padding: 12px;
+    padding: 12px 24px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: 600;
-    transition: all 0.2s;
+    transition: all 0.3s;
+    font-size: 1em;
   }
   
   .btn-primary {
@@ -349,63 +517,1241 @@
   
   .btn-primary:hover {
     background: var(--tomato-600);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(249, 105, 14, 0.3);
   }
   
   .btn-secondary {
-    background: #e0e0e0;
+    background: #e9ecef;
     color: #555;
   }
   
   .btn-secondary:hover {
-    background: #d0d0d0;
+    background: #dee2e6;
   }
   
-  @media (max-width: 768px) {
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9em;
+  }
+  
+  .btn-delete {
+    background: #dc3545;
+    color: white;
+  }
+  
+  .btn-delete:hover {
+    background: #c82333;
+  }
+  
+  .add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 30px;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.05em;
+    transition: all 0.3s;
+  }
+  
+  .add-btn:hover {
+    background: var(--tomato-600);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(249, 105, 14, 0.3);
+  }
+  
+  /* Modal */
+  .modal {
+    display: none !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+  
+  .modal.active {
+    display: flex !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 20px;
+    padding: 35px;
+    max-width: 550px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 1001;
+  }
+  
+  [data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+  }
+  
+  .modal-header h3 {
+    margin: 0;
+    color: var(--tomato-700);
+    font-size: 1.6em;
+  }
+  
+  .close-modal {
+    background: none;
+    border: none;
+    font-size: 2em;
+    cursor: pointer;
+    color: #999;
+    transition: all 0.2s;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  
+  .close-modal:hover {
+    background: #f8f9fa;
+    color: #333;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95em;
+    cursor: pointer;
+  }
+  
+  [data-theme="dark"] .form-group label {
+    color: #ddd;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100% !important;
+    padding: 12px 15px !important;
+    border: 2px solid #e9ecef !important;
+    border-radius: 10px !important;
+    font-size: 1em !important;
+    transition: all 0.3s !important;
+    background: white !important;
+    color: #333 !important;
+    cursor: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+    -webkit-user-select: text !important;
+  }
+  
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select {
+    background: var(--bg-tertiary);
+    color: #ddd;
+    border-color: var(--bg-primary);
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+    box-shadow: 0 0 0 3px rgba(249, 105, 14, 0.1);
+    background: white;
+  }
+  
+  [data-theme="dark"] .form-group input:focus,
+  [data-theme="dark"] .form-group select:focus {
+    background: var(--bg-secondary);
+    border-color: var(--tomato-500);
+  }
+  
+  /* Force all inputs to be interactive */
+  input, select, textarea, button {
+    pointer-events: auto !important;
+  }
+  
+  input:focus, select:focus, textarea:focus {
+    outline: 3px solid var(--tomato-500) !important;
+    outline-offset: 2px !important;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 30px;
+  }
+  
+  .form-actions .btn {
+    flex: 1;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #999;
+  }
+  
+  .empty-state-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+    opacity: 0.5;
+  }
+  
+  .empty-state p {
+    font-size: 1.1em;
+    margin-bottom: 25px;
+  }
+  
+  .empty-state a {
+    color: var(--tomato-500);
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 1.1em;
+  }
+  
+  .empty-state a:hover {
+    text-decoration: underline;
+  }
+  
+  .info-box {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-top: 20px;
+    line-height: 1.6;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 50;
+  }
+  
+  .info-box * {
+    pointer-events: auto !important;
+  }
+  
+  .info-box p {
+    margin: 0;
+    color: #555;
+  }
+  
+  .info-box input,
+  .info-box button {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 100;
+  }
+  
+  @media (max-width: 1024px) {
     .profile-content {
       grid-template-columns: 1fr;
     }
     
-    .profile-header {
+    .profile-menu {
+      position: static;
+      display: flex;
+      overflow-x: auto;
+      padding: 10px;
+    }
+    
+    .menu-item {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .header-top {
       flex-direction: column;
-      gap: 15px;
+      gap: 20px;
       text-align: center;
     }
     
-    .addresses-grid {
+    .user-info {
+      flex-direction: column;
+    }
+    
+    .quick-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .addresses-grid,
+    .vouchers-grid {
       grid-template-columns: 1fr;
     }
+  }
+  
+  /* ==================== WALLET STYLES ==================== */
+  .wallet-balance-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  }
+  
+  .wallet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .wallet-label {
+    font-size: 0.95em;
+    opacity: 0.9;
+    margin-bottom: 8px;
+  }
+  
+  .wallet-balance {
+    font-size: 2.5em;
+    font-weight: 700;
+  }
+  
+  .wallet-points {
+    font-size: 1.1em;
+    opacity: 0.95;
+  }
+  
+  .transactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  
+  .transaction-item:hover {
+    border-color: #ff6347;
+    transform: translateX(5px);
+  }
+  
+  .transaction-info {
+    flex: 1;
+  }
+  
+  .transaction-type {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+  }
+  
+  .transaction-desc {
+    color: #666;
+    font-size: 0.95em;
+    margin-bottom: 5px;
+  }
+  
+  .transaction-date {
+    color: #999;
+    font-size: 0.85em;
+  }
+  
+  .transaction-amount {
+    font-size: 1.3em;
+    font-weight: 700;
+    min-width: 150px;
+    text-align: right;
+  }
+  
+  .transaction-amount.credit {
+    color: #4caf50;
+  }
+  
+  .transaction-amount.debit {
+    color: #f44336;
+  }
+  
+  /* ==================== REFERRAL STYLES ==================== */
+  .referral-card {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .referral-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .referral-header h3 {
+    margin-bottom: 15px;
+    color: #333;
+  }
+  
+  .referral-code {
+    display: inline-block;
+    font-size: 2em;
+    font-weight: 700;
+    color: #ff6347;
+    background: #fff3f0;
+    padding: 15px 40px;
+    border-radius: 12px;
+    border: 3px dashed #ff6347;
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+  }
+  
+  .referral-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin: 30px 0;
+  }
+  
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+  }
+  
+  .stat-item .stat-icon {
+    font-size: 2.5em;
+  }
+  
+  .stat-item .stat-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: #333;
+  }
+  
+  .stat-item .stat-label {
+    font-size: 0.9em;
+    color: #666;
+  }
+  
+  .referral-info {
+    background: #fff3f0;
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 4px solid #ff6347;
+  }
+  
+  .referral-info h4 {
+    margin-bottom: 15px;
+    color: #ff6347;
+  }
+  
+  .referral-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .referral-info li {
+    padding: 8px 0;
+    font-size: 1.05em;
+  }
+  
+  .referral-leaderboard {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  .leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  
+  .leaderboard-item:last-child {
+    border-bottom: none;
+  }
+  
+  .leaderboard-item:hover {
+    background: #f8f9fa;
+  }
+  
+  .leaderboard-rank {
+    font-size: 1.5em;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
+  }
+  
+  .leaderboard-user {
+    flex: 1;
+  }
+  
+  .leaderboard-name {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+  }
+  
+  .leaderboard-stats {
+    color: #666;
+    font-size: 0.95em;
+  }
+  
+  /* ==================== ACHIEVEMENTS STYLES ==================== */
+  .achievements-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  
+  .filter-btn {
+    padding: 10px 20px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+  }
+  
+  .filter-btn:hover {
+    border-color: #ff6347;
+    color: #ff6347;
+  }
+  
+  .filter-btn.active {
+    background: #ff6347;
+    border-color: #ff6347;
+    color: white;
+  }
+  
+  .achievements-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  
+  .achievement-stat {
+    text-align: center;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .achievement-stat .stat-number {
+    display: block;
+    font-size: 2.5em;
+    font-weight: 700;
+    color: #ff6347;
+    margin-bottom: 5px;
+  }
+  
+  .achievement-stat .stat-text {
+    color: #666;
+    font-size: 0.95em;
+  }
+  
+  .achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  
+  .achievement-card {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    text-align: center;
+    transition: all 0.3s;
+    position: relative;
+    border: 3px solid #e0e0e0;
+  }
+  
+  .achievement-card.unlocked {
+    border-color: #ffd700;
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+  }
+  
+  .achievement-card.locked {
+    opacity: 0.6;
+    filter: grayscale(80%);
+  }
+  
+  .achievement-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  }
+  
+  .achievement-icon {
+    font-size: 4em;
+    margin-bottom: 15px;
+  }
+  
+  .achievement-name {
+    font-weight: 700;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    color: #333;
+  }
+  
+  .achievement-desc {
+    color: #666;
+    font-size: 0.95em;
+    margin-bottom: 15px;
+  }
+  
+  .achievement-progress {
+    margin-top: 15px;
+  }
+  
+  .achievement-progress .progress-bar {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 5px;
+  }
+  
+  .achievement-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff6347, #ff8566);
+    transition: width 0.3s;
+  }
+  
+  .achievement-progress .progress-text {
+    font-size: 0.85em;
+    color: #666;
+  }
+  
+  .achievement-date {
+    color: #4caf50;
+    font-size: 0.9em;
+    margin-top: 10px;
+  }
+  
+  .achievement-points {
+    background: #ff6347;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 10px;
+  }
+  
+  /* ==================== QUESTS STYLES ==================== */
+  .quests-header {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  .quest-timer {
+    font-size: 1.2em;
+    color: #666;
+  }
+  
+  .quest-timer strong {
+    color: #ff6347;
+    font-size: 1.3em;
+  }
+  
+  .quests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .quest-card {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    border: 3px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  
+  .quest-card.completed {
+    border-color: #4caf50;
+    background: #f1f8f4;
+  }
+  
+  .quest-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  
+  .quest-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .quest-icon {
+    font-size: 2.5em;
+  }
+  
+  .quest-info {
+    flex: 1;
+  }
+  
+  .quest-name {
+    font-weight: 700;
+    font-size: 1.2em;
+    margin-bottom: 5px;
+    color: #333;
+  }
+  
+  .quest-desc {
+    color: #666;
+    font-size: 0.95em;
+  }
+  
+  .quest-check {
+    font-size: 2em;
+  }
+  
+  .quest-progress {
+    margin-bottom: 15px;
+  }
+  
+  .quest-progress .progress-bar {
+    height: 12px;
+    background: #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  
+  .quest-progress .progress-fill {
+    height: 100%;
+    background: #ff6347;
+    transition: width 0.3s;
+  }
+  
+  .quest-progress .progress-text {
+    font-size: 0.9em;
+    color: #666;
+    text-align: right;
+  }
+  
+  .quest-reward {
+    background: #fff3f0;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    color: #ff6347;
+    font-weight: 600;
+  }
+  
+  .quest-info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+  }
+  
+  .quest-info h4 {
+    margin-bottom: 15px;
+    color: #333;
+  }
+  
+  .quest-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .quest-info li {
+    padding: 8px 0;
+    font-size: 1.05em;
+    color: #666;
+  }
+  
+  /* ==================== COMMON UTILITY STYLES ==================== */
+  .loading,
+  .empty-state,
+  .error-state {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+    font-size: 1.1em;
+  }
+  
+  .error-state {
+    color: #f44336;
   }
 </style>
 
 <div class="profile-container">
+  <!-- Profile Header -->
   <div class="profile-header">
-    <div class="profile-info">
-      <h1>👋 Xin chào, {{ user.full_name }}</h1>
-      <p>{{ user.email }}</p>
+    <div class="header-top">
+      <div class="user-info">
+        <div class="user-avatar">
+          {% if session.get('is_admin') %}👑{% else %}👤{% endif %}
+        </div>
+        <div class="user-details">
+          <h1>{{ user.full_name }}</h1>
+          <p>{{ user.email }}</p>
+          {% if session.get('is_admin') %}
+          <span class="admin-badge">⚡ QUẢN TRỊ VIÊN</span>
+          {% elif user.created_at %}
+          <p style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">
+            Thành viên từ {{ user.created_at[:10] }}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="logout-btn">Đăng xuất</a>
     </div>
-    <a href="{{ url_for('logout') }}" class="logout-btn">Đăng xuất</a>
+    
+    {% if not session.get('is_admin') and stats and stats.membership %}
+    <div class="membership-card">
+      <div class="tier-badge">
+        <span>{{ stats.membership.tier_name }}</span>
+      </div>
+      <p style="margin: 10px 0; font-size: 1.05em;">
+        🎁 Giảm giá {{ stats.membership.benefits.discount }}% | 
+        {% if stats.membership.benefits.free_shipping %}
+        🚚 Free ship
+        {% else %}
+        🚚 Ship tiêu chuẩn
+        {% endif %}
+      </p>
+      
+      {% if stats.membership.benefits.next_tier %}
+      <div class="tier-progress">
+        <div class="tier-progress-label">
+          <span>Chi thêm để lên hạng {{ stats.membership.benefits.next_tier|title }}</span>
+          <span><strong>{{ (stats.membership.remaining)|int|format_number }}đ</strong></span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: {{ stats.membership.progress_pct }}%"></div>
+        </div>
+      </div>
+      {% else %}
+      <p style="margin-top: 10px; font-size: 1.05em;">
+        ⭐ Bạn đã đạt hạng cao nhất!
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
   
+  <!-- Quick Stats for Regular Users -->
+  {% if not session.get('is_admin') and stats %}
+  <div class="quick-stats">
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-value">{{ stats.wallet.balance|int|format_number }}đ</div>
+      <div class="stat-label">Số dư ví</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💳</div>
+      <div class="stat-value">{{ stats.wallet.total_spent|int|format_number }}đ</div>
+      <div class="stat-label">Tổng chi tiêu</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🎫</div>
+      <div class="stat-value">{{ stats.vouchers.total_count }}</div>
+      <div class="stat-label">Mã giảm giá</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-value">{{ stats.wallet.points }}</div>
+      <div class="stat-label">Điểm tích lũy</div>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Main Content -->
   <div class="profile-content">
-    <div class="profile-menu">
-      <div class="menu-item active" onclick="showSection('addresses')">
-        📍 Địa chỉ giao hàng
+    <!-- Admin Menu -->
+    {% if session.get('is_admin') %}
+    <div class="profile-menu" style="position: sticky; top: 20px;">
+      <div class="menu-item active" data-section="admin-overview">
+        <span class="menu-icon">📊</span>
+        <span>Tổng quan</span>
       </div>
-      <div class="menu-item" onclick="showSection('orders')">
-        📦 Đơn hàng của tôi
+      <div class="menu-item" data-href="{{ url_for('admin_orders') }}">
+        <span class="menu-icon">📦</span>
+        <span>Quản lý Đơn hàng</span>
+      </div>
+      <div class="menu-item" data-href="{{ url_for('admin_products') }}">
+        <span class="menu-icon">🏪</span>
+        <span>Quản lý Sản phẩm</span>
+      </div>
+      <div class="menu-item" data-href="{{ url_for('admin_feedback') }}">
+        <span class="menu-icon">📝</span>
+        <span>Quản lý Feedback</span>
+      </div>
+      <div class="menu-item" data-href="{{ url_for('admin_stats') }}">
+        <span class="menu-icon">📈</span>
+        <span>Thống kê</span>
       </div>
     </div>
     
+    <!-- Regular User Menu -->
+    {% else %}
+    <div class="profile-menu" style="position: sticky; top: 20px;">
+      <div class="menu-item active" data-section="vouchers">
+        <span class="menu-icon">🎫</span>
+        <span>Mã giảm giá</span>
+      </div>
+      <div class="menu-item" data-section="overview">
+        <span class="menu-icon">📊</span>
+        <span>Tổng quan</span>
+      </div>
+      <div class="menu-item" data-section="wallet">
+        <span class="menu-icon">💰</span>
+        <span>Ví điện tử</span>
+      </div>
+      <div class="menu-item" data-section="referral">
+        <span class="menu-icon">🤝</span>
+        <span>Giới thiệu bạn</span>
+      </div>
+      <div class="menu-item" data-section="achievements">
+        <span class="menu-icon">🏆</span>
+        <span>Thành tích</span>
+      </div>
+      <div class="menu-item" data-section="quests">
+        <span class="menu-icon">📋</span>
+        <span>Nhiệm vụ</span>
+      </div>
+      <div class="menu-item" data-section="orders">
+        <span class="menu-icon">📦</span>
+        <span>Đơn hàng</span>
+      </div>
+      <div class="menu-item" data-section="addresses">
+        <span class="menu-icon">📍</span>
+        <span>Địa chỉ</span>
+      </div>
+      <div class="menu-item" data-href="/dashboard">
+        <span class="menu-icon">🌱</span>
+        <span>Dashboard</span>
+      </div>
+    </div>
+    {% endif %}
+    
     <div class="profile-main">
+      <!-- Admin Overview Section -->
+      {% if session.get('is_admin') %}
+      <div class="section active" id="admin-overview-section">
+        <h2 class="section-title">
+          <span>👑</span>
+          <span>Bảng điều khiển quản trị</span>
+        </h2>
+        
+        <div style="display: grid; gap: 20px;">
+          <div class="stat-card" style="text-align: left;">
+            <h3 style="margin: 0 0 15px 0; color: var(--tomato-600);">Chức năng quản lý</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">
+                📦 Quản lý Đơn hàng
+              </a>
+              <a href="{{ url_for('admin_products') }}" class="btn btn-primary">
+                🏪 Quản lý Sản phẩm
+              </a>
+              <a href="{{ url_for('admin_feedback') }}" class="btn btn-primary">
+                📝 Quản lý Feedback
+              </a>
+              <a href="{{ url_for('admin_stats') }}" class="btn btn-primary">
+                📈 Xem thống kê hệ thống
+              </a>
+              <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                🏠 Về trang chủ
+              </a>
+            </div>
+          </div>
+          
+          <div class="info-box">
+            <h4 style="margin: 0 0 10px 0; color: var(--tomato-700);">Quyền quản trị viên</h4>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>Quản lý feedback từ người dùng</li>
+              <li>Xem thống kê và báo cáo hệ thống</li>
+              <li>Truy cập toàn bộ dữ liệu ứng dụng</li>
+              <li>Quản lý mẫu dữ liệu huấn luyện</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Regular User Sections -->
+      {% else %}
+      
+      <!-- Vouchers Section -->
+      <div class="section active" id="vouchers-section">
+        <h2 class="section-title">
+          <span>🎫</span>
+          <span>Mã giảm giá của tôi</span>
+        </h2>
+        
+        <!-- Voucher Redemption Box -->
+        <div class="info-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; margin-bottom: 30px; position: relative; z-index: 100;">
+          <h3 style="margin: 0 0 15px 0; font-size: 1.2em; color: white;">
+            🎮 Có mã giảm giá từ game?
+          </h3>
+          <p style="margin-bottom: 20px; opacity: 0.95; line-height: 1.6;">
+            Nhập mã giảm giá bạn nhận được từ trò chơi để thêm vào tài khoản!<br>
+            <small style="font-size: 0.9em; opacity: 0.85;">
+              💡 Mã bắt đầu bằng <strong>MEM</strong> (Memory Game) hoặc <strong>QUIZ</strong> (Quiz Game)
+            </small>
+          </p>
+          <div style="display: flex; gap: 10px; max-width: 600px; position: relative; z-index: 200; isolation: isolate;">
+            <input 
+              type="text" 
+              id="voucher-code-input" 
+              name="voucher-code"
+              placeholder="Nhập mã (VD: MEM12345678 hoặc QUIZ12345678)" 
+              style="flex: 1 !important; padding: 14px 18px !important; border: 2px solid rgba(255,255,255,0.4) !important; border-radius: 10px !important; font-size: 1.05em !important; background: white !important; color: #333 !important; cursor: text !important; user-select: text !important; pointer-events: auto !important; font-weight: 500 !important; -webkit-user-select: text !important; box-sizing: border-box !important; position: relative !important; z-index: 300 !important;"
+              maxlength="20"
+              autocomplete="off"
+              spellcheck="false"
+              onclick="console.log('Input clicked directly!');"
+              onfocus="console.log('Input focused!'); this.style.borderColor='#667eea';"
+              onblur="this.style.borderColor='rgba(255,255,255,0.4)';"
+            >
+            <button 
+              type="button"
+              id="voucher-submit-btn"
+              onclick="console.log('Button clicked!'); redeemVoucher(); return false;" 
+              style="padding: 14px 32px !important; background: white !important; color: #667eea !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; cursor: pointer !important; transition: all 0.3s !important; white-space: nowrap !important; font-size: 1.05em !important; pointer-events: auto !important; position: relative !important; z-index: 300 !important;"
+              onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'"
+              onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'"
+            >
+              ✅ Nhập mã
+            </button>
+          </div>
+          <div id="redeem-result" style="margin-top: 15px; font-weight: 600; font-size: 1.05em; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); min-height: 40px; display: none;"></div>
+        </div>
+        
+        {% if stats and stats.vouchers.active %}
+        <div class="vouchers-grid">
+          {% for voucher in stats.vouchers.active %}
+          <div class="voucher-card">
+            <div class="voucher-code">{{ voucher.code }}</div>
+            <div class="voucher-value">-{{ voucher.value|int|format_number }}đ</div>
+            <div class="voucher-source">
+              📱 Từ {% if voucher.source == 'quiz' %}Quiz Game{% elif voucher.source == 'memory_game' %}Memory Game{% else %}{{ voucher.source }}{% endif %}
+            </div>
+            <div class="voucher-expires">
+              ⏰ Hết hạn: {{ voucher.expires_at[:10] }}
+            </div>
+            <button class="voucher-btn" onclick="copyVoucherCode('{{ voucher.code }}')">
+              📋 Sao chép mã
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="info-box">
+          <p>
+            💡 <strong>Mẹo:</strong> Chơi các trò chơi để nhận thêm mã giảm giá! 
+            <a href="{{ url_for('game_menu') }}" style="color: var(--tomato-500); font-weight: 600;">
+              Chơi ngay →
+            </a>
+          </p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">🎫</div>
+          <p>Bạn chưa có mã giảm giá nào</p>
+          <a href="{{ url_for('game_menu') }}">Chơi game để nhận voucher →</a>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Overview Section -->
+      <div class="section" id="overview-section">
+        <h2 class="section-title">
+          <span>📊</span>
+          <span>Tổng quan hoạt động</span>
+        </h2>
+        
+        {% if stats %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+          <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value">{{ stats.activity.total_orders }}</div>
+            <div class="stat-label">Tổng đơn hàng</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔍</div>
+            <div class="stat-value">{{ stats.activity.total_predictions }}</div>
+            <div class="stat-label">Lượt chẩn đoán</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📝</div>
+            <div class="stat-value">{{ stats.activity.quiz_completed }}</div>
+            <div class="stat-label">Quiz hoàn thành</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🎮</div>
+            <div class="stat-value">{{ stats.activity.memory_completed }}</div>
+            <div class="stat-label">Memory Game</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 30px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 16px;">
+          <h3 style="margin: 0 0 20px 0; color: #333;">🎁 Quyền lợi thành viên {{ stats.membership.tier_name }}</h3>
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.3);">
+              <strong>Giảm giá:</strong> {{ stats.membership.benefits.discount }}% cho mọi đơn hàng
+            </li>
+            <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.3);">
+              <strong>Vận chuyển:</strong> 
+              {% if stats.membership.benefits.free_shipping %}Miễn phí ship toàn quốc{% else %}Phí ship tiêu chuẩn{% endif %}
+            </li>
+            <li style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.3);">
+              <strong>Voucher boost:</strong> x{{ stats.membership.benefits.voucher_boost }} giá trị voucher từ game
+            </li>
+            <li style="padding: 10px 0;">
+              <strong>Hỗ trợ:</strong> Kênh hỗ trợ ưu tiên
+            </li>
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Orders Section -->
+      <div class="section" id="orders-section">
+        <h2 class="section-title">
+          <span>📦</span>
+          <span>Đơn hàng của tôi</span>
+        </h2>
+        
+        <!-- Filter Controls -->
+        <div class="filter-controls" style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <select id="orderStatusFilter" class="filter-select" style="padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="pending">⏳ Chờ xử lý</option>
+            <option value="processing">⚙️ Đang xử lý</option>
+            <option value="shipped">🚚 Đã giao vận</option>
+            <option value="delivered">✅ Đã giao hàng</option>
+            <option value="cancelled">❌ Đã hủy</option>
+          </select>
+          
+          <select id="orderPaymentFilter" class="filter-select" style="padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <option value="all">Tất cả phương thức</option>
+            <option value="cod">💵 COD</option>
+            <option value="vnpay">💳 VNPay</option>
+            <option value="momo">🎀 MoMo</option>
+          </select>
+          
+          <button onclick="applyOrderFilters()" style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+            🔍 Lọc
+          </button>
+        </div>
+        
+        {% if orders %}
+        <div class="orders-list" id="ordersList">
+          {% for order in orders %}
+          <div class="order-card">
+            <div class="order-header">
+              <div>
+                <div class="order-id">Đơn hàng #{{ order.id }}</div>
+                <div class="order-date">{{ order.timestamp[:16] }}</div>
+              </div>
+              <span class="order-status {{ order.status }}">
+                {% if order.status == 'pending' %}⏳ Chờ xử lý
+                {% elif order.status == 'processing' %}⚙️ Đang xử lý
+                {% elif order.status == 'shipped' %}🚚 Đã giao vận
+                {% elif order.status == 'delivered' %}✅ Đã giao hàng
+                {% elif order.status == 'cancelled' %}❌ Đã hủy
+                {% elif order.status == 'completed' %}✅ Hoàn thành
+                {% else %}{{ order.status }}
+                {% endif %}
+              </span>
+            </div>
+            
+            <div class="order-items">
+              {% for item in order.items %}
+              <div class="order-item">
+                <span>{{ item.name }} <strong>x{{ item.quantity }}</strong></span>
+                <span style="font-weight: 600;">{{ (item.price * item.quantity)|int|format_number }}đ</span>
+              </div>
+              {% endfor %}
+            </div>
+            
+            <div class="order-total">
+              <span>Tổng cộng:</span>
+              <span>{{ order.total|int|format_number }}đ</span>
+            </div>
+            
+            <!-- Tracking Button -->
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+              <a href="{{ url_for('order_tracking_page', order_id=order.id) }}" 
+                 class="btn btn-primary" 
+                 style="flex: 1; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none;">
+                🔍 Theo dõi đơn hàng
+              </a>
+              {% if order.status == 'pending' %}
+              <button onclick="cancelOrder('{{ order.id }}')" 
+                      class="btn btn-secondary" 
+                      style="flex: 0.5; padding: 10px; border-radius: 8px;">
+                ❌ Hủy
+              </button>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">📦</div>
+          <p>Bạn chưa có đơn hàng nào</p>
+          <a href="{{ url_for('shop') }}">Mua sắm ngay →</a>
+        </div>
+        {% endif %}
+      </div>
+      
       <!-- Addresses Section -->
-      <div class="section active" id="addresses-section">
-        <h2>📍 Địa chỉ giao hàng</h2>
+      <div class="section" id="addresses-section">
+        <h2 class="section-title">
+          <span>📍</span>
+          <span>Địa chỉ giao hàng</span>
+        </h2>
         
         <div class="addresses-grid">
           {% for address in addresses %}
           <div class="address-card {% if address.is_default %}default{% endif %}">
             {% if address.is_default %}
-            <div class="default-badge">Mặc định</div>
+            <div class="default-badge">✓ Mặc định</div>
             {% endif %}
             
             <div class="address-name">{{ address.full_name }}</div>
@@ -416,70 +1762,168 @@
             </div>
             
             <div class="address-actions">
-              <button class="btn-sm btn-delete" onclick="deleteAddress('{{ address.id }}')">
-                Xóa
+              <button class="btn btn-sm btn-delete" onclick="deleteAddress('{{ address.id }}')">
+                🗑️ Xóa
               </button>
             </div>
           </div>
           {% endfor %}
         </div>
         
-        <button class="add-address-btn" onclick="openAddressModal()">
-          ➕ Thêm địa chỉ mới
+        <button class="add-btn" onclick="openAddressModal()">
+          <span>➕</span>
+          <span>Thêm địa chỉ mới</span>
         </button>
       </div>
-      
-      <!-- Orders Section -->
-      <div class="section" id="orders-section">
-        <h2>📦 Đơn hàng của tôi</h2>
+
+      <!-- Wallet Section -->
+      <div class="section" id="wallet-section" style="display: none;">
+        <h2 class="section-title">
+          <span>💰</span>
+          <span>Ví điện tử</span>
+        </h2>
         
-        {% if orders %}
-        <div class="orders-list">
-          {% for order in orders %}
-          <div class="order-card">
-            <div class="order-header">
-              <div>
-                <div class="order-id">Đơn hàng #{{ order.id }}</div>
-                <div style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                  {{ order.timestamp[:10] }}
-                </div>
-              </div>
-              <span class="order-status {{ order.status }}">
-                {% if order.status == 'pending' %}Đang xử lý{% endif %}
-              </span>
+        <div class="wallet-balance-card">
+          <div class="wallet-header">
+            <div>
+              <div class="wallet-label">Số dư khả dụng</div>
+              <div class="wallet-balance" id="wallet-balance">0đ</div>
             </div>
-            
-            <div class="order-items">
-              {% for item in order.items %}
-              <div class="order-item">
-                <span>{{ item.name }} x{{ item.quantity }}</span>
-                <span>{{ (item.price * item.quantity)|format_number }}đ</span>
+            <button class="btn btn-primary" onclick="openTopupModal()">
+              <span>💳</span>
+              <span>Nạp tiền</span>
+            </button>
+          </div>
+          
+          <div class="wallet-points">
+            <span>⭐ Điểm tích lũy: <strong id="wallet-points">0</strong></span>
+          </div>
+        </div>
+        
+        <h3 style="margin-top: 30px; margin-bottom: 15px;">Lịch sử giao dịch</h3>
+        <div class="transactions-list" id="transactions-list">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
+
+      <!-- Referral Section -->
+      <div class="section" id="referral-section" style="display: none;">
+        <h2 class="section-title">
+          <span>🤝</span>
+          <span>Giới thiệu bạn bè</span>
+        </h2>
+        
+        <div class="referral-card">
+          <div class="referral-header">
+            <h3>Mã giới thiệu của bạn</h3>
+            <div class="referral-code" id="referral-code">Loading...</div>
+            <button class="btn btn-primary" onclick="copyReferralCode()">
+              📋 Sao chép mã
+            </button>
+          </div>
+          
+          <div class="referral-stats">
+            <div class="stat-item">
+              <div class="stat-icon">👥</div>
+              <div class="stat-content">
+                <div class="stat-value" id="referral-count">0</div>
+                <div class="stat-label">Người đã giới thiệu</div>
               </div>
-              {% endfor %}
             </div>
-            
-            <div class="order-total">
-              <span>Tổng cộng:</span>
-              <span>{{ order.total|format_number }}đ</span>
+            <div class="stat-item">
+              <div class="stat-icon">💰</div>
+              <div class="stat-content">
+                <div class="stat-value" id="referral-earnings">0đ</div>
+                <div class="stat-label">Tổng thu nhập</div>
+              </div>
             </div>
           </div>
-          {% endfor %}
+          
+          <div class="referral-info">
+            <h4>🎁 Quyền lợi khi giới thiệu:</h4>
+            <ul>
+              <li>✅ Bạn nhận: <strong>100 điểm</strong> + <strong>50,000đ</strong> vào ví</li>
+              <li>✅ Người được giới thiệu nhận: <strong>50 điểm</strong></li>
+            </ul>
+          </div>
         </div>
-        {% else %}
-        <div style="text-align: center; padding: 60px 20px; color: #999;">
-          <div style="font-size: 3em; margin-bottom: 15px;">📦</div>
-          <p>Bạn chưa có đơn hàng nào</p>
-          <a href="{{ url_for('shop') }}" style="color: var(--tomato-500); font-weight: 600;">
-            Mua sắm ngay →
-          </a>
+        
+        <h3 style="margin-top: 30px; margin-bottom: 15px;">🏆 Bảng xếp hạng</h3>
+        <div class="referral-leaderboard" id="referral-leaderboard">
+          <div class="loading">Đang tải...</div>
         </div>
-        {% endif %}
       </div>
+
+      <!-- Achievements Section -->
+      <div class="section" id="achievements-section" style="display: none;">
+        <h2 class="section-title">
+          <span>🏆</span>
+          <span>Thành tích</span>
+        </h2>
+        
+        <div class="achievements-filters">
+          <button class="filter-btn active" data-filter="all">Tất cả</button>
+          <button class="filter-btn" data-filter="scan">🔍 Quét bệnh</button>
+          <button class="filter-btn" data-filter="purchase">🛒 Mua sắm</button>
+          <button class="filter-btn" data-filter="community">👥 Cộng đồng</button>
+          <button class="filter-btn" data-filter="game">🎮 Trò chơi</button>
+          <button class="filter-btn" data-filter="referral">🤝 Giới thiệu</button>
+          <button class="filter-btn" data-filter="loyalty">💎 Trung thành</button>
+        </div>
+        
+        <div class="achievements-stats">
+          <div class="achievement-stat">
+            <span class="stat-number" id="unlocked-count">0</span>
+            <span class="stat-text">Đã mở khóa</span>
+          </div>
+          <div class="achievement-stat">
+            <span class="stat-number" id="total-count">0</span>
+            <span class="stat-text">Tổng số</span>
+          </div>
+          <div class="achievement-stat">
+            <span class="stat-number" id="achievement-points">0</span>
+            <span class="stat-text">Điểm thưởng</span>
+          </div>
+        </div>
+        
+        <div class="achievements-grid" id="achievements-grid">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
+
+      <!-- Quests Section -->
+      <div class="section" id="quests-section" style="display: none;">
+        <h2 class="section-title">
+          <span>📋</span>
+          <span>Nhiệm vụ hàng ngày</span>
+        </h2>
+        
+        <div class="quests-header">
+          <div class="quest-timer" id="quest-timer">
+            ⏰ Làm mới sau: <strong>--:--:--</strong>
+          </div>
+        </div>
+        
+        <div class="quests-list" id="quests-list">
+          <div class="loading">Đang tải...</div>
+        </div>
+        
+        <div class="quest-info">
+          <h4>💡 Mẹo:</h4>
+          <ul>
+            <li>Hoàn thành nhiệm vụ hàng ngày để nhận điểm thưởng</li>
+            <li>Nhiệm vụ sẽ được làm mới vào 00:00 mỗi ngày</li>
+            <li>Điểm thưởng sẽ được cộng ngay khi hoàn thành</li>
+          </ul>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
 
-<!-- Add Address Modal -->
+<!-- Add Address Modal (only for regular users) -->
+{% if not session.get('is_admin') %}
 <div class="modal" id="address-modal">
   <div class="modal-content">
     <div class="modal-header">
@@ -490,32 +1934,33 @@
     <form id="address-form" onsubmit="saveAddress(event)">
       <div class="form-group">
         <label>Họ và tên *</label>
-        <input type="text" name="full_name" required>
+        <input type="text" name="full_name" required placeholder="Nguyễn Văn A">
       </div>
       
       <div class="form-group">
         <label>Số điện thoại *</label>
-        <input type="tel" name="phone" required pattern="[0-9]{10,11}">
+        <input type="tel" name="phone" required pattern="[0-9]{10,11}" placeholder="0912345678">
       </div>
       
       <div class="form-group">
         <label>Tỉnh/Thành phố *</label>
-        <input type="text" name="city" required placeholder="VD: TP Hồ Chí Minh">
+        <input type="text" name="city" required placeholder="TP Hồ Chí Minh">
       </div>
       
       <div class="form-group">
         <label>Quận/Huyện *</label>
-        <input type="text" name="district" required placeholder="VD: Quận 1">
+        <input type="text" name="district" required placeholder="Quận 1">
       </div>
       
       <div class="form-group">
         <label>Địa chỉ chi tiết *</label>
-        <input type="text" name="address" required placeholder="Số nhà, tên đường">
+        <input type="text" name="address" required placeholder="123 Nguyễn Huệ">
       </div>
       
-      <div class="form-group">
-        <label>
-          <input type="checkbox" name="is_default" value="true">
+      <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+        <input type="checkbox" name="is_default" value="true" id="is_default" 
+               style="width: auto; margin: 0;">
+        <label for="is_default" style="margin: 0; cursor: pointer;">
           Đặt làm địa chỉ mặc định
         </label>
       </div>
@@ -525,26 +1970,107 @@
           Hủy
         </button>
         <button type="submit" class="btn btn-primary">
-          Lưu địa chỉ
+          💾 Lưu địa chỉ
         </button>
       </div>
     </form>
   </div>
 </div>
+{% endif %}
 
 <script>
-function showSection(section) {
-  // Update menu
-  document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
-  event.target.classList.add('active');
+function showSection(section, element) {
+  console.log('========== showSection ==========');
+  console.log('Section:', section);
+  console.log('Element:', element);
   
-  // Update sections
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.getElementById(section + '-section').classList.add('active');
+  try {
+    // Update menu - remove active from all items
+    const menuItems = document.querySelectorAll('.menu-item');
+    console.log('Total menu items:', menuItems.length);
+    
+    menuItems.forEach(item => {
+      item.classList.remove('active');
+      item.style.background = '';
+      item.style.color = '#555';
+    });
+    
+    // Add active to clicked item
+    if (element) {
+      element.classList.add('active');
+      element.style.background = 'var(--tomato-500)';
+      element.style.color = 'white';
+      console.log('Added active class to clicked element');
+    }
+    
+    // Update sections
+    const sections = document.querySelectorAll('.section');
+    console.log('Total sections:', sections.length);
+    
+    sections.forEach(s => {
+      s.classList.remove('active');
+      console.log('Removed active from section:', s.id);
+    });
+    
+    const sectionElement = document.getElementById(section + '-section');
+    if (sectionElement) {
+      sectionElement.classList.add('active');
+      console.log('✅ Section activated:', section + '-section');
+    } else {
+      console.error('❌ Section not found:', section + '-section');
+      
+      // List all available sections
+      const allSections = document.querySelectorAll('[id$="-section"]');
+      console.log('Available sections:', Array.from(allSections).map(s => s.id));
+    }
+  } catch (error) {
+    console.error('❌ Error in showSection:', error);
+  }
+  
+  console.log('========== End showSection ==========');
+}
+
+function copyVoucherCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    if (window.showToast) {
+      window.showToast('Đã sao chép mã: ' + code, 'success');
+    } else {
+      alert('Đã sao chép mã: ' + code);
+    }
+  }).catch(err => {
+    console.error('Error copying:', err);
+    alert('Mã voucher: ' + code);
+  });
 }
 
 function openAddressModal() {
-  document.getElementById('address-modal').classList.add('active');
+  console.log('Opening address modal...');
+  const modal = document.getElementById('address-modal');
+  if (modal) {
+    modal.classList.add('active');
+    
+    // Ensure all inputs are interactive
+    const inputs = modal.querySelectorAll('input, select, textarea');
+    console.log(`Modal has ${inputs.length} inputs`);
+    inputs.forEach((input, index) => {
+      input.removeAttribute('readonly');
+      input.removeAttribute('disabled');
+      input.style.pointerEvents = 'auto';
+      input.style.cursor = 'text';
+      console.log(`Fixed modal input ${index}:`, input.name);
+    });
+    
+    // Auto-focus first input after modal opens
+    setTimeout(() => {
+      const firstInput = modal.querySelector('input[type="text"]');
+      if (firstInput) {
+        firstInput.focus();
+        console.log('First input focused');
+      }
+    }, 100);
+  } else {
+    console.error('Modal not found!');
+  }
 }
 
 function closeAddressModal() {
@@ -576,16 +2102,16 @@ async function saveAddress(event) {
     
     if (result.ok) {
       if (window.showToast) {
-        window.showToast('Đã thêm địa chỉ mới!', 'success');
+        window.showToast('✅ Đã thêm địa chỉ mới!', 'success');
       }
       closeAddressModal();
-      location.reload();
+      setTimeout(() => location.reload(), 500);
     } else {
-      alert('Có lỗi xảy ra. Vui lòng thử lại!');
+      alert('❌ Có lỗi xảy ra. Vui lòng thử lại!');
     }
   } catch (error) {
     console.error('Error saving address:', error);
-    alert('Không thể kết nối đến server!');
+    alert('❌ Không thể kết nối đến server!');
   }
 }
 
@@ -601,17 +2127,634 @@ async function deleteAddress(addressId) {
     
     if (result.ok) {
       if (window.showToast) {
-        window.showToast('Đã xóa địa chỉ!', 'info');
+        window.showToast('✅ Đã xóa địa chỉ!', 'success');
       }
-      location.reload();
+      setTimeout(() => location.reload(), 500);
     } else {
-      alert('Có lỗi xảy ra!');
+      alert('❌ Có lỗi xảy ra!');
     }
   } catch (error) {
     console.error('Error deleting address:', error);
-    alert('Không thể kết nối đến server!');
+    alert('❌ Không thể kết nối đến server!');
   }
 }
+
+// Redeem voucher code
+async function redeemVoucher() {
+  console.log('redeemVoucher() called');
+  
+  const input = document.getElementById('voucher-code-input');
+  const resultDiv = document.getElementById('redeem-result');
+  
+  if (!input) {
+    console.error('Input element not found');
+    alert('Lỗi: Không tìm thấy ô nhập mã');
+    return;
+  }
+  
+  if (!resultDiv) {
+    console.error('Result div not found');
+  }
+  
+  const code = input.value.trim().toUpperCase();
+  console.log('Voucher code:', code);
+  
+  if (!code) {
+    if (resultDiv) {
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '⚠️ Vui lòng nhập mã giảm giá';
+      resultDiv.style.color = 'white';
+      resultDiv.style.background = 'rgba(255, 152, 0, 0.3)';
+    }
+    alert('⚠️ Vui lòng nhập mã giảm giá');
+    return;
+  }
+  
+  // Show loading
+  if (resultDiv) {
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '⏳ Đang xử lý...';
+    resultDiv.style.color = 'white';
+    resultDiv.style.background = 'rgba(255, 255, 255, 0.2)';
+  }
+  
+  console.log('Sending request to /api/redeem_voucher');
+  
+  try {
+    const response = await fetch('/api/redeem_voucher', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ code: code })
+    });
+    
+    console.log('Response status:', response.status);
+    const result = await response.json();
+    console.log('Response data:', result);
+    
+    if (result.ok) {
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `✅ ${result.message}`;
+        resultDiv.style.color = 'white';
+        resultDiv.style.background = 'rgba(76, 175, 80, 0.3)';
+      }
+      input.value = '';
+      
+      // Show toast if available
+      if (window.showToast) {
+        window.showToast(`✅ ${result.message}`, 'success');
+      }
+      
+      // Reload page after 1.5 seconds to show new voucher
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `❌ ${result.error}`;
+        resultDiv.style.color = 'white';
+        resultDiv.style.background = 'rgba(244, 67, 54, 0.3)';
+      }
+      // Also show alert for better visibility
+      alert(`❌ ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Error redeeming voucher:', error);
+    const errorMsg = '❌ Không thể kết nối đến server. Vui lòng thử lại!';
+    if (resultDiv) {
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = errorMsg;
+      resultDiv.style.color = 'white';
+      resultDiv.style.background = 'rgba(244, 67, 54, 0.3)';
+    }
+    alert(errorMsg);
+  }
+}
+
+// Setup voucher input event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('=== Profile page loaded ===');
+  
+  // Force clear any modal active classes
+  document.querySelectorAll('.modal').forEach(m => {
+    m.classList.remove('active');
+    const styles = window.getComputedStyle(m);
+    console.log(`Modal ${m.id}: display=${styles.display}, pointer-events=${styles.pointerEvents}, visibility=${styles.visibility}`);
+  });
+  
+  // Check for any fixed/absolute elements that might overlay
+  const allElements = document.querySelectorAll('*');
+  const suspiciousElements = [];
+  allElements.forEach(el => {
+    const styles = window.getComputedStyle(el);
+    if ((styles.position === 'fixed' || styles.position === 'absolute') && 
+        parseInt(styles.zIndex) > 100 && 
+        styles.pointerEvents !== 'none') {
+      suspiciousElements.push({
+        tag: el.tagName,
+        id: el.id,
+        class: el.className,
+        zIndex: styles.zIndex,
+        pointerEvents: styles.pointerEvents,
+        display: styles.display
+      });
+    }
+  });
+  
+  if (suspiciousElements.length > 0) {
+    console.warn('⚠️ Found elements that might block clicks:', suspiciousElements);
+  } else {
+    console.log('✅ No suspicious overlay elements found');
+  }
+  
+  // SETUP MENU ITEMS WITH DIRECT EVENT LISTENERS
+  const menuItems = document.querySelectorAll('.menu-item');
+  console.log(`Found ${menuItems.length} menu items to setup`);
+  
+  menuItems.forEach((item, index) => {
+    const text = item.textContent.trim();
+    const section = item.getAttribute('data-section');
+    const href = item.getAttribute('data-href');
+    
+    console.log(`Menu ${index}: "${text}"`);
+    console.log(`  Section: ${section}, Href: ${href}`);
+    
+    // Force styles
+    item.style.cursor = 'pointer';
+    item.style.pointerEvents = 'auto';
+    
+    // Add click handler
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      console.log('✅ MENU CLICK:', text);
+      
+      if (href) {
+        // Navigation
+        console.log('Navigating to:', href);
+        window.location.href = href;
+      } else if (section) {
+        // Section switch
+        console.log('Switching to section:', section);
+        showSection(section, this);
+      }
+    }, {capture: false});
+    
+    // Add more event listeners for debugging
+    item.addEventListener('mousedown', () => {
+      console.log('mousedown:', text);
+    });
+    
+    item.addEventListener('mouseup', () => {
+      console.log('mouseup:', text);
+    });
+    
+    item.addEventListener('mouseenter', () => {
+      console.log('mouseenter:', text);
+      item.style.background = '#f8f9fa';
+    });
+    
+    item.addEventListener('mouseleave', () => {
+      console.log('mouseleave:', text);
+      if (!item.classList.contains('active')) {
+        item.style.background = '';
+      }
+    });
+  });
+  
+  console.log('Menu items setup complete');
+  
+  const voucherInput = document.getElementById('voucher-code-input');
+  if (voucherInput) {
+    voucherInput.removeAttribute('readonly');
+    voucherInput.removeAttribute('disabled');
+    
+    voucherInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+    
+    voucherInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        redeemVoucher();
+      }
+    });
+  }
+  
+  // Fix all form inputs
+  const allInputs = document.querySelectorAll('.modal input, .info-box input, .form-group input, .form-group select, .form-group textarea');
+  allInputs.forEach((input) => {
+    input.removeAttribute('readonly');
+    input.removeAttribute('disabled');
+    input.style.pointerEvents = 'auto';
+    input.style.cursor = 'text';
+  });
+  
+  console.log('=== Initialization complete ===');
+});
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('address-modal');
+    if (modal) closeAddressModal();
+  }
+});
+
+// Close modal on background click
+const modal = document.getElementById('address-modal');
+if (modal) {
+  modal.addEventListener('click', (e) => {
+    if (e.target.id === 'address-modal') {
+      closeAddressModal();
+    }
+  });
+}
+
+// ========== Order Tracking & Management Functions ==========
+
+function cancelOrder(orderId) {
+  if (!confirm('Bạn có chắc muốn hủy đơn hàng này?')) {
+    return;
+  }
+  
+  fetch(`/api/order/${orderId}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✅ Đơn hàng đã được hủy thành công');
+      location.reload();
+    } else {
+      alert('❌ Lỗi: ' + (data.error || 'Không thể hủy đơn hàng'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('❌ Có lỗi xảy ra khi hủy đơn hàng');
+  });
+}
+
+function applyOrderFilters() {
+  const status = document.getElementById('orderStatusFilter').value;
+  const payment = document.getElementById('orderPaymentFilter').value;
+  
+  const params = new URLSearchParams();
+  if (status !== 'all') params.append('status', status);
+  if (payment !== 'all') params.append('payment', payment);
+  
+  fetch('/api/orders/my?' + params.toString())
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        displayFilteredOrders(data.orders);
+      } else {
+        alert('Lỗi khi lọc đơn hàng: ' + data.error);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Có lỗi xảy ra khi lọc đơn hàng');
+    });
+}
+
+function displayFilteredOrders(orders) {
+  const ordersList = document.getElementById('ordersList');
+  
+  if (orders.length === 0) {
+    ordersList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📦</div>
+        <p>Không tìm thấy đơn hàng nào phù hợp</p>
+      </div>
+    `;
+    return;
+  }
+  
+  ordersList.innerHTML = orders.map(order => {
+    const statusText = {
+      'pending': '⏳ Chờ xử lý',
+      'processing': '⚙️ Đang xử lý',
+      'shipped': '🚚 Đã giao vận',
+      'delivered': '✅ Đã giao hàng',
+      'cancelled': '❌ Đã hủy',
+      'completed': '✅ Hoàn thành'
+    }[order.status] || order.status;
+    
+    const itemsHtml = order.items.map(item => `
+      <div class="order-item">
+        <span>${item.name} <strong>x${item.quantity}</strong></span>
+        <span style="font-weight: 600;">${(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
+      </div>
+    `).join('');
+    
+    const cancelBtn = order.status === 'pending' ? `
+      <button onclick="cancelOrder('${order.id}')" 
+              class="btn btn-secondary" 
+              style="flex: 0.5; padding: 10px; border-radius: 8px;">
+        ❌ Hủy
+      </button>
+    ` : '';
+    
+    return `
+      <div class="order-card">
+        <div class="order-header">
+          <div>
+            <div class="order-id">Đơn hàng #${order.id}</div>
+            <div class="order-date">${order.timestamp.substring(0, 16)}</div>
+          </div>
+          <span class="order-status ${order.status}">${statusText}</span>
+        </div>
+        
+        <div class="order-items">
+          ${itemsHtml}
+        </div>
+        
+        <div class="order-total">
+          <span>Tổng cộng:</span>
+          <span>${order.total.toLocaleString('vi-VN')}đ</span>
+        </div>
+        
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+          <a href="/order/track/${order.id}" 
+             class="btn btn-primary" 
+             style="flex: 1; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none;">
+            🔍 Theo dõi đơn hàng
+          </a>
+          ${cancelBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ==================== WALLET FUNCTIONS ====================
+async function loadWallet() {
+  try {
+    const response = await fetch('/api/wallet');
+    const data = await response.json();
+    
+    if (data.ok) {
+      const wallet = data.wallet;
+      document.getElementById('wallet-balance').textContent = wallet.balance.toLocaleString('vi-VN') + 'đ';
+      document.getElementById('wallet-points').textContent = wallet.points.toLocaleString('vi-VN');
+      
+      // Load transactions (separate key in response)
+      const transactions = data.transactions || [];
+      const transactionsHtml = transactions.length > 0 
+        ? transactions.map(tx => {
+            const typeClass = tx.type === 'topup' ? 'credit' : 'debit';
+            const typeIcon = tx.type === 'topup' ? '💚' : '💸';
+            const typeText = tx.type === 'topup' ? 'Nạp tiền' : 'Thanh toán';
+            const amountPrefix = tx.type === 'topup' ? '+' : '-';
+            
+            return `
+              <div class="transaction-item ${typeClass}">
+                <div class="transaction-info">
+                  <div class="transaction-type">${typeIcon} ${typeText}</div>
+                  <div class="transaction-desc">${tx.description}</div>
+                  <div class="transaction-date">${new Date(tx.timestamp).toLocaleString('vi-VN')}</div>
+                </div>
+                <div class="transaction-amount ${typeClass}">
+                  ${amountPrefix}${Math.abs(tx.amount).toLocaleString('vi-VN')}đ
+                </div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty-state">Chưa có giao dịch nào</div>';
+      
+      document.getElementById('transactions-list').innerHTML = transactionsHtml;
+    }
+  } catch (error) {
+    console.error('Error loading wallet:', error);
+    document.getElementById('transactions-list').innerHTML = '<div class="error-state">Không thể tải thông tin ví</div>';
+  }
+}
+
+function openTopupModal() {
+  const amount = prompt('Nhập số tiền muốn nạp (VNĐ):\nTối thiểu: 10,000đ\nTối đa: 50,000,000đ');
+  
+  if (!amount) return;
+  
+  const numAmount = parseInt(amount.replace(/[^\d]/g, ''));
+  
+  if (isNaN(numAmount) || numAmount < 10000 || numAmount > 50000000) {
+    alert('Số tiền không hợp lệ! Vui lòng nhập từ 10,000đ đến 50,000,000đ');
+    return;
+  }
+  
+  const method = confirm('Chọn phương thức thanh toán:\n\nOK = VNPay\nCancel = MoMo');
+  const paymentMethod = method ? 'vnpay' : 'momo';
+  
+  // Redirect to topup endpoint
+  window.location.href = `/api/wallet/topup?amount=${numAmount}&method=${paymentMethod}`;
+}
+
+// ==================== REFERRAL FUNCTIONS ====================
+async function loadReferral() {
+  try {
+    const response = await fetch('/api/referral/info');
+    const data = await response.json();
+    
+    if (data.ok) {
+      const ref = data.referral;
+      document.getElementById('referral-code').textContent = ref.code;
+      document.getElementById('referral-count').textContent = ref.referral_count;
+      document.getElementById('referral-earnings').textContent = ref.total_earnings.toLocaleString('vi-VN') + 'đ';
+      
+      // Render leaderboard from same response
+      const leaderboardHtml = data.leaderboard && data.leaderboard.length > 0
+        ? data.leaderboard.map((entry, index) => {
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            return `
+              <div class="leaderboard-item">
+                <div class="leaderboard-rank">${medal}</div>
+                <div class="leaderboard-user">
+                  <div class="leaderboard-name">${entry.username}</div>
+                  <div class="leaderboard-stats">${entry.referral_count} người • ${entry.total_earnings.toLocaleString('vi-VN')}đ</div>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty-state">Chưa có dữ liệu</div>';
+      
+      document.getElementById('referral-leaderboard').innerHTML = leaderboardHtml;
+    }
+  } catch (error) {
+    console.error('Error loading referral:', error);
+  }
+}
+
+function copyReferralCode() {
+  const code = document.getElementById('referral-code').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    if (window.showToast) {
+      window.showToast('✅ Đã sao chép mã giới thiệu!', 'success');
+    } else {
+      alert('✅ Đã sao chép: ' + code);
+    }
+  }).catch(err => {
+    console.error('Copy failed:', err);
+    alert('Mã giới thiệu: ' + code);
+  });
+}
+
+// ==================== ACHIEVEMENTS FUNCTIONS ====================
+async function loadAchievements() {
+  try {
+    const response = await fetch('/api/achievements');
+    const data = await response.json();
+    
+    if (data.ok) {
+      const achievements = data.achievements;
+      const unlocked = achievements.filter(a => a.unlocked).length;
+      
+      document.getElementById('unlocked-count').textContent = unlocked;
+      document.getElementById('total-count').textContent = achievements.length;
+      document.getElementById('achievement-points').textContent = 
+        achievements.filter(a => a.unlocked).reduce((sum, a) => sum + (a.points || 0), 0);
+      
+      renderAchievements(achievements);
+      
+      // Setup filter buttons
+      const filterBtns = document.querySelectorAll('.achievements-filters .filter-btn');
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          filterBtns.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          const filter = e.target.dataset.filter;
+          renderAchievements(achievements, filter);
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error loading achievements:', error);
+    document.getElementById('achievements-grid').innerHTML = '<div class="error-state">Không thể tải thành tích</div>';
+  }
+}
+
+function renderAchievements(achievements, filter = 'all') {
+  const filtered = filter === 'all' 
+    ? achievements 
+    : achievements.filter(a => a.category === filter);
+  
+  const achievementsHtml = filtered.map(ach => {
+    const unlockedClass = ach.unlocked ? 'unlocked' : 'locked';
+    const progressBar = !ach.unlocked && ach.progress !== undefined ? `
+      <div class="achievement-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${ach.progress_percentage}%"></div>
+        </div>
+        <div class="progress-text">${ach.progress}/${ach.target}</div>
+      </div>
+    ` : '';
+    
+    return `
+      <div class="achievement-card ${unlockedClass}">
+        <div class="achievement-icon">${ach.icon}</div>
+        <div class="achievement-name">${ach.name}</div>
+        <div class="achievement-desc">${ach.description}</div>
+        ${progressBar}
+        ${ach.unlocked ? `<div class="achievement-date">🎉 ${new Date(ach.unlocked_at).toLocaleDateString('vi-VN')}</div>` : ''}
+        <div class="achievement-points">+${ach.points} điểm</div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('achievements-grid').innerHTML = achievementsHtml || '<div class="empty-state">Không có thành tích nào</div>';
+}
+
+// ==================== QUESTS FUNCTIONS ====================
+async function loadQuests() {
+  try {
+    const response = await fetch('/api/quests/daily');
+    const data = await response.json();
+    
+    if (data.ok) {
+      const quests = data.quests;
+      
+      const questsHtml = quests.map(quest => {
+        const completed = quest.completed;
+        const progressPercent = (quest.progress / quest.target) * 100;
+        
+        return `
+          <div class="quest-card ${completed ? 'completed' : ''}">
+            <div class="quest-header">
+              <div class="quest-icon">${quest.icon}</div>
+              <div class="quest-info">
+                <div class="quest-name">${quest.name}</div>
+                <div class="quest-desc">${quest.description}</div>
+              </div>
+              ${completed ? '<div class="quest-check">✅</div>' : ''}
+            </div>
+            
+            <div class="quest-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progressPercent}%; background: ${completed ? '#4caf50' : '#ff6347'}"></div>
+              </div>
+              <div class="progress-text">${quest.progress}/${quest.target}</div>
+            </div>
+            
+            <div class="quest-reward">
+              🎁 Phần thưởng: <strong>+${quest.reward_points} điểm</strong>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      document.getElementById('quests-list').innerHTML = questsHtml || '<div class="empty-state">Không có nhiệm vụ</div>';
+      
+      // Update timer
+      updateQuestTimer();
+    }
+  } catch (error) {
+    console.error('Error loading quests:', error);
+    document.getElementById('quests-list').innerHTML = '<div class="error-state">Không thể tải nhiệm vụ</div>';
+  }
+}
+
+function updateQuestTimer() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const diff = tomorrow - now;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  const timerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  const timerElement = document.querySelector('#quest-timer strong');
+  
+  if (timerElement) {
+    timerElement.textContent = timerText;
+  }
+  
+  // Update every second
+  setTimeout(updateQuestTimer, 1000);
+}
+
+// Update showSection to load data when switching sections
+const originalShowSection = showSection;
+showSection = function(section, element) {
+  originalShowSection(section, element);
+  
+  // Load data for new sections
+  if (section === 'wallet') {
+    loadWallet();
+  } else if (section === 'referral') {
+    loadReferral();
+  } else if (section === 'achievements') {
+    loadAchievements();
+  } else if (section === 'quests') {
+    loadQuests();
+  }
+};
 </script>
 
 {% endblock %}

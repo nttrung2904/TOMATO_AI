@@ -10,6 +10,10 @@ Web application để phát hiện bệnh trên lá cà chua sử dụng Deep Le
 - 💬 Chatbot hỗ trợ câu hỏi về bệnh cà chua
 - 📊 Admin dashboard quản lý feedback
 - 🚀 LRU cache tự động quản lý memory
+- 💳 **Thanh toán trực tuyến VNPay & MoMo** ⭐ NEW
+- 🛒 Hệ thống shop và giỏ hàng
+- 🎮 Mini games (Quiz, Memory, Farm RPG)
+- 👤 Quản lý tài khoản và membership tiers
 
 ## Setup
 
@@ -102,12 +106,28 @@ web_tomato_1/
 - `GET /chat` - Chatbot interface
 - `POST /api/chat` - Chatbot API
 - `POST /feedback` - Submit feedback
+- `GET /shop` - Shop page
+- `GET /cart` - Shopping cart
+- `POST /api/order/submit` - Submit order
+- `POST /api/payment/create` - Create payment transaction
+- `GET /payment/vnpay/callback` - VNPay callback
+- `GET /payment/momo/callback` - MoMo callback
+- `POST /payment/momo/ipn` - MoMo IPN
 
 ### Admin
 - `GET /admin/feedback` - Xem feedback images
 - `POST /admin/feedback_action` - Xử lý feedback
 - `GET /api/cache_stats` - Xem cache statistics
 - `POST /api/clear_cache` - Clear model cache
+
+## Payment Integration
+
+Hệ thống hỗ trợ 3 phương thức thanh toán:
+- 💵 **COD (Cash on Delivery)**: Thanh toán khi nhận hàng
+- 💳 **VNPay**: Thẻ ATM, Visa, Mastercard, QR Code
+- 🎀 **MoMo**: Ví điện tử MoMo
+
+**Xem hướng dẫn chi tiết tại:** [PAYMENT_SETUP.md](PAYMENT_SETUP.md)
 
 ## Configuration
 

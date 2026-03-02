@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý sản phẩm | Admin{% endblock %}
+
+{% block content %}
+<style>
+  .admin-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .admin-title {
+    font-size: 2rem;
+    color: #2d5016;
+    margin: 0;
+  }
+  
+  .btn-add {
+    padding: 0.75rem 1.5rem;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.3s;
+  }
+  
+  .btn-add:hover {
+    background: var(--tomato-600);
+    color: white;
+  }
+  
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+  
+  .product-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  
+  [data-theme="dark"] .product-card {
+    background: var(--bg-secondary);
+  }
+  
+  .product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  }
+  
+  .product-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #f5f5f5;
+  }
+  
+  .product-body {
+    padding: 1.5rem;
+  }
+  
+  .product-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .product-name {
+    color: #ddd;
+  }
+  
+  .product-category {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+  
+  .product-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .product-meta {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .product-price {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--tomato-600);
+  }
+  
+  [data-theme="dark"] .product-price {
+    color: var(--tomato-400);
+  }
+  
+  .product-stock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  
+  .stock-label {
+    font-size: 0.85rem;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .stock-label {
+    color: #999;
+  }
+  
+  .stock-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  
+  .stock-value.low {
+    color: #f44336;
+  }
+  
+  .stock-value.medium {
+    color: #ff9800;
+  }
+  
+  .stock-value.high {
+    color: #4caf50;
+  }
+  
+  .product-stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .product-stats {
+    color: #999;
+  }
+  
+  .product-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .btn-edit, .btn-delete {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+  }
+  
+  .btn-edit {
+    background: #2196F3;
+    color: white;
+  }
+  
+  .btn-edit:hover {
+    background: #1976D2;
+    color: white;
+  }
+  
+  .btn-delete {
+    background: #f44336;
+    color: white;
+  }
+  
+  .btn-delete:hover {
+    background: #d32f2f;
+  }
+  
+  .status-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.9);
+  }
+  
+  .status-active {
+    color: #4caf50;
+  }
+  
+  .status-inactive {
+    color: #f44336;
+  }
+  
+  .back-btn {
+    padding: 0.5rem 1.5rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.3s;
+  }
+  
+  .back-btn:hover {
+    background: #5a6268;
+    color: white;
+  }
+</style>
+
+<div class="admin-container">
+  <div class="admin-header">
+    <h1 class="admin-title">📦 Quản lý sản phẩm</h1>
+    <div style="display: flex; gap: 1rem;">
+      <a href="{{ url_for('admin_add_product') }}" class="btn-add">
+        <span>➕</span>
+        <span>Thêm sản phẩm</span>
+      </a>
+      <a href="{{ url_for('profile') }}" class="back-btn">← Quay lại</a>
+    </div>
+  </div>
+  
+  {% if products %}
+  <div class="products-grid">
+    {% for product in products %}
+    <div class="product-card" style="position: relative;">
+      <span class="status-badge status-{{ product.status }}">
+        {{ 'Hoạt động' if product.status == 'active' else 'Ẩn' }}
+      </span>
+      
+      <img src="{{ url_for('static', filename=product.image) }}" 
+           alt="{{ product.name }}" 
+           class="product-image"
+           onerror="this.src='{{ url_for('static', filename='images/tomato.jpg') }}'">
+      
+      <div class="product-body">
+        <span class="product-category">
+          {% if product.category == 'pesticide' %}Thuốc trừ sâu
+          {% elif product.category == 'fungicide' %}Thuốc trừ nấm
+          {% elif product.category == 'fertilizer' %}Phân bón
+          {% elif product.category == 'equipment' %}Dụng cụ
+          {% else %}{{ product.category }}
+          {% endif %}
+        </span>
+        
+        <h3 class="product-name">{{ product.name }}</h3>
+        
+        <div class="product-meta">
+          <div class="product-price">{{ "{:,.0f}".format(product.price) }}đ</div>
+          <div class="product-stock">
+            <span class="stock-label">Tồn kho</span>
+            <span class="stock-value {% if product.stock == 0 %}low{% elif product.stock < 20 %}medium{% else %}high{% endif %}">
+              {{ product.stock }}
+            </span>
+          </div>
+        </div>
+        
+        <div class="product-stats">
+          <span>⭐ {{ product.rating_avg or 0 }} ({{ product.rating_count or 0 }})</span>
+          <span>📦 Đã bán: {{ product.sold or 0 }}</span>
+        </div>
+        
+        <div class="product-actions">
+          <a href="{{ url_for('admin_edit_product', product_id=product.id) }}" class="btn-edit">
+            ✏️ Sửa
+          </a>
+          <form action="{{ url_for('admin_delete_product', product_id=product.id) }}" 
+                method="POST" 
+                style="flex: 1;"
+                onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này?')">
+            <button type="submit" class="btn-delete">🗑️ Xóa</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align: center; padding: 3rem; color: #999;">
+    <div style="font-size: 4rem; margin-bottom: 1rem;">📦</div>
+    <p>Chưa có sản phẩm nào</p>
+    <a href="{{ url_for('admin_add_product') }}" class="btn-add" style="margin-top: 1rem;">
+      Thêm sản phẩm đầu tiên
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

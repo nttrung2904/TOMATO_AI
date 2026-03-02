@@ -1,0 +1,916 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .product-detail-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .breadcrumb {
+    margin-bottom: 2rem;
+    color: #666;
+  }
+  
+  .breadcrumb a {
+    color: var(--tomato-600);
+    text-decoration: none;
+  }
+  
+  .breadcrumb a:hover {
+    text-decoration: underline;
+  }
+  
+  .product-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    margin-bottom: 3rem;
+  }
+  
+  .product-image-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .product-image-section {
+    background: var(--bg-secondary);
+  }
+  
+  .product-image-main {
+    width: 100%;
+    height: 500px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #f5f5f5;
+  }
+  
+  [data-theme="dark"] .product-image-main {
+    background: var(--bg-tertiary);
+  }
+  
+  .product-info-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .product-info-section {
+    background: var(--bg-secondary);
+  }
+  
+  .product-category-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  
+  .product-name {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0 0 1rem 0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .product-name {
+    color: #ddd;
+  }
+  
+  .product-rating {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  [data-theme="dark"] .product-rating {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .stars {
+    color: #ffc107;
+    font-size: 1.2rem;
+  }
+  
+  .rating-text {
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  [data-theme="dark"] .rating-text {
+    color: #999;
+  }
+  
+  .product-price {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--tomato-600);
+    margin-bottom: 1.5rem;
+  }
+  
+  .product-stock {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+  
+  .product-stock.in-stock {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  
+  .product-stock.low-stock {
+    background: #fff3e0;
+    color: #f57c00;
+  }
+  
+  .product-stock.out-of-stock {
+    background: #ffebee;
+    color: #c62828;
+  }
+  
+  .product-description {
+    margin-bottom: 2rem;
+    line-height: 1.8;
+    color: #555;
+  }
+  
+  [data-theme="dark"] .product-description {
+    color: #bbb;
+  }
+  
+  .product-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  
+  .btn-add-cart, .btn-buy-now {
+    flex: 1;
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .btn-add-cart {
+    background: var(--tomato-500);
+    color: white;
+  }
+  
+  .btn-add-cart:hover:not(:disabled) {
+    background: var(--tomato-600);
+  }
+  
+  .btn-buy-now {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+  }
+  
+  .btn-buy-now:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255,107,107,0.4);
+  }
+  
+  .btn-add-cart:disabled, .btn-buy-now:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .btn-wishlist {
+    padding: 1rem 2rem;
+    border: 2px solid var(--tomato-500);
+    background: white;
+    color: var(--tomato-500);
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 10px;
+    width: 100%;
+  }
+  
+  .btn-wishlist:hover {
+    background: var(--tomato-50);
+    transform: translateY(-2px);
+  }
+  
+  .btn-wishlist.in-wishlist {
+    background: var(--tomato-500);
+    color: white;
+    border-color: var(--tomato-500);
+  }
+  
+  [data-theme="dark"] .btn-wishlist {
+    background: #2d2d2d;
+    border-color: var(--tomato-400);
+    color: var(--tomato-400);
+  }
+  
+  [data-theme="dark"] .btn-wishlist.in-wishlist {
+    background: var(--tomato-500);
+    color: white;
+  }
+  
+  .reviews-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .reviews-section {
+    background: var(--bg-secondary);
+  }
+  
+  .reviews-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .reviews-header {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .reviews-header h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .reviews-header h2 {
+    color: #ddd;
+  }
+  
+  .btn-write-review {
+    padding: 0.75rem 1.5rem;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .btn-write-review:hover {
+    background: var(--tomato-600);
+  }
+  
+  .review-form {
+    background: #f9f9f9;
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: none;
+  }
+  
+  [data-theme="dark"] .review-form {
+    background: var(--bg-tertiary);
+  }
+  
+  .review-form.active {
+    display: block;
+  }
+  
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .form-group label {
+    color: #ddd;
+  }
+  
+  .star-rating {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 2rem;
+  }
+  
+  .star-rating .star {
+    cursor: pointer;
+    color: #ddd;
+    transition: color 0.2s;
+  }
+  
+  .star-rating .star.active,
+  .star-rating .star:hover {
+    color: #ffc107;
+  }
+  
+  .form-group textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 120px;
+  }
+  
+  [data-theme="dark"] .form-group textarea {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: #ddd;
+  }
+  
+  .form-group input[type="file"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #fafafa;
+  }
+  
+  .form-group input[type="file"]:hover {
+    border-color: var(--tomato-500);
+    background: #fff;
+  }
+  
+  [data-theme="dark"] .form-group input[type="file"] {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: #ddd;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .btn-submit {
+    padding: 0.75rem 2rem;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  
+  .btn-submit:hover {
+    background: var(--tomato-600);
+  }
+  
+  .btn-cancel {
+    padding: 0.75rem 2rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  
+  .btn-cancel:hover {
+    background: #5a6268;
+  }
+  
+  .reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .review-item {
+    padding: 1.5rem;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    transition: box-shadow 0.3s;
+  }
+  
+  [data-theme="dark"] .review-item {
+    border-color: var(--bg-tertiary);
+  }
+  
+  .review-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .review-author {
+    font-weight: 600;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .review-author {
+    color: #ddd;
+  }
+  
+  .review-date {
+    color: #999;
+    font-size: 0.9rem;
+  }
+  
+  .review-stars {
+    color: #ffc107;
+    margin-bottom: 0.5rem;
+  }
+  
+  .review-comment {
+    color: #555;
+    line-height: 1.6;
+  }
+  
+  [data-theme="dark"] .review-comment {
+    color: #bbb;
+  }
+  
+  .no-reviews {
+    text-align: center;
+    padding: 3rem;
+    color: #999;
+  }
+  
+  .no-reviews-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .product-detail {
+      grid-template-columns: 1fr;
+    }
+    
+    .product-actions {
+      flex-direction: column;
+    }
+    
+    .product-image-main {
+      height: 350px;
+    }
+  }
+</style>
+
+<div class="product-detail-container">
+  <div class="breadcrumb">
+    <a href="{{ url_for('shop') }}">← Cửa hàng</a> / {{ product.name }}
+  </div>
+  
+  <div class="product-detail">
+    <div class="product-image-section">
+      <img src="{{ url_for('static', filename=product.image) }}" 
+           alt="{{ product.name }}" 
+           class="product-image-main"
+           onerror="this.src='{{ url_for('static', filename='images/tomato.jpg') }}'">
+    </div>
+    
+    <div class="product-info-section">
+      <span class="product-category-badge">
+        {% if product.category == 'pesticide' %}Thuốc trừ sâu
+        {% elif product.category == 'fungicide' %}Thuốc trừ nấm
+        {% elif product.category == 'fertilizer' %}Phân bón
+        {% elif product.category == 'equipment' %}Dụng cụ
+        {% else %}{{ product.category }}
+        {% endif %}
+      </span>
+      
+      <h1 class="product-name">{{ product.name }}</h1>
+      
+      <div class="product-rating">
+        <div class="stars" id="product-stars"></div>
+        <span class="rating-text" id="rating-text">
+          {{ product.rating_avg or 0 }} ({{ product.rating_count or 0 }} đánh giá)
+        </span>
+      </div>
+      
+      <div class="product-price">{{ "{:,.0f}".format(product.price) }}đ</div>
+      
+      <div class="product-stock {% if product.stock == 0 %}out-of-stock{% elif product.stock < 20 %}low-stock{% else %}in-stock{% endif %}">
+        {% if product.stock == 0 %}
+          ❌ Hết hàng
+        {% elif product.stock < 20 %}
+          ⚠️ Chỉ còn {{ product.stock }} sản phẩm
+        {% else %}
+          ✅ Còn {{ product.stock }} sản phẩm
+        {% endif %}
+      </div>
+      
+      <p class="product-description">{{ product.description }}</p>
+      
+      <div class="product-actions">
+        <button class="btn-add-cart" 
+                onclick="addToCart()"
+                {% if product.stock == 0 %}disabled{% endif %}>
+          {% if product.stock == 0 %}❌ Hết hàng{% else %}🛒 Thêm vào giỏ{% endif %}
+        </button>
+        <button class="btn-buy-now" 
+                onclick="buyNow()"
+                {% if product.stock == 0 %}disabled{% endif %}>
+          {% if product.stock == 0 %}❌ Hết hàng{% else %}⚡ Mua ngay{% endif %}
+        </button>
+        {% if session.get('username') %}
+        <button class="btn-wishlist" 
+                id="wishlistBtn"
+                onclick="toggleWishlist()"
+                title="Thêm vào yêu thích">
+          <span id="wishlistIcon">🤍</span> <span id="wishlistText">Yêu thích</span>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <div class="reviews-section">
+    <div class="reviews-header">
+      <h2>💬  Đánh giá sản phẩm</h2>
+      {% if session.get('username') %}
+      <button class="btn-write-review" onclick="toggleReviewForm()">✍️ Viết đánh giá</button>
+      {% endif %}
+    </div>
+    
+    {% if session.get('username') %}
+    <div class="review-form" id="reviewForm">
+      <h3 style="margin-top: 0;">Viết đánh giá của bạn</h3>
+      <form onsubmit="submitReview(event)">
+        <div class="form-group">
+          <label>Đánh giá của bạn:</label>
+          <div class="star-rating" id="starRating">
+            <span class="star" data-rating="1">★</span>
+            <span class="star" data-rating="2">★</span>
+            <span class="star" data-rating="3">★</span>
+            <span class="star" data-rating="4">★</span>
+            <span class="star" data-rating="5">★</span>
+          </div>
+          <input type="hidden" id="ratingValue" value="0">
+        </div>
+        
+        <div class="form-group">
+          <label for="comment">Nhận xét:</label>
+          <textarea id="comment" placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..." required></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="reviewImages">📷 Hình ảnh (tùy chọn, tối đa 5 ảnh):</label>
+          <input type="file" id="reviewImages" multiple accept="image/png,image/jpeg,image/jpg" onchange="previewReviewImages(event)">
+          <div id="imagePreview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;"></div>
+          <small style="color: #999; display: block; margin-top: 5px;">✨ +5 điểm thưởng khi thêm hình ảnh!</small>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-submit">Gửi đánh giá</button>
+          <button type="button" class="btn-cancel" onclick="toggleReviewForm()">Hủy</button>
+        </div>
+      </form>
+    </div>
+    {% else %}
+    <div style="background: #f9f9f9; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; text-align: center;">
+      <a href="{{ url_for('login') }}" style="color: var(--tomato-600); font-weight: 600;">
+        Đăng nhập để viết đánh giá
+      </a>
+    </div>
+    {% endif %}
+    
+    <div class="reviews-list" id="reviewsList">
+      <div style="text-align: center; padding: 2rem; color: #999;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">⏳</div>
+        <p>Đang tải đánh giá...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const productId = {{ product.id }};
+const productData = {
+  id: {{ product.id }},
+  name: '{{ product.name }}',
+  price: {{ product.price }},
+  stock: {{ product.stock }},
+  image: '{{ url_for("static", filename=product.image) }}'
+};
+
+let isInWishlist = false;
+
+// Check if product is in wishlist
+async function checkWishlistStatus() {
+  {% if session.get('username') %}
+  try {
+    const response = await fetch(`/api/wishlist/check/${productId}`);
+    const data = await response.json();
+    
+    if (data.ok) {
+      isInWishlist = data.in_wishlist;
+      updateWishlistButton();
+    }
+  } catch (error) {
+    console.error('Error checking wishlist:', error);
+  }
+  {% endif %}
+}
+
+function updateWishlistButton() {
+  const btn = document.getElementById('wishlistBtn');
+  const icon = document.getElementById('wishlistIcon');
+  const text = document.getElementById('wishlistText');
+  
+  if (!btn) return;
+  
+  if (isInWishlist) {
+    btn.classList.add('in-wishlist');
+    icon.textContent = '❤️';
+    text.textContent = 'Đã yêu thích';
+  } else {
+    btn.classList.remove('in-wishlist');
+    icon.textContent = '🤍';
+    text.textContent = 'Yêu thích';
+  }
+}
+
+async function toggleWishlist() {
+  try {
+    const endpoint = isInWishlist 
+      ? `/api/wishlist/remove/${productId}` 
+      : `/api/wishlist/add/${productId}`;
+    
+    const response = await fetch(endpoint, { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.ok) {
+      isInWishlist = !isInWishlist;
+      updateWishlistButton();
+      
+      const message = isInWishlist 
+        ? '❤️ Đã thêm vào danh sách yêu thích!' 
+        : 'Đã xóa khỏi danh sách yêu thích';
+      window.toast.success(message);
+    } else {
+      window.toast.error(data.error || 'Lỗi khi cập nhật danh sách yêu thích');
+    }
+  } catch (error) {
+    console.error('Error toggling wishlist:', error);
+    window.toast.error('Lỗi kết nối');
+  }
+}
+
+// Display product rating stars
+function displayProductRating() {
+  const rating = {{ product.rating_avg or 0 }};
+  const stars = document.getElementById('product-stars');
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  
+  let html = '';
+  for (let i = 0; i < fullStars; i++) {
+    html += '★';
+  }
+  if (hasHalfStar) {
+    html += '☆';
+  }
+  for (let i = fullStars + (hasHalfStar ? 1 : 0); i < 5; i++) {
+    html += '☆';
+  }
+  
+  stars.innerHTML = html;
+}
+
+// Load reviews
+async function loadReviews() {
+  try {
+    const response = await fetch(`/api/product/${productId}/reviews`);
+    const data = await response.json();
+    
+    const reviewsList = document.getElementById('reviewsList');
+    
+    if (data.ok && data.reviews.length > 0) {
+      reviewsList.innerHTML = data.reviews.map(review => {
+        const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
+        const date = new Date(review.created_at).toLocaleDateString('vi-VN');
+        
+        // Render review images if any
+        let imagesHtml = '';
+        if (review.images && review.images.length > 0) {
+          imagesHtml = `
+            <div class="review-images" style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+              ${review.images.map(img => `
+                <img src="/static/${img}" 
+                     alt="Review image" 
+                     style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid #ddd;"
+                     onclick="window.open('/static/${img}', '_blank')">
+              `).join('')}
+            </div>
+          `;
+        }
+        
+        return `
+          <div class="review-item">
+            <div class="review-header">
+              <span class="review-author">👤 ${review.user_name}</span>
+              <span class="review-date">${date}</span>
+            </div>
+            <div class="review-stars">${stars}</div>
+            <p class="review-comment">${review.comment}</p>
+            ${imagesHtml}
+          </div>
+        `;
+      }).join('');
+    } else {
+      reviewsList.innerHTML = `
+        <div class="no-reviews">
+          <div class="no-reviews-icon">📝</div>
+          <p>Chưa có đánh giá nào cho sản phẩm này</p>
+          <p style="font-size: 0.9rem; color: #bbb;">Hãy là người đầu tiên đánh giá!</p>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading reviews:', error);
+    document.getElementById('reviewsList').innerHTML = `
+      <div class="no-reviews">
+        <p style="color: #f44336;">Không thể tải đánh giá</p>
+      </div>
+    `;
+  }
+}
+
+// Toggle review form
+function toggleReviewForm() {
+  const form = document.getElementById('reviewForm');
+  form.classList.toggle('active');
+}
+
+// Star rating interaction
+document.addEventListener('DOMContentLoaded', function() {
+  displayProductRating();
+  loadReviews();
+  checkWishlistStatus();
+  
+  const stars = document.querySelectorAll('#starRating .star');
+  stars.forEach(star => {
+    star.addEventListener('click', function() {
+      const rating = this.dataset.rating;
+      document.getElementById('ratingValue').value = rating;
+      
+      stars.forEach((s, index) => {
+        if (index < rating) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+    });
+  });
+});
+
+// Preview review images
+function previewReviewImages(event) {
+  const preview = document.getElementById('imagePreview');
+  preview.innerHTML = '';
+  
+  const files = Array.from(event.target.files).slice(0, 5);
+  
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid #ddd;';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Submit review
+async function submitReview(event) {
+  event.preventDefault();
+  
+  const rating = document.getElementById('ratingValue').value;
+  const comment = document.getElementById('comment').value;
+  const imagesInput = document.getElementById('reviewImages');
+  
+  if (rating == 0) {
+    window.toast.warning('Vui lòng chọn số sao đánh giá');
+    return;
+  }
+  
+  try {
+    const formData = new FormData();
+    formData.append('rating', rating);
+    formData.append('comment', comment);
+    
+    // Add images if any
+    if (imagesInput && imagesInput.files.length > 0) {
+      Array.from(imagesInput.files).slice(0, 5).forEach(file => {
+        formData.append('images', file);
+      });
+    }
+    
+    const response = await fetch(`/api/product/${productId}/review`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      const imageCount = data.images_count || 0;
+      const bonusMsg = imageCount > 0 ? ` (+${imageCount} ảnh, +5 điểm thưởng!)` : '';
+      window.toast.success(`Cảm ơn bạn đã đánh giá!${bonusMsg}`);
+      toggleReviewForm();
+      loadReviews();
+      // Reset form
+      document.getElementById('ratingValue').value = 0;
+      document.getElementById('comment').value = '';
+      document.getElementById('reviewImages').value = '';
+      document.getElementById('imagePreview').innerHTML = '';
+      document.querySelectorAll('#starRating .star').forEach(s => s.classList.remove('active'));
+      
+      // Update rating display
+      location.reload();
+    } else {
+      window.toast.error(data.error || 'Không thể gửi đánh giá');
+    }
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    window.toast.error('Lỗi khi gửi đánh giá');
+  }
+}
+
+// Add to cart
+function addToCart() {
+  let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
+  
+  const existingItem = cart.find(item => item.id === productData.id);
+  if (existingItem) {
+    if (existingItem.quantity < productData.stock) {
+      existingItem.quantity++;
+    } else {
+      window.toast.warning('Đã đạt số lượng tối đa trong kho!');
+      return;
+    }
+  } else {
+    cart.push({
+      id: productData.id,
+      name: productData.name,
+      price: productData.price,
+      quantity: 1,
+      maxStock: productData.stock,
+      image: productData.image
+    });
+  }
+  
+  localStorage.setItem('tomatoCart', JSON.stringify(cart));
+  window.toast.success(`Đã thêm "${productData.name}" vào giỏ hàng!`);
+}
+
+// Buy now
+function buyNow() {
+  let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
+  
+  const existingItem = cart.find(item => item.id === productData.id);
+  if (!existingItem) {
+    cart.push({
+      id: productData.id,
+      name: productData.name,
+      price: productData.price,
+      quantity: 1,
+      maxStock: productData.stock,
+      image: productData.image
+    });
+    localStorage.setItem('tomatoCart', JSON.stringify(cart));
+  }
+  
+  window.location.href = '{{ url_for("cart") }}';
+}
+</script>
+
+{% endblock %}

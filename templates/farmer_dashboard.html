@@ -1,0 +1,1050 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .dashboard-container {
+    max-width: 1400px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .dashboard-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+
+  [data-theme="dark"] .dashboard-header h1 {
+    background: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .dashboard-header p {
+    color: #6b7280;
+    font-size: 1.1rem;
+  }
+
+  [data-theme="dark"] .dashboard-header p {
+    color: #9ca3af;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+
+  [data-theme="dark"] .stat-card {
+    background: #1f2937;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  }
+
+  .stat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .stat-card-icon {
+    font-size: 2.5rem;
+  }
+
+  .stat-card-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  [data-theme="dark"] .stat-card-label {
+    color: #9ca3af;
+  }
+
+  .stat-card-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+  }
+
+  [data-theme="dark"] .stat-card-value {
+    color: #f9fafb;
+  }
+
+  .stat-card-trend {
+    font-size: 0.85rem;
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .stat-card-trend.down {
+    color: #ef4444;
+  }
+
+  .chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+  }
+
+  [data-theme="dark"] .chart-section {
+    background: #1f2937;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  }
+
+  .chart-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .chart-title {
+    color: #f9fafb;
+  }
+
+  .chart-canvas {
+    max-height: 400px;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  [data-theme="dark"] .data-table th,
+  [data-theme="dark"] .data-table td {
+    border-bottom: 1px solid #374151;
+  }
+
+  .data-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  [data-theme="dark"] .data-table th {
+    background: #111827;
+    color: #d1d5db;
+  }
+
+  .data-table tr:hover {
+    background: #f9fafb;
+  }
+
+  [data-theme="dark"] .data-table tr:hover {
+    background: #374151;
+  }
+
+  .health-score-meter {
+    width: 100%;
+    height: 30px;
+    background: #e5e7eb;
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative;
+    margin-top: 10px;
+  }
+
+  [data-theme="dark"] .health-score-meter {
+    background: #374151;
+  }
+
+  .health-score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+    transition: width 1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .health-score-fill.medium {
+    background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+  }
+
+  .health-score-fill.low {
+    background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+  }
+
+  .disease-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-right: 8px;
+    margin-bottom: 8px;
+  }
+
+  .disease-badge.healthy {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .disease-badge.diseased {
+    background: #fed7d7;
+    color: #991b1b;
+  }
+
+  [data-theme="dark"] .disease-badge.healthy {
+    background: #064e3b;
+    color: #6ee7b7;
+  }
+
+  [data-theme="dark"] .disease-badge.diseased {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+
+  .loading-spinner {
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .spinner {
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .timeline-container {
+    position: relative;
+    padding-left: 30px;
+    margin-top: 20px;
+  }
+
+  .timeline-item {
+    position: relative;
+    padding-bottom: 20px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #667eea;
+    border: 3px solid white;
+    z-index: 1;
+  }
+
+  [data-theme="dark"] .timeline-item::before {
+    border-color: #1f2937;
+  }
+
+  .timeline-item::after {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 20px;
+    width: 2px;
+    height: calc(100% - 10px);
+    background: #e5e7eb;
+  }
+
+  [data-theme="dark"] .timeline-item::after {
+    background: #374151;
+  }
+
+  .timeline-item:last-child::after {
+    display: none;
+  }
+
+  .timeline-date {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .timeline-content {
+    font-size: 0.95rem;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .timeline-content {
+    color: #f9fafb;
+  }
+
+  .care-calendar {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .care-task {
+    background: #f9fafb;
+    border-left: 4px solid #667eea;
+    padding: 16px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  [data-theme="dark"] .care-task {
+    background: #111827;
+  }
+
+  .care-task.overdue {
+    border-left-color: #ef4444;
+    background: #fef2f2;
+  }
+
+  [data-theme="dark"] .care-task.overdue {
+    background: #7f1d1d;
+  }
+
+  .care-task-info {
+    flex: 1;
+  }
+
+  .care-task-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .care-task-desc {
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+
+  .care-task-due {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #667eea;
+  }
+
+  .care-task-due.overdue {
+    color: #ef4444;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>
+
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>🌱 Dashboard Nông dân</h1>
+    <p>Theo dõi sức khỏe vườn cà chua của bạn</p>
+  </div>
+
+  <div class="loading-spinner" id="loadingSpinner">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu dashboard...</p>
+  </div>
+
+  <div id="dashboardContent" style="display: none;">
+    <!-- Overview Stats -->
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-card-icon">🔍</span>
+        </div>
+        <div class="stat-card-label">Tổng số lần quét</div>
+        <div class="stat-card-value" id="statTotalScans">0</div>
+        <div class="stat-card-trend">
+          <span>📊 Tracking your progress</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-card-icon">💚</span>
+        </div>
+        <div class="stat-card-label">Chỉ số sức khỏe</div>
+        <div class="stat-card-value" id="statHealthScore">100%</div>
+        <div class="health-score-meter">
+          <div class="health-score-fill" id="healthScoreFill" style="width: 100%;">
+            <span id="healthScoreText">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-card-icon">🔥</span>
+        </div>
+        <div class="stat-card-label">Streak (ngày liên tiếp)</div>
+        <div class="stat-card-value" id="statStreak">0</div>
+        <div class="stat-card-trend">
+          <span>Keep scanning daily!</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-card-icon">🌾</span>
+        </div>
+        <div class="stat-card-label">Cây đã thu hoạch</div>
+        <div class="stat-card-value" id="statHarvested">0</div>
+        <div class="stat-card-trend">
+          <span>🌱 <span id="statActivePlants">0</span> cây đang trồng</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scan Timeline Chart -->
+    <div class="chart-section">
+      <h2 class="chart-title">📈 Lịch sử quét (30 ngày qua)</h2>
+      <canvas id="scanTimelineChart" class="chart-canvas"></canvas>
+    </div>
+
+    <!-- Disease Distribution -->
+    <div class="chart-section">
+      <h2 class="chart-title">🦠 Phân bố bệnh hại</h2>
+      <canvas id="diseaseDistributionChart" class="chart-canvas"></canvas>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+      <!-- Model Usage -->
+      <div class="chart-section">
+        <h2 class="chart-title">🤖 Mô hình sử dụng</h2>
+        <canvas id="modelUsageChart" class="chart-canvas"></canvas>
+      </div>
+
+      <!-- Severity Distribution -->
+      <div class="chart-section">
+        <h2 class="chart-title">⚠️ Phân bố mức độ nghiêm trọng</h2>
+        <canvas id="severityChart" class="chart-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Care Calendar -->
+    <div class="chart-section">
+      <h2 class="chart-title">📅 Lịch chăm sóc sắp tới</h2>
+      <div class="care-calendar" id="careCalendar">
+        <p style="text-align: center; color: #6b7280; padding: 20px;">
+          Chưa có lịch chăm sóc nào. Hãy thêm lịch để nhận nhắc nhở!
+        </p>
+      </div>
+      <button class="btn btn-primary" onclick="addCareTask()" style="margin-top: 16px;">
+        ➕ Thêm lịch chăm sóc
+      </button>
+    </div>
+
+    <!-- Recent Activities -->
+    <div class="chart-section">
+      <h2 class="chart-title">🕐 Hoạt động gần đây</h2>
+      <div class="table-responsive">
+        <table class="data-table" id="recentActivitiesTable">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Bệnh phát hiện</th>
+              <th>Độ tin cậy</th>
+              <th>Mức độ</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="recentActivitiesBody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 40px;">
+                Đang tải...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Care Task Modal -->
+<div id="careTaskModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 500px;">
+    <div class="modal-header">
+      <h2>➕ Thêm lịch chăm sóc</h2>
+      <button onclick="closeCareModal()" class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="careTaskForm" onsubmit="submitCareTask(event)">
+        <div class="form-group">
+          <label>Loại công việc:</label>
+          <select id="taskType" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <option value="water">💧 Tưới nước</option>
+            <option value="fertilize">🌱 Bón phân</option>
+            <option value="spray">🧴 Phun thuốc</option>
+            <option value="prune">✂️ Tỉa cành</option>
+            <option value="other">📝 Khác</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tiêu đề:</label>
+          <input type="text" id="taskTitle" required placeholder="VD: Tưới nước buổi sáng" 
+                 style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+        </div>
+
+        <div class="form-group">
+          <label>Mô tả:</label>
+          <textarea id="taskDesc" rows="3" placeholder="Mô tả chi tiết (tùy chọn)"
+                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Tần suất:</label>
+          <select id="taskFrequency" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <option value="once">Một lần</option>
+            <option value="daily">Hàng ngày</option>
+            <option value="weekly">Hàng tuần</option>
+            <option value="monthly">Hàng tháng</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Ngày thực hiện:</label>
+          <input type="datetime-local" id="taskDueDate" required 
+                 style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">
+            ✅ Thêm lịch
+          </button>
+          <button type="button" onclick="closeCareModal()" class="btn btn-secondary" style="flex: 1;">
+            ❌ Hủy
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let dashboardData = null;
+let charts = {};
+
+// Load dashboard data
+async function loadDashboard() {
+  try {
+    const response = await fetch('/api/dashboard/farmer');
+    const data = await response.json();
+    
+    if (data.ok) {
+      dashboardData = data.dashboard;
+      renderDashboard();
+    } else {
+      throw new Error(data.error || 'Failed to load dashboard');
+    }
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    document.getElementById('loadingSpinner').innerHTML = `
+      <div style="text-align: center; color: #ef4444;">
+        <div style="font-size: 3rem;">⚠️</div>
+        <p>Không thể tải dashboard</p>
+        <button onclick="loadDashboard()" class="btn btn-primary" style="margin-top: 16px;">
+          🔄 Thử lại
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Render dashboard
+function renderDashboard() {
+  document.getElementById('loadingSpinner').style.display = 'none';
+  document.getElementById('dashboardContent').style.display = 'block';
+  
+  const overview = dashboardData.overview;
+  
+  // Update stats
+  document.getElementById('statTotalScans').textContent = overview.total_scans;
+  document.getElementById('statHealthScore').textContent = overview.health_score + '%';
+  document.getElementById('statStreak').textContent = overview.scan_streak;
+  document.getElementById('statHarvested').textContent = overview.total_harvested;
+  document.getElementById('statActivePlants').textContent = overview.active_plants;
+  
+  // Update health score meter
+  const healthFill = document.getElementById('healthScoreFill');
+  healthFill.style.width = overview.health_score + '%';
+  document.getElementById('healthScoreText').textContent = overview.health_score + '%';
+  
+  if (overview.health_score >= 70) {
+    healthFill.className = 'health-score-fill';
+  } else if (overview.health_score >= 40) {
+    healthFill.className = 'health-score-fill medium';
+  } else {
+    healthFill.className = 'health-score-fill low';
+  }
+  
+  // Render charts
+  renderScanTimelineChart();
+  renderDiseaseDistributionChart();
+  renderModelUsageChart();
+  renderSeverityChart();
+  
+  // Render recent activities
+  renderRecentActivities();
+  
+  // Load care calendar
+  loadCareCalendar();
+}
+
+// Render scan timeline chart
+function renderScanTimelineChart() {
+  const ctx = document.getElementById('scanTimelineChart');
+  if (charts.timeline) charts.timeline.destroy();
+  
+  const timeline = dashboardData.scan_timeline;
+  
+  charts.timeline = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timeline.map(t => t.date.substring(5)),  // MM-DD
+      datasets: [
+        {
+          label: 'Tổng số quét',
+          data: timeline.map(t => t.scans),
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: 'Khỏe mạnh',
+          data: timeline.map(t => t.healthy),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: 'Bệnh hại',
+          data: timeline.map(t => t.diseased),
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          fill: true,
+          tension: 0.4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        }
+      }
+    }
+  });
+}
+
+// Render disease distribution chart
+function renderDiseaseDistributionChart() {
+  const ctx = document.getElementById('diseaseDistributionChart');
+  if (charts.disease) charts.disease.destroy();
+  
+  const distribution = dashboardData.disease_distribution;
+  
+  charts.disease = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: distribution.map(d => d.disease),
+      datasets: [{
+        label: 'Số lần phát hiện',
+        data: distribution.map(d => d.count),
+        backgroundColor: distribution.map((d, i) => {
+          const colors = ['#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
+          return colors[i % colors.length];
+        })
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        }
+      }
+    }
+  });
+}
+
+// Render model usage chart
+function renderModelUsageChart() {
+  const ctx = document.getElementById('modelUsageChart');
+  if (charts.model) charts.model.destroy();
+  
+  const models = dashboardData.model_stats;
+  
+  charts.model = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: models.map(m => m.model),
+      datasets: [{
+        data: models.map(m => m.usage),
+        backgroundColor: [
+          '#667eea', '#764ba2', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          position: 'right'
+        }
+      }
+    }
+  });
+}
+
+// Render severity chart
+function renderSeverityChart() {
+  const ctx = document.getElementById('severityChart');
+  if (charts.severity) charts.severity.destroy();
+  
+  const severity = dashboardData.severity_distribution;
+  
+  charts.severity = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: severity.map(s => s.severity),
+      datasets: [{
+        data: severity.map(s => s.count),
+        backgroundColor: ['#10b981', '#fbbf24', '#f59e0b', '#ef4444']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true
+    }
+  });
+}
+
+// Render recent activities
+function renderRecentActivities() {
+  const tbody = document.getElementById('recentActivitiesBody');
+  const activities = dashboardData.recent_activities;
+  
+  if (activities.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">Chưa có hoạt động nào</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = activities.map(act => {
+    const diseaseClass = act.disease === 'Healthy' ? 'healthy' : 'diseased';
+    const severityColors = {
+      'Healthy': '#10b981',
+      'Mild': '#fbbf24',
+      'Moderate': '#f59e0b',
+      'Severe': '#ef4444'
+    };
+    
+    return `
+      <tr>
+        <td>${new Date(act.timestamp).toLocaleString('vi-VN')}</td>
+        <td><span class="disease-badge ${diseaseClass}">${act.disease}</span></td>
+        <td>${(act.confidence * 100).toFixed(1)}%</td>
+        <td style="color: ${severityColors[act.severity] || '#6b7280'}; font-weight: 600;">
+          ${act.severity}
+        </td>
+        <td>
+          <a href="/history" class="btn btn-sm btn-secondary">Xem chi tiết</a>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Load care calendar
+async function loadCareCalendar() {
+  try {
+    const response = await fetch('/api/care/schedule');
+    const data = await response.json();
+    
+    if (data.ok) {
+      renderCareCalendar(data.upcoming);
+    }
+  } catch (error) {
+    console.error('Care calendar error:', error);
+  }
+}
+
+// Render care calendar
+function renderCareCalendar(tasks) {
+  const calendar = document.getElementById('careCalendar');
+  
+  if (tasks.length === 0) {
+    calendar.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">Chưa có lịch chăm sóc nào. Hãy thêm lịch để nhận nhắc nhở!</p>';
+    return;
+  }
+  
+  calendar.innerHTML = tasks.map(task => {
+    const overdueClass = task.overdue ? 'overdue' : '';
+    const dueText = task.overdue 
+      ? `❗ Quá hạn ${Math.abs(task.days_until)} ngày` 
+      : task.days_until === 0 
+        ? '⏰ Hôm nay' 
+        : `📅 Còn ${task.days_until} ngày`;
+    
+    const typeIcons = {
+      'water': '💧',
+      'fertilize': '🌱',
+      'spray': '🧴',
+      'prune': '✂️',
+      'other': '📝'
+    };
+    
+    return `
+      <div class="care-task ${overdueClass}">
+        <div class="care-task-info">
+          <div class="care-task-title">
+            ${typeIcons[task.task_type] || '📝'} ${task.title}
+          </div>
+          <div class="care-task-desc">${task.description || ''}</div>
+        </div>
+        <div class="care-task-due ${overdueClass ? 'overdue' : ''}">
+          ${dueText}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Add care task
+function addCareTask() {
+  document.getElementById('careTaskModal').style.display = 'flex';
+  // Set default date to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('taskDueDate').value = tomorrow.toISOString().slice(0, 16);
+}
+
+// Close care modal
+function closeCareModal() {
+  document.getElementById('careTaskModal').style.display = 'none';
+  document.getElementById('careTaskForm').reset();
+}
+
+// Submit care task
+async function submitCareTask(e) {
+  e.preventDefault();
+  
+  const task = {
+    title: document.getElementById('taskTitle').value,
+    description: document.getElementById('taskDesc').value,
+    task_type: document.getElementById('taskType').value,
+    frequency: document.getElementById('taskFrequency').value,
+    next_due: new Date(document.getElementById('taskDueDate').value).toISOString()
+  };
+  
+  try {
+    const response = await fetch('/api/care/schedule', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(task)
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      alert('✅ Đã thêm lịch chăm sóc!');
+      closeCareModal();
+      loadCareCalendar();
+    } else {
+      alert('❌ Lỗi: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('❌ Có lỗi xảy ra');
+  }
+}
+
+// Modal styling
+const modalStyle = document.createElement('style');
+modalStyle.textContent = `
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 0;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+
+  [data-theme="dark"] .modal-content {
+    background: #1f2937;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  [data-theme="dark"] .modal-header {
+    border-bottom-color: #374151;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+
+  .modal-close:hover {
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .modal-close:hover {
+    background: #374151;
+    color: #f9fafb;
+  }
+
+  .modal-body {
+    padding: 24px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  [data-theme="dark"] .form-group label {
+    color: #d1d5db;
+  }
+
+  [data-theme="dark"] input,
+  [data-theme="dark"] textarea,
+  [data-theme="dark"] select {
+    background: #374151;
+    color: #f9fafb;
+    border-color: #4b5563 !important;
+  }
+`;
+document.head.appendChild(modalStyle);
+
+// Initialize
+loadDashboard();
+</script>
+
+{% endblock %}

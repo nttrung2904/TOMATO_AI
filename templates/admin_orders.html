@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý đơn hàng | Admin{% endblock %}
+
+{% block content %}
+<style>
+  .admin-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+  
+  .admin-title {
+    font-size: 2rem;
+    color: #2d5016;
+    margin: 0;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .stat-card {
+    background: var(--bg-secondary);
+  }
+  
+  .stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+  }
+  
+  [data-theme="dark"] .stat-label {
+    color: #999;
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--tomato-600);
+  }
+  
+  [data-theme="dark"] .stat-value {
+    color: var(--tomato-400);
+  }
+  
+  .orders-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .orders-table {
+    background: var(--bg-secondary);
+  }
+  
+  .table-header {
+    background: #f8f9fa;
+    padding: 1rem;
+    font-weight: 600;
+    display: grid;
+    grid-template-columns: 100px 1fr 150px 150px 150px 120px 100px;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  [data-theme="dark"] .table-header {
+    background: var(--bg-tertiary);
+  }
+  
+  .table-row {
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: 100px 1fr 150px 150px 150px 120px 100px;
+    gap: 1rem;
+    align-items: center;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+  }
+  
+  [data-theme="dark"] .table-row {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .table-row:hover {
+    background: #f8f9fa;
+  }
+  
+  [data-theme="dark"] .table-row:hover {
+    background: var(--bg-tertiary);
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+  }
+  
+  .status-pending {
+    background: #fff3cd;
+    color: #856404;
+  }
+  
+  .status-processing {
+    background: #cfe2ff;
+    color: #084298;
+  }
+  
+  .status-shipped {
+    background: #d1ecf1;
+    color: #0c5460;
+  }
+  
+  .status-delivered {
+    background: #d4edda;
+    color: #155724;
+  }
+  
+  .status-cancelled {
+    background: #f8d7da;
+    color: #721c24;
+  }
+  
+  .btn-view {
+    padding: 0.5rem 1rem;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+  }
+  
+  .btn-view:hover {
+    background: var(--tomato-600);
+    color: white;
+  }
+  
+  .back-btn {
+    padding: 0.5rem 1.5rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.3s;
+  }
+  
+  .back-btn:hover {
+    background: #5a6268;
+    color: white;
+  }
+  
+  @media (max-width: 1200px) {
+    .table-header, .table-row {
+      grid-template-columns: 80px 1fr 120px 120px 100px;
+      font-size: 0.9rem;
+    }
+    
+    .table-header > :nth-child(4),
+    .table-row > :nth-child(4),
+    .table-header > :nth-child(5),
+    .table-row > :nth-child(5) {
+      display: none;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .table-header, .table-row {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .table-header {
+      display: none;
+    }
+    
+    .table-row > * {
+      display: block !important;
+    }
+  }
+</style>
+
+<div class="admin-container">
+  <div class="admin-header">
+    <h1 class="admin-title">📦 Quản lý đơn hàng</h1>
+    <a href="{{ url_for('profile') }}" class="back-btn">← Quay lại</a>
+  </div>
+  
+  <!-- Statistics -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Tổng đơn hàng</div>
+      <div class="stat-value">{{ stats.total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Doanh thu</div>
+      <div class="stat-value">{{ "{:,.0f}".format(stats.revenue) }}đ</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Chờ xử lý</div>
+      <div class="stat-value">{{ stats.pending }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Đang xử lý</div>
+      <div class="stat-value">{{ stats.processing }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Đang giao</div>
+      <div class="stat-value">{{ stats.shipped }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Hoàn thành</div>
+      <div class="stat-value">{{ stats.delivered }}</div>
+    </div>
+  </div>
+  
+  <!-- Orders Table -->
+  <div class="orders-table">
+    <div class="table-header">
+      <div>Mã ĐH</div>
+      <div>Khách hàng</div>
+      <div>Số điện thoại</div>
+      <div>Tổng tiền</div>
+      <div>Thời gian</div>
+      <div>Trạng thái</div>
+      <div>Thao tác</div>
+    </div>
+    
+    {% if orders %}
+      {% for order in orders %}
+      <div class="table-row">
+        <div><strong>#{{ order.id }}</strong></div>
+        <div>{{ order.customer_name }}</div>
+        <div>{{ order.customer_phone }}</div>
+        <div><strong>{{ "{:,.0f}".format(order.total) }}đ</strong></div>
+        <div>{{ order.timestamp[:16].replace('T', ' ') }}</div>
+        <div>
+          <span class="status-badge status-{{ order.status }}">
+            {% if order.status == 'pending' %}Chờ xử lý
+            {% elif order.status == 'processing' %}Đang xử lý
+            {% elif order.status == 'shipped' %}Đang giao
+            {% elif order.status == 'delivered' %}Hoàn thành
+            {% elif order.status == 'cancelled' %}Đã hủy
+            {% else %}{{ order.status }}
+            {% endif %}
+          </span>
+        </div>
+        <div>
+          <a href="{{ url_for('admin_order_detail', order_id=order.id) }}" class="btn-view">
+            Xem
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding: 3rem; text-align: center; color: #999;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
+        <p>Chưa có đơn hàng nào</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

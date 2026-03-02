@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍅 Nông Trại Cà Chua RPG | Tomato AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+      overflow: hidden;
+    }
+    
+    .game-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    
+    /* Header */
+    .game-header {
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    
+    .game-title {
+      font-size: 1.3em;
+      font-weight: bold;
+    }
+    
+    .stats-bar {
+      display: flex;
+      gap: 15px;
+      font-size: 1.05em;
+    }
+    
+    .stat {
+      background: rgba(255,255,255,0.1);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+    
+    .back-btn {
+      background: #e74c3c;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    
+    .back-btn:hover {
+      background: #c0392b;
+    }
+    
+    /* Game container */
+    .game-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Canvas */
+    #gameCanvas {
+      display: block;
+      margin: auto;
+      background: #2d5016;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+      image-rendering: pixelated;
+    }
+    
+    /* UI Overlays */
+    .ui-overlay {
+      position: absolute;
+      pointer-events: none;
+    }
+    
+    /* Energy bar */
+    .energy-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.8);
+      padding: 12px;
+      border-radius: 10px;
+      min-width: 200px;
+      pointer-events: auto;
+    }
+    
+    .bar-label {
+      color: white;
+      font-size: 0.9em;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .bar {
+      width: 100%;
+      height: 10px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f39c12, #f1c40f);
+      transition: width 0.3s;
+    }
+    
+    /* Tool bar */
+    .tool-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      border-radius: 10px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    
+    .tool {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8em;
+      cursor: pointer;
+      transition: 0.2s;
+      position: relative;
+    }
+    
+    .tool:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-3px);
+    }
+    
+    .tool.active {
+      border-color: #3498db;
+      background: rgba(52,152,219,0.3);
+      box-shadow: 0 0 15px rgba(52,152,219,0.5);
+    }
+    
+    .tool .hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 3px;
+      font-size: 0.35em;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    
+    /* Inventory panel */
+    .inventory {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 12px;
+      border-radius: 10px;
+      min-width: 180px;
+      pointer-events: auto;
+    }
+    
+    .inventory h3 {
+      color: white;
+      font-size: 1em;
+      margin-bottom: 8px;
+    }
+    
+    .inventory-items {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .inv-item {
+      color: white;
+      font-size: 0.9em;
+      display: flex;
+      justify-content: space-between;
+      padding: 5px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 5px;
+    }
+    
+    /* Help panel */
+    .help-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 12px;
+      border-radius: 10px;
+      color: white;
+      font-size: 0.85em;
+      pointer-events: auto;
+    }
+    
+    .help-panel h3 {
+      font-size: 1em;
+      margin-bottom: 8px;
+      color: #3498db;
+    }
+    
+    /* Notification */
+    .notification {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-size: 1.1em;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      border: 2px solid #3498db;
+      transition: top 0.3s;
+      z-index: 1000;
+    }
+    
+    .notification.show {
+      top: 80px;
+    }
+    
+    /* Dialog box */
+    .dialog {
+      position: absolute;
+      bottom: -300px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.95);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      max-width: 500px;
+      min-width: 400px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.8);
+      border: 3px solid #2ecc71;
+      transition: bottom 0.3s;
+      z-index: 1000;
+    }
+    
+    .dialog.show {
+      bottom: 100px;
+    }
+    
+    .dialog .speaker {
+      font-weight: bold;
+      color: #2ecc71;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    
+    .dialog .text {
+      line-height: 1.5;
+      margin-bottom: 15px;
+    }
+    
+    .dialog .choices {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .dialog-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(52,152,219,0.3);
+      border: 2px solid #3498db;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    
+    .dialog-btn:hover {
+      background: rgba(52,152,219,0.5);
+    }
+    
+    /* Loading */
+    .loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      z-index: 9999;
+    }
+    
+    .loading.hidden {
+      display: none;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <!-- Header -->
+    <div class="game-header">
+      <div class="game-title">🍅 Nông Trại Cà Chua RPG</div>
+      <div class="stats-bar">
+        <div class="stat">💰 <span id="coins">0</span></div>
+        <div class="stat">🍅 <span id="harvested">0</span></div>
+        <div class="stat">⭐ Lv.<span id="level">1</span></div>
+      </div>
+      <button class="back-btn" onclick="window.location.href='/game'">↩ Menu</button>
+    </div>
+    
+    <!-- Game -->
+    <div class="game-container">
+      <canvas id="gameCanvas"></canvas>
+      
+      <!-- UI Overlays -->
+      <div class="ui-overlay">
+        <!-- Help -->
+        <div class="help-panel">
+          <h3>🎮 Điều khiển</h3>
+          <div>WASD / ← ↑ → ↓: Di chuyển</div>
+          <div>E / Space: Tương tác</div>
+          <div>1-6: Chọn công cụ</div>
+        </div>
+        
+        <!-- Inventory -->
+        <div class="inventory">
+          <h3>🎒 Kho đồ</h3>
+          <div class="inventory-items" id="inventoryItems"></div>
+        </div>
+        
+        <!-- Energy -->
+        <div class="energy-bar">
+          <div class="bar-label">
+            <span>⚡ Năng lượng</span>
+            <span id="energyText">100/100</span>
+          </div>
+          <div class="bar">
+            <div class="bar-fill" id="energyFill" style="width: 100%"></div>
+          </div>
+        </div>
+        
+        <!-- Tool bar -->
+        <div class="tool-bar" id="toolBar">
+          <div class="tool active" data-tool="0" onclick="selectTool(0)">
+            ✋<span class="hotkey">1</span>
+          </div>
+          <div class="tool" data-tool="1" onclick="selectTool(1)">
+            🌰<span class="hotkey">2</span>
+          </div>
+          <div class="tool" data-tool="2" onclick="selectTool(2)">
+            💧<span class="hotkey">3</span>
+          </div>
+          <div class="tool" data-tool="3" onclick="selectTool(3)">
+            🌾<span class="hotkey">4</span>
+          </div>
+          <div class="tool" data-tool="4" onclick="selectTool(4)">
+            💊<span class="hotkey">5</span>
+          </div>
+          <div class="tool" data-tool="5" onclick="selectTool(5)">
+            ✂️<span class="hotkey">6</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Notification -->
+      <div class="notification" id="notification"></div>
+      
+      <!-- Dialog -->
+      <div class="dialog" id="dialog">
+        <div class="speaker" id="dialogSpeaker"></div>
+        <div class="text" id="dialogText"></div>
+        <div class="choices" id="dialogChoices"></div>
+      </div>
+      
+      <!-- Loading -->
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Đang tải game...</div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Game data
+    let gameData = {{ progress | tojson }};
+    
+    // Canvas setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const TILE = 32;
+    const MAP_W = 30;
+    const MAP_H = 25;
+    canvas.width = Math.min(window.innerWidth - 20, MAP_W * TILE);
+    canvas.height = Math.min(window.innerHeight - 100, MAP_H * TILE);
+    
+    const VIEW_W = Math.floor(canvas.width / TILE);
+    const VIEW_H = Math.floor(canvas.height / TILE);
+    
+    // Game state
+    let selectedTool = 0;
+    let energy = 100;
+    let camera = { x: 0, y: 0 };
+    let keys = {};
+    
+    // Tile colors
+    const TILES = {
+      GRASS: '#5a9216',
+      DIRT: '#8b6f47',
+      WATER: '#4a90e2',
+      FARMLAND: '#654321',
+      ROAD: '#95a5a6',
+      HOUSE: '#e67e22',
+      SHOP: '#e74c3c',
+      FENCE: '#7f8c8d'
+    };
+    
+    // Map (simple procedural)
+    const map = [];
+    for (let y = 0; y < MAP_H; y++) {
+      map[y] = [];
+      for (let x = 0; x < MAP_W; x++) {
+        let tile = 'GRASS';
+        
+        // Water top
+        if (y < 3) tile = 'WATER';
+        
+        // Farm area
+        if (x >= 8 && x <= 22 && y >= 10 && y <= 20) {
+          tile = 'FARMLAND';
+        }
+        
+        // Fence around farm
+        if (((x === 7 || x === 23) && y >= 9 && y <= 21) ||
+            ((y === 9 || y === 21) && x >= 7 && x <= 23)) {
+          tile = 'FENCE';
+        }
+        
+        // Road
+        if (x === 6 && y >= 10) tile = 'ROAD';
+        if (y === 10 && x <= 10) tile = 'ROAD';
+        
+        // House
+        if (x >= 10 && x <= 13 && y >= 5 && y <= 7) tile = 'HOUSE';
+        
+        // Shop
+        if (x >= 25 && x <= 27 && y >= 12 && y <= 14) tile = 'SHOP';
+        
+        map[y][x] = tile;
+      }
+    }
+    
+    // Player
+    const player = {
+      x: 12,
+      y: 8,
+      dir: 'down',
+      anim: 0,
+      moving: false
+    };
+    
+    // Plants (map them to world positions)
+    const plants = [];
+    function initPlants() {
+      let px = 10, py = 12;
+      for (let i = 0; i < gameData.plants.length; i++) {
+        const p = gameData.plants[i];
+        if (p) {
+          plants.push({
+            x: px,
+            y: py,
+            data: p
+          });
+        }
+        px += 2;
+        if (px > 20) {
+          px = 10;
+          py += 2;
+        }
+      }
+    }
+    initPlants();
+    
+    // NPCs
+    const npcs = [
+      { x: 12, y: 6, name: '🧓 Ông Nội', dialog: ['Chào cháu! Hãy chăm chỉ trồng cà chua nhé!', 'Nhớ tưới nước đều đặn đấy!'] },
+      { x: 26, y: 13, name: '🏪 Cửa hàng', dialog: ['Chào mừng đến cửa hàng!'], isShop: true }
+    ];
+    
+    // Growth stages
+    const STAGES = {
+      seed: { icon: '🌰', name: 'Hạt', time: 30 },
+      sprout: { icon: '🌱', name: 'Mầm', time: 60 },
+      growing: { icon: '🪴', name: 'Lớn', time: 120 },
+      mature: { icon: '🌿', name: 'Trưởng thành', time: 120 },
+      fruiting: { icon: '🍅', name: 'Ra quả', time: 0 }
+    };
+    
+    // Input
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      
+      // Tool selection
+      if (e.key >= '1' && e.key <= '6') {
+        selectTool(parseInt(e.key) - 1);
+      }
+      
+      // Interact
+      if (e.key === 'e' || e.key === 'E' || e.key === ' ') {
+        interact();
+      }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+    
+    // Select tool
+    function selectTool(index) {
+      selectedTool = index;
+      document.querySelectorAll('.tool').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+    }
+    
+    // Check solid
+    function isSolid(x, y) {
+      const tx = Math.floor(x);
+      const ty = Math.floor(y);
+      if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+      const tile = map[ty][tx];
+      return tile === 'WATER' || tile === 'FENCE' || tile === 'HOUSE' || tile === 'SHOP';
+    }
+    
+    // Update player
+    function updatePlayer() {
+      let dx = 0, dy = 0;
+      const speed = 0.1;
+      
+      if (keys['w'] || keys['arrowup']) { dy = -speed; player.dir = 'up'; }
+      if (keys['s'] || keys['arrowdown']) { dy = speed; player.dir = 'down'; }
+      if (keys['a'] || keys['arrowleft']) { dx = -speed; player.dir = 'left'; }
+      if (keys['d'] || keys['arrowright']) { dx = speed; player.dir = 'right'; }
+      
+      player.moving = dx !== 0 || dy !== 0;
+      
+      if (player.moving) {
+        player.anim = (player.anim + 0.1) % 4;
+        const newX = player.x + dx;
+        const newY = player.y + dy;
+        
+        if (!isSolid(newX, player.y)) player.x = newX;
+        if (!isSolid(player.x, newY)) player.y = newY;
+        
+        // Drain energy slowly
+        if (Math.random() < 0.01) {
+          energy = Math.max(0, energy - 0.5);
+          updateUI();
+        }
+      }
+      
+      // Camera follow
+      camera.x = Math.max(0, Math.min(player.x - VIEW_W / 2, MAP_W - VIEW_W));
+      camera.y = Math.max(0, Math.min(player.y - VIEW_H / 2, MAP_H - VIEW_H));
+    }
+    
+    // Interact
+    function interact() {
+      const tx = Math.floor(player.x + (player.dir === 'right' ? 1 : player.dir === 'left' ? -1 : 0));
+      const ty = Math.floor(player.y + (player.dir === 'down' ? 1 : player.dir === 'up' ? -1 : 0));
+      
+      // Check NPC
+      const npc = npcs.find(n => Math.floor(n.x) === tx && Math.floor(n.y) === ty);
+      if (npc) {
+        if (npc.isShop) {
+          showShop();
+        } else {
+          showDialog(npc.name, npc.dialog[Math.floor(Math.random() * npc.dialog.length)]);
+        }
+        return;
+      }
+      
+      // Check if on farmland
+      if (map[ty][tx] !== 'FARMLAND') {
+        showNotification('Chỉ trồng được trên đất nông nghiệp!');
+        return;
+      }
+      
+      // Check plant at location
+      const plant = plants.find(p => Math.floor(p.x) === tx && Math.floor(p.y) === ty);
+      
+      // Tool actions
+      switch (selectedTool) {
+        case 1: // Plant seed
+          if (!plant) {
+            plantSeed(tx, ty);
+          } else {
+            showNotification('Đã có cây ở đây rồi!');
+          }
+          break;
+        case 2: // Water
+          if (plant) waterPlant(plant);
+          break;
+        case 3: // Fertilize
+          if (plant) fertilizePlant(plant);
+          break;
+        case 4: // Medicine
+          if (plant && plant.data.disease) treatPlant(plant);
+          break;
+        case 5: // Harvest
+          if (plant && plant.data.stage === 'fruiting') harvestPlant(plant);
+          break;
+      }
+    }
+    
+    // API calls
+    async function apiCall(endpoint, data = {}) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (result.ok) {
+          gameData = result.progress;
+          updateUI();
+          return result;
+        } else {
+          showNotification(result.error || 'Lỗi!');
+        }
+      } catch (err) {
+        showNotification('Lỗi kết nối!');
+      }
+      return null;
+    }
+    
+    // Actions
+    async function plantSeed(x, y) {
+      // Find empty slot
+      let slot = -1;
+      for (let i = 0; i < gameData.plants.length; i++) {
+        if (!gameData.plants[i]) {
+          slot = i;
+          break;
+        }
+      }
+      
+      if (slot === -1) {
+        showNotification('Hết ô trống! Thu hoạch cây để trồng thêm.');
+        return;
+      }
+      
+      const result = await apiCall('/api/farm/plant', { slot });
+      if (result) {
+        plants.push({ x, y, data: result.progress.plants[slot] });
+        showNotification('🌱 Đã trồng cà chua!');
+      }
+    }
+    
+    async function waterPlant(plant) {
+      const slot = gameData.plants.indexOf(plant.data);
+      const result = await apiCall('/api/farm/water', { slot });
+      if (result) {
+        plant.data = result.progress.plants[slot];
+        showNotification('💧 Đã tưới nước!');
+      }
+    }
+    
+    async function fertilizePlant(plant) {
+      const slot = gameData.plants.indexOf(plant.data);
+      const result = await apiCall('/api/farm/fertilize', { slot });
+      if (result) {
+        plant.data = result.progress.plants[slot];
+        showNotification('🌾 Đã bón phân!');
+      }
+    }
+    
+    async function treatPlant(plant) {
+      const slot = gameData.plants.indexOf(plant.data);
+      const result = await apiCall('/api/farm/treat', { slot, medicine: 'medicine' });
+      if (result) {
+        plant.data = result.progress.plants[slot];
+        showNotification('💊 Đã chữa bệnh!');
+      }
+    }
+    
+    async function harvestPlant(plant) {
+      const slot = gameData.plants.indexOf(plant.data);
+      const result = await apiCall('/api/farm/harvest', { slot });
+      if (result) {
+        const index = plants.indexOf(plant);
+        plants.splice(index, 1);
+        showNotification(`🍅 Thu hoạch! +${result.reward} xu`);
+      }
+    }
+    
+    // Shop
+    function showShop() {
+      const items = [
+        { id: 'water', icon: '💧', name: 'Nước', price: 5 },
+        { id: 'fertilizer', icon: '🌾', name: 'Phân bón', price: 15 },
+        { id: 'medicine', icon: '💊', name: 'Thuốc', price: 30 }
+      ];
+      
+      let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+      items.forEach(item => {
+        html += `
+          <button class="dialog-btn" onclick="buyItem('${item.id}', ${item.price})" style="display:flex; justify-content:space-between;">
+            <span>${item.icon} ${item.name}</span>
+            <span>💰 ${item.price}</span>
+          </button>
+        `;
+      });
+      html += '</div>';
+      
+      showDialog('🏪 Cửa hàng', 'Bạn muốn mua gì?', html);
+    }
+    
+    async function buyItem(item, price) {
+      hideDialog();
+      const result = await apiCall('/api/farm/buy', { item });
+      if (result) {
+        showNotification(`✅ Đã mua ${item}!`);
+      }
+    }
+    
+    // UI
+    function updateUI() {
+      document.getElementById('coins').textContent = gameData.coins;
+      document.getElementById('harvested').textContent = gameData.total_harvested;
+      document.getElementById('level').textContent = gameData.level;
+      document.getElementById('energyText').textContent = `${Math.floor(energy)}/100`;
+      document.getElementById('energyFill').style.width = energy + '%';
+      
+      const inv = document.getElementById('inventoryItems');
+      inv.innerHTML = '';
+      Object.entries(gameData.inventory).forEach(([key, val]) => {
+        const icons = { water: '💧', fertilizer: '🌾', pesticide: '🪲', medicine: '💊' };
+        inv.innerHTML += `
+          <div class="inv-item">
+            <span>${icons[key] || '📦'} ${key}</span>
+            <span>${val}</span>
+          </div>
+        `;
+      });
+    }
+    
+    function showNotification(msg) {
+      const el = document.getElementById('notification');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2500);
+    }
+    
+    function showDialog(speaker, text, choicesHtml = '') {
+      document.getElementById('dialogSpeaker').textContent = speaker;
+      document.getElementById('dialogText').textContent = text;
+      document.getElementById('dialogChoices').innerHTML = choicesHtml || 
+        '<button class="dialog-btn" onclick="hideDialog()">Đóng</button>';
+      document.getElementById('dialog').classList.add('show');
+    }
+    
+    function hideDialog() {
+      document.getElementById('dialog').classList.remove('show');
+    }
+    
+    // Render
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw map
+      for (let y = 0; y < VIEW_H; y++) {
+        for (let x = 0; x < VIEW_W; x++) {
+          const mx = Math.floor(camera.x + x);
+          const my = Math.floor(camera.y + y);
+          if (mx >= 0 && mx < MAP_W && my >= 0 && my < MAP_H) {
+            ctx.fillStyle = TILES[map[my][mx]] || TILES.GRASS;
+            ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
+          }
+        }
+      }
+      
+      // Draw NPCs
+      npcs.forEach(npc => {
+        const sx = (npc.x - camera.x) * TILE;
+        const sy = (npc.y - camera.y) * TILE;
+        if (sx >= -TILE && sx < canvas.width && sy >= -TILE && sy < canvas.height) {
+          ctx.font = `${TILE * 0.8}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(npc.name.split(' ')[0], sx + TILE/2, sy + TILE/2);
+        }
+      });
+      
+      // Draw plants
+      plants.forEach(plant => {
+        const sx = (plant.x - camera.x) * TILE;
+        const sy = (plant.y - camera.y) * TILE;
+        if (sx >= -TILE && sx < canvas.width && sy >= -TILE && sy < canvas.height) {
+          const stage = STAGES[plant.data.stage];
+          ctx.font = `${TILE * 0.9}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(stage.icon, sx + TILE/2, sy + TILE/2);
+          
+          // Health bar
+          if (plant.data.health < 100) {
+            const barW = TILE - 4;
+            const barH = 4;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(sx + 2, sy + TILE - 6, barW, barH);
+            ctx.fillStyle = plant.data.health > 50 ? '#2ecc71' : '#e74c3c';
+            ctx.fillRect(sx + 2, sy + TILE - 6, barW * (plant.data.health / 100), barH);
+          }
+          
+          // Disease icon
+          if (plant.data.disease) {
+            ctx.font = `${TILE * 0.4}px Arial`;
+            ctx.fillText('🦠', sx + TILE * 0.75, sy + TILE * 0.25);
+          }
+        }
+      });
+      
+      // Draw player
+      const px = (player.x - camera.x) * TILE;
+      const py = (player.y - camera.y) * TILE;
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(px + TILE/2, py + TILE * 0.85, TILE/3, TILE/6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Character
+      ctx.font = `${TILE}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const chars = {
+        up: '🧑',
+        down: '🧑',
+        left: '🧑',
+        right: '🧑'
+      };
+      
+      ctx.fillText(chars[player.dir], px + TILE/2, py + TILE/2);
+      
+      // Interaction indicator
+      const tx = player.x + (player.dir === 'right' ? 1 : player.dir === 'left' ? -1 : 0);
+      const ty = player.y + (player.dir === 'down' ? 1 : player.dir === 'up' ? -1 : 0);
+      const ix = (tx - camera.x) * TILE;
+      const iy = (ty - camera.y) * TILE;
+      
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(ix + 2, iy + 2, TILE - 4, TILE - 4);
+    }
+    
+    // Game loop
+    function gameLoop() {
+      updatePlayer();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Auto update
+    setInterval(async () => {
+      await apiCall('/api/farm/update');
+      
+      // Re-sync plants
+      plants.length = 0;
+      let px = 10, py = 12;
+      for (let i = 0; i < gameData.plants.length; i++) {
+        const p = gameData.plants[i];
+        if (p) {
+          plants.push({ x: px, y: py, data: p });
+        }
+        px += 2;
+        if (px > 20) {
+          px = 10;
+          py += 2;
+        }
+      }
+    }, 3000);
+    
+    // Init
+    updateUI();
+    document.getElementById('loading').classList.add('hidden');
+    gameLoop();
+    
+    setTimeout(() => {
+      showNotification('🎮 Sử dụng WASD để di chuyển, E để tương tác!');
+    }, 1000);
+  </script>
+</body>
+</html>

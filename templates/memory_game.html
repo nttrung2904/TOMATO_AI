@@ -517,6 +517,20 @@
         </table>
       </div>
       
+      <!-- Voucher Display (hidden by default) -->
+      <div id="voucher-box" style="display: none; margin: 25px 0; padding: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; color: white; box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);">
+        <div style="text-align: center;">
+          <div style="font-size: 2em; margin-bottom: 10px;">🎉</div>
+          <h3 style="margin: 0 0 15px 0; font-size: 1.5em;">Chúc mừng! Bạn nhận được mã giảm giá!</h3>
+          <div id="voucher-code" style="background: white; color: #667eea; padding: 15px 25px; border-radius: 10px; font-size: 1.8em; font-weight: bold; letter-spacing: 2px; margin: 15px 0; font-family: monospace;"></div>
+          <div id="voucher-value" style="font-size: 1.3em; font-weight: 600; margin-bottom: 15px;"></div>
+          <div id="voucher-message" style="opacity: 0.95; margin-bottom: 20px; line-height: 1.6;"></div>
+          <button onclick="copyVoucherToClipboard()" style="padding: 12px 30px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1.1em; transition: all 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            📋 Sao chép mã
+          </button>
+        </div>
+      </div>
+      
       <div class="result-actions">
         <button class="action-btn btn-primary" onclick="restartGame()">
           🔄 Chơi lại
@@ -741,6 +755,8 @@ async function saveScore(score, timeElapsed) {
     
     const result = await response.json();
     if (result.ok) {
+      // Store voucher data if received
+      gameState.voucherData = result.voucher;
       return result;
     }
   } catch (error) {
@@ -777,6 +793,29 @@ function showResult(score, timeElapsed, rating) {
   document.getElementById('result-icon').textContent = icon;
   document.getElementById('result-title').textContent = title;
   document.getElementById('result-message').textContent = message;
+  
+  // Display voucher if earned
+  if (gameState.voucherData) {
+    const voucherBox = document.getElementById('voucher-box');
+    const voucherCode = document.getElementById('voucher-code');
+    const voucherValue = document.getElementById('voucher-value');
+    const voucherMessage = document.getElementById('voucher-message');
+    
+    voucherCode.textContent = gameState.voucherData.code;
+    voucherValue.textContent = `Giá trị: ${gameState.voucherData.value.toLocaleString('vi-VN')}đ`;
+    voucherMessage.innerHTML = gameState.voucherData.message;
+    
+    // Add instruction based on login status
+    if (!gameState.voucherData.auto_added) {
+      voucherMessage.innerHTML += '<br><br><strong>💡 Cách sử dụng:</strong><br>' +
+        '1️⃣ Sao chép mã bên dưới<br>' +
+        '2️⃣ Đăng nhập vào tài khoản<br>' +
+        '3️⃣ Vào <a href="/profile" style="color: white; text-decoration: underline;">Tài khoản > Mã giảm giá</a><br>' +
+        '4️⃣ Nhập mã để thêm vào tài khoản';
+    }
+    
+    voucherBox.style.display = 'block';
+  }
   
   // Load and show leaderboard
   loadLeaderboard();
@@ -835,6 +874,57 @@ function quitGame() {
 
 function backToMenu() {
   window.location.href = '{{ url_for("game_menu") }}';
+}
+
+function copyVoucherToClipboard() {
+  const voucherCode = document.getElementById('voucher-code').textContent;
+  
+  // Try to copy to clipboard
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(voucherCode).then(() => {
+      // Show success message
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '✅ Đã sao chép!';
+      btn.style.background = '#4caf50';
+      
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = 'white';
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+      fallbackCopyToClipboard(voucherCode);
+    });
+  } else {
+    fallbackCopyToClipboard(voucherCode);
+  }
+}
+
+function fallbackCopyToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  document.body.appendChild(textArea);
+  textArea.select();
+  
+  try {
+    document.execCommand('copy');
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✅ Đã sao chép!';
+    btn.style.background = '#4caf50';
+    
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.style.background = 'white';
+    }, 2000);
+  } catch (err) {
+    alert('Không thể sao chép. Vui lòng copy thủ công: ' + text);
+  }
+  
+  document.body.removeChild(textArea);
 }
 </script>
 

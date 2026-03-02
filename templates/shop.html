@@ -110,11 +110,46 @@
     transition: transform 0.3s, box-shadow 0.3s;
     display: flex;
     flex-direction: column;
+    position: relative;
   }
   
   .product-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+  }
+  
+  .wishlist-heart-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    font-size: 1.5em;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: all 0.3s;
+  }
+  
+  .wishlist-heart-btn:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  
+  .wishlist-heart-btn.in-wishlist {
+    animation: heartBeat 0.5s ease;
+  }
+  
+  @keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.3); }
+    50% { transform: scale(1.1); }
   }
   
   .product-image {
@@ -194,6 +229,21 @@
     transform: scale(0.95);
   }
   
+  .buy-now-btn:hover {
+    background: linear-gradient(135deg, #ee5a52 0%, #d94840 100%) !important;
+    transform: scale(1.05);
+  }
+  
+  .buy-now-btn:active {
+    transform: scale(0.95) !important;
+  }
+  
+  .buy-now-btn:disabled,
+  .add-to-cart-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
   .product-stock {
     font-size: 0.85em;
     color: #666;
@@ -256,124 +306,115 @@
 </div>
 
 <script>
-const products = [
-  {
-    id: 1,
-    name: 'Thuốc trừ sâu sinh học',
-    category: 'pesticide',
-    price: 125000,
-    description: 'Thuốc trừ sâu sinh học an toàn, không độc hại. Hiệu quả với sâu đục thân, sâu cuốn lá.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 50
-  },
-  {
-    id: 2,
-    name: 'Thuốc trừ nấm Septoria',
-    category: 'fungicide',
-    price: 145000,
-    description: 'Chuyên trị bệnh đốm lá Septoria, hiệu quả cao, sử dụng đơn giản.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 35
-  },
-  {
-    id: 3,
-    name: 'Thuốc trừ Early Blight',
-    category: 'fungicide',
-    price: 155000,
-    description: 'Ngăn ngừa và điều trị bệnh Early Blight (Alternaria), bảo vệ lá khỏi đốm nâu.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 28
-  },
-  {
-    id: 4,
-    name: 'Phân bón NPK 16-16-8',
-    category: 'fertilizer',
-    price: 95000,
-    description: 'Phân bón đa vi lượng, cung cấp dinh dưỡng toàn diện cho cây cà chua.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 100
-  },
-  {
-    id: 5,
-    name: 'Phân bón lá vi lượng',
-    category: 'fertilizer',
-    price: 85000,
-    description: 'Bổ sung vi lượng thiết yếu, tăng cường sức đề kháng cho cây.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 75
-  },
-  {
-    id: 6,
-    name: 'Thuốc trừ Late Blight',
-    category: 'fungicide',
-    price: 165000,
-    description: 'Phòng trị bệnh mốc sương (Late Blight), bảo vệ cây khỏi nấm Phytophthora.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 20
-  },
-  {
-    id: 7,
-    name: 'Thuốc trừ Bacterial Spot',
-    category: 'fungicide',
-    price: 135000,
-    description: 'Điều trị đốm lá do vi khuẩn, ngăn ngừa lây lan trên lá và quả.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 42
-  },
-  {
-    id: 8,
-    name: 'Phun sương cầm tay',
-    category: 'equipment',
-    price: 185000,
-    description: 'Bình phun sương áp lực cao, dung tích 2L, tiện lợi cho vườn nhỏ.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 15
-  },
-  {
-    id: 9,
-    name: 'Thuốc trừ Yellow Leaf Curl',
-    category: 'fungicide',
-    price: 175000,
-    description: 'Ngăn chặn virus gây vàng lá và cuộn lá, bảo vệ cây non.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 18
-  },
-  {
-    id: 10,
-    name: 'Phân bón hữu cơ',
-    category: 'fertilizer',
-    price: 65000,
-    description: 'Phân compost hữu cơ, cải thiện đất, tăng độ phì nhiêu.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 120
-  },
-  {
-    id: 11,
-    name: 'Thuốc trừ Spider Mites',
-    category: 'pesticide',
-    price: 115000,
-    description: 'Diệt nhện đỏ hai chấm, bảo vệ lá khỏi bị hút nhựa.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 32
-  },
-  {
-    id: 12,
-    name: 'Găng tay làm vườn',
-    category: 'equipment',
-    price: 45000,
-    description: 'Găng tay chống thấm nước, bảo vệ tay khi làm vườn.',
-    image: '{{ url_for("static", filename="images/tomato.jpg") }}',
-    stock: 60
-  }
-];
-
+let products = [];
 let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
+let userWishlists = [];
+
+// Load user's wishlist
+async function loadUserWishlist() {
+  {% if session.get('username') %}
+  try {
+    const response = await fetch('/api/wishlist');
+    const data = await response.json();
+    if (data.ok) {
+      userWishlists = data.products.map(p => p.id);
+    }
+  } catch (error) {
+    console.error('Error loading wishlist:', error);
+  }
+  {% endif %}
+}
+
+// Toggle wishlist
+async function toggleWishlist(productId, event) {
+  event.stopPropagation();
+  
+  const isInWishlist = userWishlists.includes(productId);
+  const endpoint = isInWishlist 
+    ? `/api/wishlist/remove/${productId}` 
+    : `/api/wishlist/add/${productId}`;
+  
+  try {
+    const response = await fetch(endpoint, { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.ok) {
+      if (isInWishlist) {
+        userWishlists = userWishlists.filter(id => id !== productId);
+        showToast('Đã xóa khỏi danh sách yêu thích', 'info');
+      } else {
+        userWishlists.push(productId);
+        showToast('❤️ Đã thêm vào danh sách yêu thích!', 'success');
+      }
+      
+      // Re-render to update heart icons
+      renderProducts();
+    } else {
+      showToast(data.error || 'Lỗi khi cập nhật', 'error');
+    }
+  } catch (error) {
+    console.error('Error toggling wishlist:', error);
+    showToast('Lỗi kết nối', 'error');
+  }
+}
+
+// Load products from API
+async function loadProducts() {
+  try {
+    // Temporarily disable wishlist loading
+    // await loadUserWishlist();
+    
+    const response = await fetch('/api/products?status=active');
+    const data = await response.json();
+    
+    console.log('Products API response:', data);
+    console.log('Products count:', data.products?.length);
+    
+    if (data.ok) {
+      products = data.products;
+      console.log('Rendering products:', products.length);
+      renderProducts();
+      updateCartCount();
+    } else {
+      showToast('Không thể tải sản phẩm!', 'error');
+    }
+  } catch (error) {
+    console.error('Error loading products:', error);
+    showToast('Lỗi khi tải sản phẩm!', 'error');
+  }
+}
+
+// Load products on page load
+document.addEventListener('DOMContentLoaded', function() {
+  loadProducts();
+});
+
+function getImageUrl(imagePath) {
+  // If image path starts with /static or http, use as is
+  if (imagePath.startsWith('/static') || imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  // Otherwise, prepend /static/
+  return '/static/' + imagePath;
+}
 
 function renderProducts(category = 'all') {
   const grid = document.getElementById('products-grid');
+  if (!grid) return;
+  
+  console.log('renderProducts called with category:', category);
+  console.log('Total products:', products.length);
+  
   const filteredProducts = category === 'all' 
     ? products 
     : products.filter(p => p.category === category);
+  
+  console.log('Filtered products:', filteredProducts.length);
+  
+  if (filteredProducts.length === 0) {
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: #999;"><div style="font-size: 3rem; margin-bottom: 1rem;">📦</div><p>Không có sản phẩm nào</p></div>';
+    return;
+  }
   
   grid.innerHTML = filteredProducts.map(product => {
     let stockClass = 'in-stock';
@@ -386,25 +427,47 @@ function renderProducts(category = 'all') {
       stockClass = 'low-stock';
     }
     
+    const imageUrl = getImageUrl(product.image);
+    
     return `
       <div class="product-card" data-category="${product.category}">
-        <img src="${product.image}" alt="${product.name}" class="product-image">
+        <img src="${imageUrl}" 
+             alt="${product.name}" 
+             class="product-image" 
+             onerror="this.src='/static/images/tomato.jpg'"
+             onclick="viewProduct(${product.id})"
+             style="cursor: pointer;">
         <div class="product-info">
           <span class="product-category">${getCategoryName(product.category)}</span>
-          <h3 class="product-name">${product.name}</h3>
+          <h3 class="product-name" 
+              onclick="viewProduct(${product.id})"
+              style="cursor: pointer; transition: color 0.3s;"
+              onmouseover="this.style.color='var(--tomato-600)'"
+              onmouseout="this.style.color=''">${product.name}</h3>
           <p class="product-description">${product.description}</p>
           <div class="product-footer">
             <div>
               <div class="product-price">${formatPrice(product.price)}</div>
               <div class="product-stock ${stockClass}">${stockText}</div>
             </div>
-            <button 
-              class="add-to-cart-btn" 
-              onclick="addToCart(${product.id})"
-              ${product.stock === 0 ? 'disabled' : ''}
-            >
-              ${product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
-            </button>
+            <div style="display: flex; gap: 8px; flex-direction: column;">
+              <button 
+                class="add-to-cart-btn" 
+                onclick="addToCart(${product.id}, event)"
+                ${product.stock === 0 ? 'disabled' : ''}
+                style="font-size: 0.9em; padding: 10px 16px;"
+              >
+                ${product.stock === 0 ? 'Hết hàng' : '🛒 Thêm vào giỏ'}
+              </button>
+              <button 
+                class="buy-now-btn" 
+                onclick="buyNow(${product.id})"
+                ${product.stock === 0 ? 'disabled' : ''}
+                style="font-size: 0.9em; padding: 10px 16px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s;"
+              >
+                ${product.stock === 0 ? 'Hết hàng' : '⚡ Mua ngay'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -426,7 +489,7 @@ function formatPrice(price) {
   return price.toLocaleString('vi-VN') + 'đ';
 }
 
-function addToCart(productId) {
+function addToCart(productId, event) {
   const product = products.find(p => p.id === productId);
   if (!product || product.stock === 0) return;
   
@@ -444,18 +507,45 @@ function addToCart(productId) {
       name: product.name,
       price: product.price,
       quantity: 1,
-      maxStock: product.stock
+      maxStock: product.stock,
+      image: product.image
     });
   }
   
   saveCart();
   updateCartCount();
-  showToast(`Đã thêm ${product.name} vào giỏ hàng!`, 'success');
+  showToast(`Đã thêm "${product.name}" vào giỏ hàng!`, 'success');
   
   // Animation effect
-  const btn = event.target;
-  btn.style.transform = 'scale(1.2)';
-  setTimeout(() => btn.style.transform = '', 200);
+  if (event) {
+    const btn = event.target;
+    btn.style.transform = 'scale(1.2)';
+    setTimeout(() => btn.style.transform = '', 200);
+  }
+}
+
+function buyNow(productId) {
+  const product = products.find(p => p.id === productId);
+  if (!product || product.stock === 0) return;
+  
+  // Check if item already in cart
+  const existingItem = cart.find(item => item.id === productId);
+  if (existingItem) {
+    // Go directly to cart
+    window.location.href = '{{ url_for("cart") }}';
+  } else {
+    // Add to cart then go to cart page
+    cart.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      maxStock: product.stock,
+      image: product.image
+    });
+    saveCart();
+    window.location.href = '{{ url_for("cart") }}';
+  }
 }
 
 function saveCart() {
@@ -473,11 +563,28 @@ function openCart() {
 
 function showToast(message, type = 'info') {
   // Use existing toast system from base template
-  if (window.showToast) {
-    window.showToast(message, type);
+  if (window.toast) {
+    switch(type) {
+      case 'success':
+        window.toast.success(message);
+        break;
+      case 'error':
+        window.toast.error(message);
+        break;
+      case 'warning':
+        window.toast.warning(message);
+        break;
+      default:
+        window.toast.info(message);
+    }
   } else {
+    console.log('Toast:', message, type);
     alert(message);
   }
+}
+
+function viewProduct(productId) {
+  window.location.href = `/product/${productId}`;
 }
 
 // Filter buttons

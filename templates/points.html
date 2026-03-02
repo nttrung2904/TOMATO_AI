@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Điểm thưởng - {{ t('site_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 40px auto;">
+  <div class="points-header" style="text-align: center; margin-bottom: 40px;">
+    <h1 style="color: var(--tomato-700); margin-bottom: 10px;">
+      <span style="font-size: 2.5em;">🏆</span>
+      {{ t('points.title') if current_lang else 'Điểm thưởng của bạn' }}
+    </h1>
+    <div class="current-points-display" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); color: white; padding: 30px; border-radius: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 10px 30px rgba(255,107,107,0.3);">
+      <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">{{ t('points.current_points') if current_lang else 'Điểm hiện tại' }}</div>
+      <div style="font-size: 3em; font-weight: 700;">{{ user.points|default(0) }}</div>
+      <div style="font-size: 0.85em; opacity: 0.85; margin-top: 10px;">
+        {% if user_rank %}
+          🏅 Hạng {{ user_rank }} trong bảng xếp hạng
+        {% else %}
+          💪 Tiếp tục tích điểm nhé!
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;">
+    <button onclick="dailyCheckin()" class="action-btn" style="background: #4caf50; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(76,175,80,0.3); transition: all 0.3s;">
+      <div style="font-size: 2em; margin-bottom: 10px;">✓</div>
+      <div>Check-in hàng ngày</div>
+      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+5 điểm</div>
+    </button>
+    
+    <a href="{{ url_for('quiz') }}" class="action-btn" style="background: #2196f3; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(33,150,243,0.3); text-decoration: none; display: block; text-align: center;">
+      <div style="font-size: 2em; margin-bottom: 10px;">📝</div>
+      <div>Làm Quiz</div>
+      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+50 điểm</div>
+    </a>
+    
+    <a href="{{ url_for('game_menu') }}" class="action-btn" style="background: #ff9800; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(255,152,0,0.3); text-decoration: none; display: block; text-align: center;">
+      <div style="font-size: 2em; margin-bottom: 10px;">🎮</div>
+      <div>Chơi Game</div>
+      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+20-30 điểm</div>
+    </a>
+    
+    <a href="{{ url_for('leaderboard') }}" class="action-btn" style="background: #9c27b0; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(156,39,176,0.3); text-decoration: none; display: block; text-align: center;">
+      <div style="font-size: 2em; margin-bottom: 10px;">🏆</div>
+      <div>Bảng xếp hạng</div>
+      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">Top người chơi</div>
+    </a>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px;">
+    <!-- Points History -->
+    <div class="points-section" style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+      <h2 style="color: var(--tomato-700); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5em;">📊</span>
+        {{ t('points.points_history') if current_lang else 'Lịch sử điểm' }}
+      </h2>
+      
+      <div class="points-history" style="max-height: 500px; overflow-y: auto;">
+        {% if history %}
+          {% for entry in history[:20] %}
+          <div class="history-entry" style="border-left: 3px solid {% if entry.points > 0 %}#4caf50{% else %}#f44336{% endif %}; padding: 15px; margin-bottom: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+              <span style="font-weight: 600; color: {% if entry.points > 0 %}#4caf50{% else %}#f44336{% endif %}; font-size: 1.2em;">
+                {% if entry.points > 0 %}+{% endif %}{{ entry.points }}
+              </span>
+              <span style="font-size: 0.85em; color: #666;">
+                {{ entry.created_at[:10] }} {{ entry.created_at[11:16] }}
+              </span>
+            </div>
+            <div style="color: #333; font-weight: 500; margin-bottom: 3px;">{{ entry.description }}</div>
+            <div style="font-size: 0.85em; color: #888;">
+              {% if entry.action == 'order' %}💰 Mua hàng
+              {% elif entry.action == 'quiz_completed' %}📝 Quiz
+              {% elif entry.action == 'memory_game' %}🧠 Trí nhớ
+              {% elif entry.action == 'farm_game' %}🌱 Nông trại
+              {% elif entry.action == 'prediction' %}🔍 Dự đoán
+              {% elif entry.action == 'review' %}⭐ Đánh giá
+              {% elif entry.action == 'daily_checkin' %}✓ Check-in
+              {% elif entry.action == 'redeem_coupon' %}🎁 Đổi quà
+              {% else %}{{ entry.action }}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align: center; padding: 40px; color: #999;">
+            <div style="font-size: 3em; margin-bottom: 10px;">📭</div>
+            <div>Chưa có lịch sử tích điểm</div>
+            <div style="font-size: 0.9em; margin-top: 10px;">Hãy bắt đầu tích điểm ngay!</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Redeem Points -->
+    <div class="points-section" style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+      <h2 style="color: var(--tomato-700); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5em;">🎁</span>
+        {{ t('points.redeem') if current_lang else 'Đổi điểm' }}
+      </h2>
+      
+      <div class="redeem-options">
+        {% for option in redemption_options %}
+        <div class="redeem-option" style="border: 2px solid {% if user.points >= option.points %}var(--tomato-600){% else %}#ddd{% endif %}; padding: 20px; margin-bottom: 15px; border-radius: 15px; position: relative; {% if user.points < option.points %}opacity: 0.6;{% endif %}">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-weight: 600; font-size: 1.1em; color: #333;">{{ option.name }}</div>
+            <div style="background: var(--tomato-600); color: white; padding: 5px 15px; border-radius: 20px; font-weight: 600; font-size: 0.9em;">
+              {{ option.points }} điểm
+            </div>
+          </div>
+          <div style="color: #666; margin-bottom: 15px;">Giá trị: {{ "{:,}".format(option.value).replace(',', '.') }}đ</div>
+          <button onclick="redeemPoints('{{ option.id }}')" 
+                  class="redeem-btn"
+                  {% if user.points < option.points %}disabled{% endif %}
+                  style="width: 100%; padding: 12px; background: {% if user.points >= option.points %}var(--tomato-600){% else %}#ccc{% endif %}; color: white; border: none; border-radius: 10px; cursor: {% if user.points >= option.points %}pointer{% else %}not-allowed{% endif %}; font-weight: 600; transition: all 0.3s;">
+            {% if user.points >= option.points %}
+              Đổi ngay
+            {% else %}
+              Không đủ điểm
+            {% endif %}
+          </button>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Earn Points Guide -->
+      <div style="margin-top: 30px; padding: 20px; background: #e3f2fd; border-radius: 15px; border-left: 4px solid #2196f3;">
+        <h3 style="color: #1976d2; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+          <span>💡</span> Cách tích điểm
+        </h3>
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          <li style="margin-bottom: 8px; color: #333;">✓ Check-in hàng ngày: <strong>+5 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">📝 Hoàn thành Quiz: <strong>+50 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">🧠 Game trí nhớ: <strong>+30 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">🌱 Game nông trại: <strong>+20 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">🔍 Dự đoán bệnh: <strong>+10 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">⭐ Đánh giá sản phẩm: <strong>+15 điểm</strong></li>
+          <li style="margin-bottom: 8px; color: #333;">💰 Mua hàng: <strong>+10 điểm/10.000đ</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+  }
+  
+  .redeem-btn:not(:disabled):hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+  }
+  
+  [data-theme="dark"] .points-section {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .history-entry {
+    background: var(--bg-primary);
+  }
+  
+  [data-theme="dark"] .redeem-option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+</style>
+
+<script>
+function dailyCheckin() {
+  fetch('/api/points/checkin', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✓ ' + data.message);
+      location.reload();
+    } else {
+      alert('⚠️ ' + data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Check-in error:', err);
+    alert('Lỗi khi check-in');
+  });
+}
+
+function redeemPoints(optionId) {
+  if (!confirm('Bạn có chắc muốn đổi điểm?')) return;
+  
+  fetch('/api/points/redeem', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ option_id: optionId })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      alert('🎉 ' + data.message + '\n\nMã giảm giá: ' + data.coupon_code + '\n\nĐiểm còn lại: ' + data.remaining_points);
+      location.reload();
+    } else {
+      alert('⚠️ ' + data.error);
+    }
+  })
+  .catch(err => {
+    console.error('Redeem error:', err);
+    alert('Lỗi khi đổi điểm');
+  });
+}
+</script>
+{% endblock %}

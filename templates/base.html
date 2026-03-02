@@ -215,6 +215,222 @@
       background: var(--bg-tertiary);
     }
     
+    /* Notification Bell */
+    .notification-bell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--tomato-50);
+      color: var(--tomato-700);
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    [data-theme="dark"] .notification-bell {
+      background: var(--bg-secondary);
+      color: var(--tomato-400);
+    }
+    
+    .notification-bell:hover {
+      background: var(--tomato-100);
+      transform: scale(1.05);
+    }
+    
+    [data-theme="dark"] .notification-bell:hover {
+      background: var(--tomato-900);
+    }
+    
+    .notification-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: #f44336;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 10px;
+      min-width: 18px;
+      text-align: center;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    
+    .notification-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 360px;
+      max-height: 500px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+      z-index: 1000;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    [data-theme="dark"] .notification-dropdown {
+      background: var(--bg-secondary);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    
+    .notification-bell.active .notification-dropdown {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    
+    .notification-header {
+      padding: 15px;
+      background: var(--tomato-50);
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    [data-theme="dark"] .notification-header {
+      background: var(--tomato-900);
+      border-bottom-color: var(--border-color);
+    }
+    
+    .notification-title {
+      font-weight: 600;
+      color: var(--tomato-700);
+    }
+    
+    [data-theme="dark"] .notification-title {
+      color: var(--tomato-400);
+    }
+    
+    .mark-all-read {
+      font-size: 0.75em;
+      color: var(--tomato-600);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    
+    .mark-all-read:hover {
+      color: var(--tomato-700);
+    }
+    
+    .notification-list {
+      overflow-y: auto;
+      max-height: 400px;
+    }
+    
+    .notification-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.2s;
+      position: relative;
+    }
+    
+    [data-theme="dark"] .notification-item {
+      border-bottom-color: var(--border-color);
+    }
+    
+    .notification-item:hover {
+      background: #f8f9fa;
+    }
+    
+    [data-theme="dark"] .notification-item:hover {
+      background: var(--bg-tertiary);
+    }
+    
+    .notification-item.unread {
+      background: var(--tomato-25);
+    }
+    
+    [data-theme="dark"] .notification-item.unread {
+      background: rgba(76, 175, 80, 0.05);
+    }
+    
+    .notification-item.unread::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      background: var(--tomato-500);
+      border-radius: 50%;
+    }
+    
+    .notification-item-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+      font-size: 0.9em;
+      padding-left: 10px;
+    }
+    
+    [data-theme="dark"] .notification-item-title {
+      color: #ddd;
+    }
+    
+    .notification-item-message {
+      font-size: 0.85em;
+      color: #666;
+      margin-bottom: 4px;
+      padding-left: 10px;
+    }
+    
+    [data-theme="dark"] .notification-item-message {
+      color: #aaa;
+    }
+    
+    .notification-item-time {
+      font-size: 0.75em;
+      color: #999;
+      padding-left: 10px;
+    }
+    
+    .notification-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: #999;
+    }
+    
+    .notification-footer {
+      padding: 12px;
+      background: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
+      text-align: center;
+    }
+    
+    [data-theme="dark"] .notification-footer {
+      background: var(--bg-tertiary);
+      border-top-color: var(--border-color);
+    }
+    
+    .notification-footer a {
+      color: var(--tomato-600);
+      text-decoration: none;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+    
+    .notification-footer a:hover {
+      text-decoration: underline;
+    }
+    
     .auth-links {
       display: flex;
       gap: 10px;
@@ -477,6 +693,12 @@
         </svg>
         <span>Hỏi đáp</span>
       </a>
+      <a href="{{ url_for('wiki_index') }}" class="nav-link">
+        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+          <path d="M21,5C19.89,4.65 18.67,4.5 17.5,4.5C15.55,4.5 13.45,4.9 12,6C10.55,4.9 8.45,4.5 6.5,4.5C4.55,4.5 2.45,4.9 1,6V20.65C1,20.9 1.25,21.15 1.5,21.15C1.6,21.15 1.65,21.1 1.75,21.1C3.1,20.45 5.05,20 6.5,20C8.45,20 10.55,20.4 12,21.5C13.35,20.65 15.8,20 17.5,20C19.15,20 20.85,20.3 22.25,21.05C22.35,21.1 22.4,21.1 22.5,21.1C22.75,21.1 23,20.85 23,20.6V6C22.4,5.55 21.75,5.25 21,5M21,18.5C19.9,18.15 18.7,18 17.5,18C15.8,18 13.35,18.65 12,19.5V8C13.35,7.15 15.8,6.5 17.5,6.5C18.7,6.5 19.9,6.65 21,7V18.5Z" />
+        </svg>
+        <span>Wiki</span>
+      </a>
       <a href="{{ url_for('webcam') }}" class="nav-link">
         <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
           <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z" />
@@ -501,6 +723,48 @@
         </svg>
         <span>Cửa hàng</span>
       </a>
+      {% if session.get('username') %}
+      <a href="{{ url_for('wishlist_page') }}" class="nav-link">
+        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+          <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+        </svg>
+        <span>Yêu thích</span>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('community') }}" class="nav-link">
+        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+          <path d="M12,5.5A3.5,3.5 0 0,1 15.5,9A3.5,3.5 0 0,1 12,12.5A3.5,3.5 0 0,1 8.5,9A3.5,3.5 0 0,1 12,5.5M5,8C5.56,8 6.08,8.15 6.53,8.42C6.38,9.85 6.8,11.27 7.66,12.38C7.16,13.34 6.16,14 5,14A3,3 0 0,1 2,11A3,3 0 0,1 5,8M19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14C17.84,14 16.84,13.34 16.34,12.38C17.2,11.27 17.62,9.85 17.47,8.42C17.92,8.15 18.44,8 19,8M5.5,18.25C5.5,16.18 8.41,14.5 12,14.5C15.59,14.5 18.5,16.18 18.5,18.25V20H5.5V18.25M0,20V18.5C0,17.11 1.89,15.94 4.45,15.6C3.86,16.28 3.5,17.22 3.5,18.25V20H0M24,20H20.5V18.25C20.5,17.22 20.14,16.28 19.55,15.6C22.11,15.94 24,17.11 24,18.5V20Z" />
+        </svg>
+        <span>{{ t('nav.community') if current_lang else 'Cộng đồng' }}</span>
+      </a>
+      
+      <!-- Language Switcher -->
+      <div class="language-switcher" style="position: relative;">
+        <button onclick="toggleLanguageMenu(event)" style="display: flex; align-items: center; gap: 5px; background: transparent; border: 1px solid #ddd; padding: 6px 12px; border-radius: 8px; cursor: pointer; color: var(--tomato-700); font-weight: 500; transition: all 0.3s;">
+          <span style="font-size: 1.2em;">{{ '🇬🇧' if current_lang == 'en' else '🇻🇳' }}</span>
+          <span>{{ current_lang|upper if current_lang else 'VI' }}</span>
+          <svg style="width:12px;height:12px;fill:currentColor;" viewBox="0 0 24 24">
+            <path d="M7,10L12,15L17,10H7Z" />
+          </svg>
+        </button>
+        <div class="language-menu" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 150px; z-index: 1000;">
+          <a href="{{ url_for('set_language', lang='vi') }}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; text-decoration: none; color: #333; border-bottom: 1px solid #f0f0f0; transition: all 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+            <span style="font-size: 1.3em;">🇻🇳</span>
+            <span>Tiếng Việt</span>
+            {% if current_lang == 'vi' or not current_lang %}
+            <span style="margin-left: auto; color: var(--tomato-600);">✓</span>
+            {% endif %}
+          </a>
+          <a href="{{ url_for('set_language', lang='en') }}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; text-decoration: none; color: #333; transition: all 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+            <span style="font-size: 1.3em;">🇬🇧</span>
+            <span>English</span>
+            {% if current_lang == 'en' %}
+            <span style="margin-left: auto; color: var(--tomato-600);">✓</span>
+            {% endif %}
+          </a>
+        </div>
+      </div>
+      
       {% if session.get('is_admin') %}
       <a href="{{ url_for('admin_feedback') }}" class="nav-link">
         <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
@@ -511,6 +775,27 @@
       {% endif %}
       
       {% if session.get('user_id') %}
+      <!-- Notification Bell -->
+      <div class="notification-bell" id="notificationBell" onclick="toggleNotifications(event)">
+        <svg style="width:20px;height:20px;fill:currentColor;" viewBox="0 0 24 24">
+          <path d="M21,19V20H3V19L5,17V11C5,7.9 7.03,5.17 10,4.29C10,4.19 10,4.1 10,4A2,2 0 0,1 12,2A2,2 0 0,1 14,4C14,4.19 14,4.19 14,4.29C16.97,5.17 19,7.9 19,11V17L21,19M14,21A2,2 0 0,1 12,23A2,2 0 0,1 10,21" />
+        </svg>
+        <span class="notification-badge" id="notificationBadge" style="display:none;">0</span>
+        
+        <!-- Notification Dropdown -->
+        <div class="notification-dropdown" onclick="event.stopPropagation()">
+          <div class="notification-header">
+            <span class="notification-title">🔔 Thông báo</span>
+            <span class="mark-all-read" onclick="markAllNotificationsRead()">Đánh dấu đã đọc</span>
+          </div>
+          <div class="notification-list" id="notificationList">
+            <div class="notification-empty">
+              <p>Chưa có thông báo nào</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- User Menu Dropdown -->
       <div class="user-menu" id="userMenuContainer">
         <button class="user-menu-trigger" onclick="toggleUserMenu(event)">
@@ -527,6 +812,12 @@
           <div class="user-menu-header">
             <div class="user-menu-name">{{ session.get('user_name', 'Người dùng') }}</div>
             <div class="user-menu-email">{{ session.get('user_email', '') }}</div>
+            {% if session.get('user_id') %}
+            <div class="user-menu-points" style="margin-top: 10px; padding: 8px 12px; background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); border-radius: 20px; color: white; font-weight: 600; text-align: center;">
+              <span style="font-size: 0.85em;">💎 Điểm thưởng:</span>
+              <span style="font-size: 1.2em; margin-left: 5px;" id="userPointsDisplay">{{ session.get('user_points', 0) }}</span>
+            </div>
+            {% endif %}
           </div>
           
           <div class="user-menu-items">
@@ -543,6 +834,52 @@
               </svg>
               <span>Giỏ hàng</span>
             </a>
+            
+            <a href="{{ url_for('points_dashboard') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z" />
+              </svg>
+              <span>💎 Điểm thưởng</span>
+            </a>
+            
+            {% if session.get('is_admin') %}
+            <div class="user-menu-divider"></div>
+            
+            <a href="{{ url_for('admin_stats') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M16,11.78L20.24,4.45L21.97,5.45L16.74,14.5L10.23,10.75L5.46,19H22V21H2V3H4V17.54L9.5,8L16,11.78Z" />
+              </svg>
+              <span>📊 Thống kê</span>
+            </a>
+            
+            <a href="{{ url_for('admin_orders') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M17 18C15.89 18 15 18.89 15 20C15 21.1 15.9 22 17 22C18.1 22 19 21.11 19 20C19 18.9 18.1 18 17 18M1 2H4.27L5.21 4H20C20.55 4 21 4.45 21 5C21 5.17 20.95 5.34 20.88 5.5L17.3 11.97C16.96 12.58 16.3 13 15.55 13H8.1L7.2 14.63L7.17 14.75C7.17 14.89 7.28 15 7.42 15H19V17H7C5.89 17 5 16.1 5 15C5 14.65 5.09 14.32 5.24 14.04L6.6 11.59L3 4H1V2M7 18C5.89 18 5 18.89 5 20C5 21.1 5.9 22 7 22C8.1 22 9 21.11 9 20C9 18.9 8.1 18 7 18M16 11L18.78 6H6.14L8.5 11H16Z" />
+              </svg>
+              <span>📦 Đơn hàng</span>
+            </a>
+            
+            <a href="{{ url_for('admin_products') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M13,7H11V11H7V13H11V17H13V13H17V11H13V7Z" />
+              </svg>
+              <span>🛍️ Sản phẩm</span>
+            </a>
+            
+            <a href="{{ url_for('admin_wiki') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M21,5C19.89,4.65 18.67,4.5 17.5,4.5C15.55,4.5 13.45,4.9 12,6C10.55,4.9 8.45,4.5 6.5,4.5C4.55,4.5 2.45,4.9 1,6V20.65C1,20.9 1.25,21.15 1.5,21.15C1.6,21.15 1.65,21.1 1.75,21.1C3.1,20.45 5.05,20 6.5,20C8.45,20 10.55,20.4 12,21.5C13.35,20.65 15.8,20 17.5,20C19.15,20 20.85,20.3 22.25,21.05C22.35,21.1 22.4,21.1 22.5,21.1C22.75,21.1 23,20.85 23,20.6V6C22.4,5.55 21.75,5.25 21,5M21,18.5C19.9,18.15 18.7,18 17.5,18C15.8,18 13.35,18.65 12,19.5V8C13.35,7.15 15.8,6.5 17.5,6.5C18.7,6.5 19.9,6.65 21,7V18.5Z" />
+              </svg>
+              <span>📚 Quản lý Wiki</span>
+            </a>
+            
+            <a href="{{ url_for('admin_feedback') }}" class="user-menu-item">
+              <svg viewBox="0 0 24 24">
+                <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4C22,2.89 21.1,2 20,2Z" />
+              </svg>
+              <span>💬 Feedback</span>
+            </a>
+            {% endif %}
             
             <div class="user-menu-divider"></div>
             
@@ -604,12 +941,29 @@
       }
     }
     
-    // Close user menu when clicking outside
+    // Language Menu Toggle
+    function toggleLanguageMenu(event) {
+      event.stopPropagation();
+      const menu = event.currentTarget.nextElementSibling;
+      if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+    
+    // Close user menu and language menu when clicking outside
     document.addEventListener('click', function(event) {
       const container = document.getElementById('userMenuContainer');
       if (container && !container.contains(event.target)) {
         container.classList.remove('active');
       }
+      
+      // Close language menu
+      const langMenus = document.querySelectorAll('.language-menu');
+      langMenus.forEach(menu => {
+        if (!menu.parentElement.contains(event.target)) {
+          menu.style.display = 'none';
+        }
+      });
     });
     
     // Dark Mode Toggle System
@@ -752,6 +1106,178 @@
     
     // Make it globally accessible
     window.toast = ToastManager;
+    
+    // ==================== Notification System ====================
+    {% if session.get('user_id') %}
+    const NotificationManager = {
+      notifications: [],
+      unreadCount: 0,
+      
+      async fetchNotifications() {
+        try {
+          const response = await fetch('/api/notifications');
+          const data = await response.json();
+          
+          if (data.ok) {
+            this.notifications = data.notifications;
+            this.unreadCount = data.unread_count;
+            this.updateBadge();
+            this.renderNotifications();
+          }
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+        }
+      },
+      
+      updateBadge() {
+        const badge = document.getElementById('notificationBadge');
+        if (this.unreadCount > 0) {
+          badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+          badge.style.display = 'block';
+        } else {
+          badge.style.display = 'none';
+        }
+      },
+      
+      renderNotifications() {
+        const listEl = document.getElementById('notificationList');
+        
+        if (this.notifications.length === 0) {
+          listEl.innerHTML = '<div class="notification-empty"><p>Chưa có thông báo nào</p></div>';
+          return;
+        }
+        
+        listEl.innerHTML = this.notifications.map(notif => {
+          const time = this.formatTime(notif.timestamp);
+          const unreadClass = notif.read ? '' : 'unread';
+          const icon = this.getIcon(notif.type);
+          
+          return `
+            <div class="notification-item ${unreadClass}" 
+                 onclick="handleNotificationClick('${notif.id}', '${notif.link || '#'}')">
+              <div class="notification-item-title">${icon} ${notif.title}</div>
+              <div class="notification-item-message">${notif.message}</div>
+              <div class="notification-item-time">${time}</div>
+            </div>
+          `;
+        }).join('');
+      },
+      
+      getIcon(type) {
+        const icons = {
+          success: '✅',
+          error: '❌',
+          warning: '⚠️',
+          info: 'ℹ️'
+        };
+        return icons[type] || 'ℹ️';
+      },
+      
+      formatTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000); // seconds
+        
+        if (diff < 60) return 'Vừa xong';
+        if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+        if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
+        
+        return date.toLocaleDateString('vi-VN');
+      },
+      
+      async markAsRead(notificationId) {
+        try {
+          await fetch(`/api/notifications/${notificationId}/read`, {
+            method: 'POST'
+          });
+          
+          // Update local state
+          const notif = this.notifications.find(n => n.id === notificationId);
+          if (notif && !notif.read) {
+            notif.read = true;
+            this.unreadCount = Math.max(0, this.unreadCount - 1);
+            this.updateBadge();
+            this.renderNotifications();
+          }
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+        }
+      },
+      
+      async markAllAsRead() {
+        try {
+          await fetch('/api/notifications/read_all', {
+            method: 'POST'
+          });
+          
+          // Update local state
+          this.notifications.forEach(n => n.read = true);
+          this.unreadCount = 0;
+          this.updateBadge();
+          this.renderNotifications();
+          
+          toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
+        } catch (error) {
+          console.error('Error marking all as read:', error);
+          toast.error('Có lỗi xảy ra');
+        }
+      }
+    };
+    
+    // Toggle notification dropdown
+    function toggleNotifications(event) {
+      event.stopPropagation();
+      const bell = document.getElementById('notificationBell');
+      const isActive = bell.classList.contains('active');
+      
+      // Close other menus
+      document.querySelectorAll('.user-menu').forEach(menu => {
+        menu.classList.remove('active');
+      });
+      
+      if (!isActive) {
+        bell.classList.add('active');
+        NotificationManager.fetchNotifications();
+      } else {
+        bell.classList.remove('active');
+      }
+    }
+    
+    // Handle notification click
+    async function handleNotificationClick(notificationId, link) {
+      await NotificationManager.markAsRead(notificationId);
+      
+      if (link && link !== '#') {
+        window.location.href = link;
+      }
+    }
+    
+    // Mark all notifications as read
+    function markAllNotificationsRead() {
+      NotificationManager.markAllAsRead();
+    }
+    
+    // Initial load and periodic refresh
+    document.addEventListener('DOMContentLoaded', () => {
+      NotificationManager.fetchNotifications();
+      
+      // Refresh every 2 minutes
+      setInterval(() => {
+        if (!document.getElementById('notificationBell').classList.contains('active')) {
+          NotificationManager.fetchNotifications();
+        }
+      }, 120000);
+    });
+    
+    // Close notification dropdown when clicking outside
+    document.addEventListener('click', (event) => {
+      const bell = document.getElementById('notificationBell');
+      if (!bell.contains(event.target)) {
+        bell.classList.remove('active');
+      }
+    });
+    {% endif %}
   </script>
   
   {% block scripts %}{% endblock %}

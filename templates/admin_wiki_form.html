@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if article %}Sửa bài viết{% else %}Thêm bài viết mới{% endif %} - Admin Wiki{% endblock %}
+
+{% block content %}
+<style>
+  .form-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .form-header {
+    margin-bottom: 30px;
+  }
+  
+  .form-header h1 {
+    color: var(--tomato-700);
+    margin: 0 0 10px 0;
+  }
+  
+  .form-header a {
+    color: var(--tomato-600);
+    text-decoration: none;
+  }
+  
+  .form-card {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+  }
+  
+  [data-theme="dark"] .form-card {
+    background: var(--bg-secondary);
+  }
+  
+  .form-group {
+    margin-bottom: 25px;
+  }
+  
+  .form-group label {
+    display: block;
+    color: var(--tomato-700);
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+  }
+  
+  [data-theme="dark"] .form-group label {
+    color: var(--tomato-400);
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: #ddd;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+  }
+  
+  .form-group textarea {
+    width: 100%;
+    min-height: 400px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    font-family: 'Courier New', monospace;
+    line-height: 1.6;
+    resize: vertical;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .form-group textarea {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: #ddd;
+  }
+  
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--tomato-500);
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+  }
+  
+  .form-help {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+  }
+  
+  [data-theme="dark"] .form-help {
+    color: #999;
+  }
+  
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .checkbox-group input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+  
+  .checkbox-group label {
+    margin: 0;
+    font-weight: normal;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 15px;
+    padding-top: 20px;
+    border-top: 2px solid #f0f0f0;
+    margin-top: 30px;
+  }
+  
+  [data-theme="dark"] .form-actions {
+    border-top-color: var(--border-color);
+  }
+  
+  .btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+  }
+  
+  .btn-primary {
+    background: var(--tomato-600);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: var(--tomato-700);
+    transform: translateY(-2px);
+  }
+  
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .btn-secondary {
+    background: var(--bg-tertiary);
+    color: #ddd;
+  }
+  
+  .btn-secondary:hover {
+    background: #d0d0d0;
+  }
+  
+  .markdown-guide {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 0.9em;
+  }
+  
+  [data-theme="dark"] .markdown-guide {
+    background: var(--bg-tertiary);
+  }
+  
+  .markdown-guide h4 {
+    margin: 0 0 10px 0;
+    color: var(--tomato-600);
+  }
+  
+  .markdown-guide code {
+    background: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+  
+  [data-theme="dark"] .markdown-guide code {
+    background: var(--bg-secondary);
+  }
+  
+  .slug-generator {
+    margin-top: 5px;
+  }
+  
+  .slug-generator button {
+    padding: 6px 15px;
+    background: var(--tomato-100);
+    color: var(--tomato-700);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+  }
+  
+  .slug-generator button:hover {
+    background: var(--tomato-200);
+  }
+</style>
+
+<div class="form-container">
+  <div class="form-header">
+    <h1>{% if article %}✏️ Sửa bài viết{% else %}➕ Thêm bài viết mới{% endif %}</h1>
+    <a href="{{ url_for('admin_wiki') }}">← Quay lại danh sách</a>
+  </div>
+  
+  <div class="form-card">
+    <form method="POST">
+      <div class="form-group">
+        <label for="title">📝 Tiêu đề bài viết *</label>
+        <input type="text" 
+               id="title" 
+               name="title" 
+               value="{% if article %}{{ article.title }}{% endif %}" 
+               required 
+               placeholder="Nhập tiêu đề bài viết..."
+               onkeyup="generateSlug()">
+        <p class="form-help">Tiêu đề hiển thị cho người dùng</p>
+      </div>
+      
+      <div class="form-group">
+        <label for="slug">🔗 Slug (URL) *</label>
+        <input type="text" 
+               id="slug" 
+               name="slug" 
+               value="{% if article %}{{ article.slug }}{% endif %}" 
+               required 
+               placeholder="vd: cham-soc-ca-chua-co-ban"
+               pattern="[a-z0-9-]+">
+        <p class="form-help">URL thân thiện (chỉ chữ thường, số, dấu gạch ngang)</p>
+        <div class="slug-generator">
+          <button type="button" onclick="generateSlug()">🔄 Tự động tạo từ tiêu đề</button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="category">📂 Danh mục *</label>
+        <input type="text" 
+               id="category" 
+               name="category" 
+               value="{% if article %}{{ article.category }}{% endif %}" 
+               required 
+               placeholder="vd: Chăm sóc, Bệnh hại, Kỹ thuật...">
+        <p class="form-help">Danh mục phân loại bài viết</p>
+      </div>
+      
+      <div class="form-group">
+        <label for="content">📄 Nội dung (Markdown) *</label>
+        <textarea id="content" name="content" required placeholder="Viết nội dung bài viết ở đây...">{% if article %}{{ article.content }}{% endif %}</textarea>
+        <div class="markdown-guide">
+          <h4>📖 Hướng dẫn Markdown:</h4>
+          <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+            <li><code>## Tiêu đề 2</code> → <strong>Tiêu đề cấp 2</strong></li>
+            <li><code>### Tiêu đề 3</code> → Tiêu đề cấp 3</li>
+            <li><code>**text**</code> → <strong>text</strong> (in đậm)</li>
+            <li><code>- Item</code> → Danh sách</li>
+            <li><code>1. Item</code> → Danh sách đánh số</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="tags">🏷️ Tags</label>
+        <input type="text" 
+               id="tags" 
+               name="tags" 
+               value="{% if article %}{{ article.tags_str }}{% endif %}" 
+               placeholder="vd: chăm sóc, bệnh, hướng dẫn">
+        <p class="form-help">Các thẻ phân cách nhau bằng dấu phẩy</p>
+      </div>
+      
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" 
+                 id="featured" 
+                 name="featured" 
+                 {% if article and article.featured %}checked{% endif %}>
+          <label for="featured">⭐ Đánh dấu là bài viết nổi bật</label>
+        </div>
+        <p class="form-help">Bài viết nổi bật sẽ hiển thị ở vị trí ưu tiên</p>
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          {% if article %}💾 Cập nhật{% else %}➕ Thêm bài viết{% endif %}
+        </button>
+        <a href="{{ url_for('admin_wiki') }}" class="btn btn-secondary">❌ Hủy</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function generateSlug() {
+  const title = document.getElementById('title').value;
+  const slug = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/-+/g, '-') // Replace multiple - with single -
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing -
+  
+  document.getElementById('slug').value = slug;
+}
+</script>
+
+{% endblock %}

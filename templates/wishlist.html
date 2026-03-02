@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+
+{% block title %}❤️ Danh sách yêu thích | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .wishlist-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .wishlist-header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 16px;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+  
+  .wishlist-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2.5em;
+  }
+  
+  .wishlist-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+  }
+  
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+    margin-top: 30px;
+  }
+  
+  .product-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  .product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  }
+  
+  .product-image {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+  }
+  
+  .product-info {
+    padding: 20px;
+  }
+  
+  .product-category {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--tomato-50);
+    color: var(--tomato-600);
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  
+  .product-name {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin: 8px 0;
+    color: #333;
+  }
+  
+  .product-description {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .product-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 15px;
+  }
+  
+  .product-price {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: var(--tomato-600);
+  }
+  
+  .product-stock {
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  
+  .product-stock.in-stock {
+    color: #4caf50;
+  }
+  
+  .product-stock.low-stock {
+    color: #ff9800;
+  }
+  
+  .product-stock.out-of-stock {
+    color: #f44336;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+  }
+  
+  .add-to-cart-btn {
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: all 0.3s;
+  }
+  
+  .add-to-cart-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  }
+  
+  .add-to-cart-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .remove-wishlist-btn {
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: all 0.3s;
+  }
+  
+  .remove-wishlist-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(238, 90, 82, 0.3);
+  }
+  
+  .empty-wishlist {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .empty-wishlist svg {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 20px;
+    opacity: 0.3;
+  }
+  
+  .empty-wishlist h2 {
+    color: #666;
+    margin-bottom: 10px;
+  }
+  
+  .empty-wishlist p {
+    color: #999;
+    margin-bottom: 30px;
+  }
+  
+  .browse-btn {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .browse-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    color: white;
+  }
+  
+  .wishlist-count {
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    font-size: 0.9em;
+    margin-top: 10px;
+  }
+</style>
+
+<div class="wishlist-container">
+  <div class="wishlist-header">
+    <h1>❤️ Danh sách yêu thích</h1>
+    <p>Các sản phẩm bạn quan tâm</p>
+    <div class="wishlist-count" id="wishlistCount">Đang tải...</div>
+  </div>
+  
+  <div id="wishlistContent">
+    <div style="text-align: center; padding: 40px;">
+      <div class="spinner"></div>
+      <p style="color: #666; margin-top: 20px;">Đang tải danh sách yêu thích...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let wishlistProducts = [];
+
+async function loadWishlist() {
+  try {
+    const response = await fetch('/api/wishlist');
+    const data = await response.json();
+    
+    if (data.ok) {
+      wishlistProducts = data.products || [];
+      renderWishlist();
+    } else {
+      showToast('Lỗi tải danh sách yêu thích', 'error');
+    }
+  } catch (error) {
+    console.error('Error loading wishlist:', error);
+    showToast('Lỗi kết nối', 'error');
+  }
+}
+
+function renderWishlist() {
+  const container = document.getElementById('wishlistContent');
+  const countEl = document.getElementById('wishlistCount');
+  
+  countEl.textContent = `${wishlistProducts.length} sản phẩm`;
+  
+  if (wishlistProducts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-wishlist">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+        </svg>
+        <h2>Danh sách yêu thích trống</h2>
+        <p>Bạn chưa thêm sản phẩm nào vào danh sách yêu thích</p>
+        <a href="{{ url_for('shop') }}" class="browse-btn">🛒 Khám phá sản phẩm</a>
+      </div>
+    `;
+    return;
+  }
+  
+  const html = `
+    <div class="products-grid">
+      ${wishlistProducts.map(product => `
+        <div class="product-card" data-id="${product.id}">
+          <img src="${getImageUrl(product.image)}" 
+               alt="${product.name}" 
+               class="product-image" 
+               onerror="this.src='/static/images/tomato.jpg'"
+               onclick="viewProduct(${product.id})">
+          <div class="product-info">
+            <span class="product-category">${getCategoryName(product.category)}</span>
+            <h3 class="product-name" onclick="viewProduct(${product.id})">${product.name}</h3>
+            <p class="product-description">${product.description}</p>
+            <div class="product-footer">
+              <div>
+                <div class="product-price">${formatPrice(product.price)}</div>
+                <div class="product-stock ${getStockClass(product.stock)}">${getStockText(product.stock)}</div>
+              </div>
+              <div class="action-buttons">
+                <button 
+                  class="add-to-cart-btn" 
+                  onclick="addToCart(${product.id}, event)"
+                  ${product.stock === 0 ? 'disabled' : ''}
+                >
+                  ${product.stock === 0 ? 'Hết hàng' : '🛒 Thêm vào giỏ'}
+                </button>
+                <button 
+                  class="remove-wishlist-btn" 
+                  onclick="removeFromWishlist(${product.id}, event)"
+                >
+                  💔 Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+function getCategoryName(category) {
+  const categories = {
+    'pesticide': 'Thuốc Trừ Sâu',
+    'fertilizer': 'Phân Bón',
+    'seeds': 'Hạt Giống',
+    'tools': 'Dụng Cụ',
+    'organic': 'Hữu Cơ'
+  };
+  return categories[category] || category;
+}
+
+function getStockClass(stock) {
+  if (stock === 0) return 'out-of-stock';
+  if (stock < 10) return 'low-stock';
+  return 'in-stock';
+}
+
+function getStockText(stock) {
+  if (stock === 0) return 'Hết hàng';
+  return `Còn ${stock} sản phẩm`;
+}
+
+function formatPrice(price) {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(price);
+}
+
+function getImageUrl(imagePath) {
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  return `/static/${imagePath}`;
+}
+
+function viewProduct(productId) {
+  window.location.href = `/product/${productId}`;
+}
+
+// Cart functions (reused from shop.html)
+let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+function addToCart(productId, event) {
+  event.stopPropagation();
+  
+  const product = wishlistProducts.find(p => p.id === productId);
+  if (!product || product.stock === 0) return;
+  
+  const existingItem = cart.find(item => item.id === productId);
+  if (existingItem) {
+    if (existingItem.quantity < product.stock) {
+      existingItem.quantity++;
+    } else {
+      showToast('Đã đạt số lượng tối đa trong kho!', 'warning');
+      return;
+    }
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      maxStock: product.stock,
+      image: product.image
+    });
+  }
+  
+  saveCart();
+  updateCartCount();
+  showToast(`Đã thêm "${product.name}" vào giỏ hàng!`, 'success');
+  
+  if (event) {
+    const btn = event.target;
+    btn.style.transform = 'scale(1.2)';
+    setTimeout(() => btn.style.transform = '', 200);
+  }
+}
+
+function saveCart() {
+  localStorage.setItem('cart', JSON.stringify(cart));
+}
+
+function updateCartCount() {
+  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const badge = document.getElementById('cartBadge');
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'block' : 'none';
+  }
+}
+
+async function removeFromWishlist(productId, event) {
+  event.stopPropagation();
+  
+  if (!confirm('Xóa sản phẩm này khỏi danh sách yêu thích?')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/wishlist/remove/${productId}`, {
+      method: 'POST'
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      wishlistProducts = wishlistProducts.filter(p => p.id !== productId);
+      renderWishlist();
+      showToast('Đã xóa khỏi danh sách yêu thích', 'success');
+    } else {
+      showToast(data.error || 'Lỗi khi xóa', 'error');
+    }
+  } catch (error) {
+    console.error('Error removing from wishlist:', error);
+    showToast('Lỗi kết nối', 'error');
+  }
+}
+
+function showToast(message, type = 'info') {
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 16px 24px;
+    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#ff9800'};
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10000;
+    font-weight: 500;
+    animation: slideUp 0.3s ease;
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideDown 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+  loadWishlist();
+  updateCartCount();
+});
+</script>
+
+<style>
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--tomato-600);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

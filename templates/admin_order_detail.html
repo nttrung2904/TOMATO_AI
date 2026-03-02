@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Chi tiết đơn hàng #{{ order.id }} | Admin{% endblock %}
+
+{% block content %}
+<style>
+  .order-detail-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .order-title {
+    font-size: 2rem;
+    color: #2d5016;
+    margin: 0;
+  }
+  
+  .order-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .order-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  [data-theme="dark"] .order-card {
+    background: var(--bg-secondary);
+  }
+  
+  .card-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+    color: var(--tomato-600);
+  }
+  
+  [data-theme="dark"] .card-title {
+    color: var(--tomato-400);
+  }
+  
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .info-row {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .info-label {
+    color: #666;
+    font-weight: 500;
+  }
+  
+  [data-theme="dark"] .info-label {
+    color: #999;
+  }
+  
+  .info-value {
+    font-weight: 600;
+  }
+  
+  .item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .item-row {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+  
+  [data-theme="dark"] .item-row {
+    background: var(--bg-tertiary);
+  }
+  
+  .item-image {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  
+  .item-details {
+    flex: 1;
+  }
+  
+  .item-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  
+  .item-meta {
+    font-size: 0.9rem;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .item-meta {
+    color: #999;
+  }
+  
+  .item-price {
+    text-align: right;
+    font-weight: 600;
+    color: var(--tomato-600);
+  }
+  
+  [data-theme="dark"] .item-price {
+    color: var(--tomato-400);
+  }
+  
+  .status-form {
+    margin-top: 2rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  
+  .form-select, .form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+  
+  [data-theme="dark"] .form-select,
+  [data-theme="dark"] .form-textarea {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+    color: #ddd;
+  }
+  
+  .form-textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+  
+  .btn-update {
+    padding: 0.75rem 2rem;
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .btn-update:hover {
+    background: var(--tomato-600);
+  }
+  
+  .status-history {
+    margin-top: 2rem;
+  }
+  
+  .history-item {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-left: 3px solid var(--tomato-500);
+    margin-bottom: 1rem;
+    border-radius: 0 8px 8px 0;
+  }
+  
+  [data-theme="dark"] .history-item {
+    background: var(--bg-tertiary);
+  }
+  
+  .history-time {
+    font-size: 0.85rem;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .history-time {
+    color: #999;
+  }
+  
+  @media (max-width: 768px) {
+    .order-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="order-detail-container">
+  <div class="order-header">
+    <h1 class="order-title">📦 Đơn hàng #{{ order.id }}</h1>
+    <a href="{{ url_for('admin_orders') }}" class="back-btn">← Danh sách đơn hàng</a>
+  </div>
+  
+  <div class="order-grid">
+    <!-- Left Column: Order Details -->
+    <div>
+      <!-- Customer Info -->
+      <div class="order-card">
+        <h2 class="card-title">👤 Thông tin khách hàng</h2>
+        <div class="info-row">
+          <span class="info-label">Họ tên</span>
+          <span class="info-value">{{ order.customer_name }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Số điện thoại</span>
+          <span class="info-value">{{ order.customer_phone }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Địa chỉ</span>
+          <span class="info-value">{{ order.customer_address }}</span>
+        </div>
+        {% if order.order_note %}
+        <div class="info-row">
+          <span class="info-label">Ghi chú</span>
+          <span class="info-value">{{ order.order_note }}</span>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Order Items -->
+      <div class="order-card" style="margin-top: 2rem;">
+        <h2 class="card-title">🛒 Sản phẩm</h2>
+        <div class="item-list">
+          {% for item in order.items %}
+          <div class="item-row">
+            <img src="{{ url_for('static', filename=item.image or 'images/tomato.jpg') }}" 
+                 alt="{{ item.name }}" 
+                 class="item-image">
+            <div class="item-details">
+              <div class="item-name">{{ item.name }}</div>
+              <div class="item-meta">Số lượng: {{ item.quantity }} x {{ "{:,.0f}".format(item.price) }}đ</div>
+            </div>
+            <div class="item-price">{{ "{:,.0f}".format(item.price * item.quantity) }}đ</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Right Column: Status & Payment -->
+    <div>
+      <!-- Order Summary -->
+      <div class="order-card">
+        <h2 class="card-title">💰 Thanh toán</h2>
+        <div class="info-row">
+          <span class="info-label">Tạm tính</span>
+          <span class="info-value">{{ "{:,.0f}".format(order.subtotal) }}đ</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Phí vận chuyển</span>
+          <span class="info-value">{{ "{:,.0f}".format(order.shipping) }}đ</span>
+        </div>
+        {% if order.discount and order.discount > 0 %}
+        <div class="info-row">
+          <span class="info-label">Giảm giá</span>
+          <span class="info-value" style="color: #4caf50;">-{{ "{:,.0f}".format(order.discount) }}đ</span>
+        </div>
+        {% if order.coupon_code %}
+        <div class="info-row" style="border: none;">
+          <span class="info-label">Mã giảm giá</span>
+          <span class="info-value">{{ order.coupon_code }}</span>
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="info-row" style="font-size: 1.2rem; border: none; margin-top: 1rem;">
+          <span class="info-label"><strong>Tổng cộng</strong></span>
+          <span class="info-value" style="color: var(--tomato-600);">
+            <strong>{{ "{:,.0f}".format(order.total) }}đ</strong>
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Phương thức</span>
+          <span class="info-value">
+            {% if order.payment_method == 'cod' %}COD
+            {% elif order.payment_method == 'vnpay' %}VNPay
+            {% elif order.payment_method == 'momo' %}MoMo
+            {% else %}{{ order.payment_method }}
+            {% endif %}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Thời gian</span>
+          <span class="info-value">{{ order.timestamp[:16].replace('T', ' ') }}</span>
+        </div>
+      </div>
+      
+      <!-- Update Status -->
+      <div class="order-card" style="margin-top: 2rem;">
+        <h2 class="card-title">🔄 Cập nhật trạng thái</h2>
+        <form action="{{ url_for('admin_update_order_status', order_id=order.id) }}" 
+              method="POST" 
+              class="status-form">
+          <div class="form-group">
+            <label class="form-label">Trạng thái mới</label>
+            <select name="status" class="form-select" required>
+              <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>
+                Chờ xử lý
+              </option>
+              <option value="processing" {% if order.status == 'processing' %}selected{% endif %}>
+                Đang xử lý
+              </option>
+              <option value="shipped" {% if order.status == 'shipped' %}selected{% endif %}>
+                Đang giao hàng
+              </option>
+              <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>
+                Đã giao hàng
+              </option>
+              <option value="cancelled" {% if order.status == 'cancelled' %}selected{% endif %}>
+                Đã hủy
+              </option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Ghi chú (tùy chọn)</label>
+            <textarea name="note" 
+                      class="form-textarea" 
+                      placeholder="Ghi chú về thay đổi trạng thái..."></textarea>
+          </div>
+          
+          <button type="submit" class="btn-update">
+            Cập nhật trạng thái
+          </button>
+        </form>
+        
+        <!-- Status History -->
+        {% if order.status_history %}
+        <div class="status-history">
+          <h3 style="margin-bottom: 1rem;">Lịch sử thay đổi</h3>
+          {% for history in order.status_history %}
+          <div class="history-item">
+            <div><strong>{{ history.from }}</strong> → <strong>{{ history.to }}</strong></div>
+            {% if history.note %}
+            <div style="margin-top: 0.5rem;">{{ history.note }}</div>
+            {% endif %}
+            <div class="history-time">{{ history.timestamp[:16].replace('T', ' ') }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

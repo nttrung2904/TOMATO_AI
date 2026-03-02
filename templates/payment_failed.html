@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}❌ Thanh toán thất bại | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .payment-result-container {
+    max-width: 700px;
+    margin: 50px auto;
+    padding: 40px;
+    text-align: center;
+  }
+  
+  .error-icon {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 30px;
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: shakeIt 0.5s ease-out;
+  }
+  
+  @keyframes shakeIt {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+    20%, 40%, 60%, 80% { transform: translateX(10px); }
+  }
+  
+  .error-icon svg {
+    width: 60px;
+    height: 60px;
+    stroke: white;
+    stroke-width: 3;
+    fill: none;
+  }
+  
+  .result-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  [data-theme="dark"] .result-card {
+    background: var(--bg-secondary);
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .result-title {
+    font-size: 2em;
+    font-weight: 700;
+    color: #f44336;
+    margin: 0 0 15px 0;
+  }
+  
+  .result-message {
+    font-size: 1.1em;
+    color: #666;
+    margin: 0 0 30px 0;
+  }
+  
+  [data-theme="dark"] .result-message {
+    color: #aaa;
+  }
+  
+  .error-details {
+    background: #ffebee;
+    border-left: 4px solid #f44336;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 30px 0;
+    text-align: left;
+  }
+  
+  [data-theme="dark"] .error-details {
+    background: rgba(244, 67, 54, 0.1);
+  }
+  
+  .error-title {
+    font-weight: 700;
+    color: #d32f2f;
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+  }
+  
+  .error-text {
+    color: #666;
+    margin: 0;
+  }
+  
+  [data-theme="dark"] .error-text {
+    color: #ccc;
+  }
+  
+  .help-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 30px 0;
+    text-align: left;
+  }
+  
+  [data-theme="dark"] .help-section {
+    background: var(--bg-tertiary);
+  }
+  
+  .help-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 15px 0;
+  }
+  
+  [data-theme="dark"] .help-title {
+    color: #ddd;
+  }
+  
+  .help-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .help-list li {
+    padding: 10px 0;
+    color: #555;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  [data-theme="dark"] .help-list li {
+    color: #bbb;
+    border-bottom-color: var(--border-color);
+  }
+  
+  .help-list li:last-child {
+    border-bottom: none;
+  }
+  
+  .help-list li::before {
+    content: "✓ ";
+    color: #4CAF50;
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+  }
+  
+  .btn-primary, .btn-secondary {
+    padding: 15px 35px;
+    border-radius: 12px;
+    font-size: 1em;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.3);
+  }
+  
+  .btn-secondary {
+    background: white;
+    color: #4CAF50;
+    border: 2px solid #4CAF50;
+  }
+  
+  [data-theme="dark"] .btn-secondary {
+    background: var(--bg-secondary);
+  }
+  
+  .btn-secondary:hover {
+    background: #4CAF50;
+    color: white;
+  }
+  
+  .payment-method-badge {
+    display: inline-block;
+    padding: 6px 15px;
+    background: #f44336;
+    color: white;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+</style>
+
+<div class="payment-result-container">
+  <div class="error-icon">
+    <svg viewBox="0 0 52 52">
+      <line x1="16" y1="16" x2="36" y2="36"/>
+      <line x1="36" y1="16" x2="16" y2="36"/>
+    </svg>
+  </div>
+  
+  <div class="result-card">
+    <h1 class="result-title">❌ Thanh toán thất bại</h1>
+    <p class="result-message">
+      Rất tiếc, giao dịch của bạn không thể hoàn tất.<br>
+      Vui lòng thử lại hoặc chọn phương thức thanh toán khác.
+    </p>
+    
+    {% if error %}
+    <div class="error-details">
+      <div class="error-title">📋 Chi tiết lỗi:</div>
+      <p class="error-text">{{ error }}</p>
+    </div>
+    {% endif %}
+    
+    {% if payment_method %}
+    <p style="color: #666; margin: 20px 0;">
+      <strong>Phương thức thanh toán:</strong>
+      <span class="payment-method-badge">{{ payment_method }}</span>
+    </p>
+    {% endif %}
+    
+    <div class="help-section">
+      <div class="help-title">💡 Một số nguyên nhân thường gặp:</div>
+      <ul class="help-list">
+        <li>Số dư tài khoản không đủ</li>
+        <li>Thông tin thẻ không chính xác</li>
+        <li>Thẻ đã hết hạn hoặc bị khóa</li>
+        <li>Vượt quá giới hạn giao dịch</li>
+        <li>Lỗi kết nối mạng</li>
+        <li>Hủy giao dịch</li>
+      </ul>
+    </div>
+    
+    <div class="action-buttons">
+      <a href="{{ url_for('cart') }}" class="btn-primary">
+        🔄 Thử lại
+      </a>
+      <a href="{{ url_for('index') }}" class="btn-secondary">
+        🏠 Về trang chủ
+      </a>
+    </div>
+    
+    <p style="margin-top: 30px; color: #888; font-size: 0.9em;">
+      📞 Cần hỗ trợ? Liên hệ: support@tomatoai.com<br>
+      Hoặc gọi hotline: 1900-xxxx-xx (8h-22h hàng ngày)
+    </p>
+  </div>
+</div>
+
+<script>
+// Auto redirect to cart after 15 seconds
+setTimeout(() => {
+  window.location.href = "{{ url_for('cart') }}";
+}, 15000);
+</script>
+{% endblock %}
