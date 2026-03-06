@@ -59,24 +59,282 @@
     .site-navigation {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
       flex-wrap: wrap;
       gap: 3px;
       flex: 1;
     }
     
     .site-navigation .nav-link {
-      padding: 7px 12px;
-      font-size: 0.82rem;
-      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 1.1rem;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     
     .site-navigation .nav-link:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: brightness(1.2);
+      border-color: rgba(220, 53, 69, 0.3);
     }
     
-    .site-navigation .nav-link svg {
+    [data-theme="dark"] .site-navigation .nav-link {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    [data-theme="dark"] .site-navigation .nav-link:hover {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: brightness(1.2);
+      border-color: rgba(255, 107, 122, 0.3);
+    }
+    
+    /* Dropdown Menu Styles */
+    .nav-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .nav-dropdown-btn {
+      padding: 10px 16px;
+      font-size: 1.1rem;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 600;
+      border: 2px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-dropdown-btn:hover {
+      transform: translateY(-2px);
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: brightness(1.2);
+      border-color: rgba(220, 53, 69, 0.3);
+    }
+    
+    [data-theme="dark"] .nav-dropdown-btn {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    [data-theme="dark"] .nav-dropdown-btn:hover {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: brightness(1.2);
+      border-color: rgba(255, 107, 122, 0.3);
+    }
+    
+    /* Language Switcher Button */
+    .language-switcher {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .language-switcher button {
+      padding: 10px 16px;
+      font-size: 1.1rem;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 600;
+      border: 2px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+    
+    .language-switcher button:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.2);
+      border-color: rgba(220, 53, 69, 0.3);
+    }
+    
+    [data-theme="dark"] .language-switcher button {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    [data-theme="dark"] .language-switcher button:hover {
+      filter: brightness(1.2);
+      border-color: rgba(255, 107, 122, 0.3);
+    }
+    
+    .language-switcher button svg {
+      fill: url(#navGradient);
+    }
+    
+    .language-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      min-width: 150px;
+      z-index: 1000;
+      overflow: hidden;
+    }
+    
+    [data-theme="dark"] .language-menu {
+      background: var(--bg-secondary);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    
+    .language-menu.show {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+    
+    .language-menu a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 15px;
+      text-decoration: none;
+      color: #333;
+      border-bottom: 1px solid #f0f0f0;
+      transition: all 0.2s;
+    }
+    
+    .language-menu a:last-child {
+      border-bottom: none;
+    }
+    
+    [data-theme="dark"] .language-menu a {
+      color: #ddd;
+      border-bottom-color: var(--bg-tertiary);
+    }
+    
+    .language-menu a:hover {
+      background: #f8f9fa;
+    }
+    
+    [data-theme="dark"] .language-menu a:hover {
+      background: var(--bg-tertiary);
+    }
+    
+    .nav-dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      min-width: 200px;
+      z-index: 1000;
+      overflow: hidden;
+    }
+    
+    [data-theme="dark"] .nav-dropdown-menu {
+      background: var(--bg-secondary);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    
+    .nav-dropdown-menu.show {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .nav-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      text-decoration: none;
+      transition: all 0.2s;
+      border-bottom: 1px solid #f0f0f0;
+      position: relative;
+    }
+    
+    .nav-dropdown-item span {
+      background: linear-gradient(90deg, #dc3545 0%, #28a745 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .nav-dropdown-item:last-child {
+      border-bottom: none;
+    }
+    
+    [data-theme="dark"] .nav-dropdown-item {
+      border-bottom-color: var(--bg-tertiary);
+    }
+    
+    [data-theme="dark"] .nav-dropdown-item span {
+      background: linear-gradient(90deg, #ff6b7a 0%, #51cf66 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .nav-dropdown-item:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+    
+    [data-theme="dark"] .nav-dropdown-item:hover {
+      background: var(--bg-tertiary);
+    }
+    
+    .site-navigation .nav-link svg,
+    .nav-dropdown-btn svg,
+    .nav-dropdown-item svg {
       width: 16px;
       height: 16px;
+      fill: url(#navGradient);
     }
     
     /* User Menu Dropdown */
@@ -486,8 +744,13 @@
       }
       
       .site-navigation .nav-link {
-        padding: 6px 10px;
-        font-size: 0.78rem;
+        padding: 8px 12px;
+        font-size: 0.95rem;
+      }
+      
+      .nav-dropdown-btn {
+        padding: 8px 12px;
+        font-size: 0.95rem;
       }
     }
     
@@ -514,12 +777,32 @@
       .site-navigation {
         justify-content: center;
         width: 100%;
+        flex-wrap: wrap;
       }
       
       .site-navigation .nav-link {
-        padding: 6px 8px;
-        font-size: 0.75rem;
+        padding: 8px 10px;
+        font-size: 0.85rem;
         gap: 4px;
+      }
+      
+      .site-navigation .nav-link span {
+        display: none;
+      }
+      
+      .nav-dropdown-btn {
+        padding: 8px 10px;
+        font-size: 0.85rem;
+      }
+      
+      .nav-dropdown-btn span:first-of-type {
+        display: none;
+      }
+      
+      .nav-dropdown-menu {
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
       }
     }
     
@@ -654,10 +937,148 @@
         min-width: auto;
       }
     }
+
+    /* Support Chat Button - Floating */
+    .support-chat-btn {
+      position: fixed;
+      bottom: 100px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 997;
+      text-decoration: none;
+    }
+    
+    .support-chat-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+    }
+    
+    .support-chat-btn svg {
+      width: 32px;
+      height: 32px;
+      fill: currentColor;
+    }
+    
+    .support-chat-btn .support-tooltip {
+      position: absolute;
+      right: 75px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.9em;
+      font-weight: 600;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    .support-chat-btn:hover .support-tooltip {
+      opacity: 1;
+      transform: translateY(-50%) translateX(-5px);
+    }
+    
+    .support-chat-btn .support-tooltip::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid rgba(0, 0, 0, 0.9);
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+    }
+    
+    [data-theme="dark"] .support-chat-btn .support-tooltip {
+      background: rgba(255, 255, 255, 0.95);
+      color: #333;
+    }
+    
+    [data-theme="dark"] .support-chat-btn .support-tooltip::after {
+      border-left-color: rgba(255, 255, 255, 0.95);
+    }
+    
+    /* Support Chat Badge */
+    .support-chat-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background: #f44336;
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75em;
+      font-weight: 700;
+      border: 2px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+    }
+    
+    [data-theme="dark"] .support-chat-badge {
+      border-color: var(--bg-primary);
+    }
+    
+    @media (max-width: 768px) {
+      .support-chat-btn {
+        bottom: 80px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+      }
+      
+      .support-chat-btn svg {
+        width: 26px;
+        height: 26px;
+      }
+      
+      .support-chat-btn .support-tooltip {
+        display: none;
+      }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
 <body>
+  <!-- SVG Gradient Definition for Navigation Icons -->
+  <svg width="0" height="0" style="position: absolute;">
+    <defs>
+      <linearGradient id="navGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#dc3545;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#28a745;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+  </svg>
+  
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
   
@@ -669,93 +1090,120 @@
     </div>
     
     <nav class="site-navigation">
+      <!-- 4 Main Navigation Items -->
       <a href="{{ url_for('index') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+        <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
           <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
         </svg>
         <span>Trang chủ</span>
       </a>
-      <a href="{{ url_for('compare') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M19,3H14V5H19V18L14,12V21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M10,18H5L10,12M10,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H10V23H12V1H10V3Z" />
-        </svg>
-        <span>So sánh</span>
-      </a>
-      <a href="{{ url_for('about_page') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
-        </svg>
-        <span>Giới thiệu</span>
-      </a>
       <a href="{{ url_for('chat') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+        <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
           <path d="M12,3C6.5,3 2,6.58 2,11A7.18,7.18 0 0,0 5.5,17.21C5.5,17.21 5,19 5,21C7,20 8.5,19 8.5,19C9.5,19.25 10.5,19.5 12,19.5C17.5,19.5 22,15.92 22,11.5C22,6.58 17.5,3 12,3M12,17C7.58,17 4,14.31 4,11C4,7.69 7.58,5 12,5C16.42,5 20,7.69 20,11C20,14.31 16.42,17 12,17Z" />
         </svg>
         <span>Hỏi đáp</span>
       </a>
-      <a href="{{ url_for('wiki_index') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M21,5C19.89,4.65 18.67,4.5 17.5,4.5C15.55,4.5 13.45,4.9 12,6C10.55,4.9 8.45,4.5 6.5,4.5C4.55,4.5 2.45,4.9 1,6V20.65C1,20.9 1.25,21.15 1.5,21.15C1.6,21.15 1.65,21.1 1.75,21.1C3.1,20.45 5.05,20 6.5,20C8.45,20 10.55,20.4 12,21.5C13.35,20.65 15.8,20 17.5,20C19.15,20 20.85,20.3 22.25,21.05C22.35,21.1 22.4,21.1 22.5,21.1C22.75,21.1 23,20.85 23,20.6V6C22.4,5.55 21.75,5.25 21,5M21,18.5C19.9,18.15 18.7,18 17.5,18C15.8,18 13.35,18.65 12,19.5V8C13.35,7.15 15.8,6.5 17.5,6.5C18.7,6.5 19.9,6.65 21,7V18.5Z" />
-        </svg>
-        <span>Wiki</span>
-      </a>
-      <a href="{{ url_for('webcam') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z" />
-        </svg>
-        <span>Webcam</span>
-      </a>
-      <a href="{{ url_for('history') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3" />
-        </svg>
-        <span>Lịch sử</span>
-      </a>
-      <a href="{{ url_for('game_menu') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M16.97,5.17C16.45,5.06 15.92,5 15.38,5C13.5,5 11.69,5.67 10.26,6.87L9.67,7.37L9.13,6.83L8.13,5.83L8.66,5.28C10.39,3.58 12.75,2.58 15.25,2.58C16,2.58 16.73,2.67 17.43,2.85L17,3.28L16.97,5.17M11.91,7.79C13.07,6.82 14.5,6.3 16,6.3C16.33,6.3 16.66,6.34 17,6.39V7.91L19.23,5.68C19.9,6.5 20.38,7.5 20.63,8.58L18.83,10.38C18.5,9.5 17.91,8.69 17.13,8.12L15.97,9.28L13.97,7.28L11.91,7.79M6.79,7.79L5,9.58C5,11.5 5.74,13.37 7.05,14.79L11.26,10.58L10.26,9.58L6.79,7.79M10.59,11.38L6.38,15.58L7.79,17C9.21,18.26 11.08,19 13,19C13.69,19 14.37,18.9 15.03,18.71L14.5,18.18L12.5,16.18L10.59,11.38M16.36,15.55C16.92,15.21 17.44,14.8 17.9,14.32L18.92,15.34L17.97,16.29C17.45,16.81 16.89,17.25 16.28,17.63L15.97,17.79V16.18L16.36,15.55Z" />
-        </svg>
-        <span>Giải trí</span>
-      </a>
       <a href="{{ url_for('shop') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+        <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
           <path d="M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z" />
         </svg>
         <span>Cửa hàng</span>
       </a>
-      {% if session.get('username') %}
-      <a href="{{ url_for('wishlist_page') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+      <a href="{{ url_for('wiki_index') }}" class="nav-link">
+        <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
+          <path d="M21,5C19.89,4.65 18.67,4.5 17.5,4.5C15.55,4.5 13.45,4.9 12,6C10.55,4.9 8.45,4.5 6.5,4.5C4.55,4.5 2.45,4.9 1,6V20.65C1,20.9 1.25,21.15 1.5,21.15C1.6,21.15 1.65,21.1 1.75,21.1C3.1,20.45 5.05,20 6.5,20C8.45,20 10.55,20.4 12,21.5C13.35,20.65 15.8,20 17.5,20C19.15,20 20.85,20.3 22.25,21.05C22.35,21.1 22.4,21.1 22.5,21.1C22.75,21.1 23,20.85 23,20.6V6C22.4,5.55 21.75,5.25 21,5M21,18.5C19.9,18.15 18.7,18 17.5,18C15.8,18 13.35,18.65 12,19.5V8C13.35,7.15 15.8,6.5 17.5,6.5C18.7,6.5 19.9,6.65 21,7V18.5Z" />
         </svg>
-        <span>Yêu thích</span>
-      </a>
-      {% endif %}
-      <a href="{{ url_for('community') }}" class="nav-link">
-        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
-          <path d="M12,5.5A3.5,3.5 0 0,1 15.5,9A3.5,3.5 0 0,1 12,12.5A3.5,3.5 0 0,1 8.5,9A3.5,3.5 0 0,1 12,5.5M5,8C5.56,8 6.08,8.15 6.53,8.42C6.38,9.85 6.8,11.27 7.66,12.38C7.16,13.34 6.16,14 5,14A3,3 0 0,1 2,11A3,3 0 0,1 5,8M19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14C17.84,14 16.84,13.34 16.34,12.38C17.2,11.27 17.62,9.85 17.47,8.42C17.92,8.15 18.44,8 19,8M5.5,18.25C5.5,16.18 8.41,14.5 12,14.5C15.59,14.5 18.5,16.18 18.5,18.25V20H5.5V18.25M0,20V18.5C0,17.11 1.89,15.94 4.45,15.6C3.86,16.28 3.5,17.22 3.5,18.25V20H0M24,20H20.5V18.25C20.5,17.22 20.14,16.28 19.55,15.6C22.11,15.94 24,17.11 24,18.5V20Z" />
-        </svg>
-        <span>{{ t('nav.community') if current_lang else 'Cộng đồng' }}</span>
+        <span>Wiki</span>
       </a>
       
-      <!-- Language Switcher -->
-      <div class="language-switcher" style="position: relative;">
-        <button onclick="toggleLanguageMenu(event)" style="display: flex; align-items: center; gap: 5px; background: transparent; border: 1px solid #ddd; padding: 6px 12px; border-radius: 8px; cursor: pointer; color: var(--tomato-700); font-weight: 500; transition: all 0.3s;">
-          <span style="font-size: 1.2em;">{{ '🇬🇧' if current_lang == 'en' else '🇻🇳' }}</span>
-          <span>{{ current_lang|upper if current_lang else 'VI' }}</span>
-          <svg style="width:12px;height:12px;fill:currentColor;" viewBox="0 0 24 24">
+      <!-- Dropdown "More" Menu -->
+      <div class="nav-dropdown">
+        <button class="nav-dropdown-btn" onclick="toggleMoreMenu(event)">
+          <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
+            <path d="M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z" />
+          </svg>
+          <span>Thêm</span>
+          <svg style="width:14px;height:14px;" viewBox="0 0 24 24">
             <path d="M7,10L12,15L17,10H7Z" />
           </svg>
         </button>
-        <div class="language-menu" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 150px; z-index: 1000;">
-          <a href="{{ url_for('set_language', lang='vi') }}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; text-decoration: none; color: #333; border-bottom: 1px solid #f0f0f0; transition: all 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+        <div class="nav-dropdown-menu" id="moreMenu">
+          <a href="{{ url_for('compare') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M19,3H14V5H19V18L14,12V21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M10,18H5L10,12M10,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H10V23H12V1H10V3Z" />
+            </svg>
+            <span>So sánh</span>
+          </a>
+          <a href="{{ url_for('about_page') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+            </svg>
+            <span>Giới thiệu</span>
+          </a>
+          <a href="{{ url_for('webcam') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z" />
+            </svg>
+            <span>Webcam</span>
+          </a>
+          <a href="{{ url_for('history') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3" />
+            </svg>
+            <span>Lịch sử</span>
+          </a>
+          <a href="{{ url_for('game_menu') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M16.97,5.17C16.45,5.06 15.92,5 15.38,5C13.5,5 11.69,5.67 10.26,6.87L9.67,7.37L9.13,6.83L8.13,5.83L8.66,5.28C10.39,3.58 12.75,2.58 15.25,2.58C16,2.58 16.73,2.67 17.43,2.85L17,3.28L16.97,5.17M11.91,7.79C13.07,6.82 14.5,6.3 16,6.3C16.33,6.3 16.66,6.34 17,6.39V7.91L19.23,5.68C19.9,6.5 20.38,7.5 20.63,8.58L18.83,10.38C18.5,9.5 17.91,8.69 17.13,8.12L15.97,9.28L13.97,7.28L11.91,7.79M6.79,7.79L5,9.58C5,11.5 5.74,13.37 7.05,14.79L11.26,10.58L10.26,9.58L6.79,7.79M10.59,11.38L6.38,15.58L7.79,17C9.21,18.26 11.08,19 13,19C13.69,19 14.37,18.9 15.03,18.71L14.5,18.18L12.5,16.18L10.59,11.38M16.36,15.55C16.92,15.21 17.44,14.8 17.9,14.32L18.92,15.34L17.97,16.29C17.45,16.81 16.89,17.25 16.28,17.63L15.97,17.79V16.18L16.36,15.55Z" />
+            </svg>
+            <span>Giải trí</span>
+          </a>
+          {% if session.get('username') %}
+          <a href="{{ url_for('wishlist_page') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"/>
+            </svg>
+            <span>Yêu thích</span>
+          </a>
+          {% endif %}
+          <a href="{{ url_for('community') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M12,5.5A3.5,3.5 0 0,1 15.5,9A3.5,3.5 0 0,1 12,12.5A3.5,3.5 0 0,1 8.5,9A3.5,3.5 0 0,1 12,5.5M5,8C5.56,8 6.08,8.15 6.53,8.42C6.38,9.85 6.8,11.27 7.66,12.38C7.16,13.34 6.16,14 5,14A3,3 0 0,1 2,11A3,3 0 0,1 5,8M19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14C17.84,14 16.84,13.34 16.34,12.38C17.2,11.27 17.62,9.85 17.47,8.42C17.92,8.15 18.44,8 19,8M5.5,18.25C5.5,16.18 8.41,14.5 12,14.5C15.59,14.5 18.5,16.18 18.5,18.25V20H5.5V18.25M0,20V18.5C0,17.11 1.89,15.94 4.45,15.6C3.86,16.28 3.5,17.22 3.5,18.25V20H0M24,20H20.5V18.25C20.5,17.22 20.14,16.28 19.55,15.6C22.11,15.94 24,17.11 24,18.5V20Z" />
+            </svg>
+            <span>{{ t('nav.community') if current_lang else 'Cộng đồng' }}</span>
+          </a>
+        </div>
+      </div>
+      
+      <!-- Messenger cho Admin -->
+      {% if session.get('user_id') and session.get('is_admin') %}
+      <a href="{{ url_for('messenger') }}" class="nav-link" style="position: relative;">
+        <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+          <path d="M12,2C6.48,2 2,6.48 2,12C2,13.82 2.59,15.5 3.58,16.89L2.05,21.95L7.11,20.42C8.5,21.41 10.18,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2M12,20C10.42,20 8.93,19.53 7.67,18.71L7.42,18.55L4.18,19.46L5.09,16.22L4.93,15.97C4.11,14.71 3.64,13.22 3.64,11.64C3.64,7.37 7.37,3.64 12,3.64C16.63,3.64 20.36,7.37 20.36,12C20.36,16.63 16.63,20.36 12,20.36M16.5,13.93C16.28,13.82 15.23,13.3 15.05,13.23C14.87,13.16 14.74,13.13 14.61,13.34C14.5,13.56 14.09,14.05 13.97,14.18C13.86,14.31 13.74,14.33 13.53,14.21C13.31,14.1 12.62,13.87 11.8,13.15C11.15,12.59 10.71,11.89 10.59,11.68C10.5,11.46 10.58,11.34 10.69,11.23C10.79,11.13 10.91,10.96 11.03,10.85C11.14,10.74 11.17,10.65 11.25,10.53C11.32,10.4 11.29,10.29 11.23,10.18C11.17,10.06 10.71,9.03 10.56,8.59C10.41,8.17 10.26,8.23 10.15,8.22C10.04,8.21 9.91,8.21 9.78,8.21C9.66,8.21 9.46,8.26 9.28,8.47C9.1,8.68 8.54,9.2 8.54,10.23C8.54,11.26 9.31,12.25 9.42,12.38C9.54,12.5 10.71,14.36 12.5,15.27C12.94,15.47 13.29,15.6 13.56,15.69C14,15.83 14.41,15.81 14.73,15.75C15.09,15.69 15.93,15.3 16.09,14.87C16.25,14.44 16.25,14.07 16.19,13.97C16.13,13.87 16,13.82 15.78,13.71L16.5,13.93Z" />
+        </svg>
+        <span>Messenger</span>
+        <span class="messenger-badge" id="messengerBadge" style="display:none; position: absolute; top: -5px; right: -5px; background: #f44336; color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.7em; font-weight: 700; min-width: 18px; text-align: center;">0</span>
+      </a>
+      {% endif %}
+      
+      <!-- Language Switcher -->
+      <div class="language-switcher">
+        <button onclick="toggleLanguageMenu(event)">
+          <span style="font-size: 1.2em;">{{ '🇬🇧' if current_lang == 'en' else '🇻🇳' }}</span>
+          <span>{{ current_lang|upper if current_lang else 'VI' }}</span>
+          <svg style="width:12px;height:12px;" viewBox="0 0 24 24">
+            <path d="M7,10L12,15L17,10H7Z" />
+          </svg>
+        </button>
+        <div class="language-menu" id="languageMenu">
+          <a href="{{ url_for('set_language', lang='vi') }}">
             <span style="font-size: 1.3em;">🇻🇳</span>
             <span>Tiếng Việt</span>
             {% if current_lang == 'vi' or not current_lang %}
             <span style="margin-left: auto; color: var(--tomato-600);">✓</span>
             {% endif %}
           </a>
-          <a href="{{ url_for('set_language', lang='en') }}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; text-decoration: none; color: #333; transition: all 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+          <a href="{{ url_for('set_language', lang='en') }}">
             <span style="font-size: 1.3em;">🇬🇧</span>
             <span>English</span>
             {% if current_lang == 'en' %}
@@ -921,6 +1369,17 @@
     </footer>
   </div>
   
+  <!-- Support Chat Button (Floating) - CHỈ cho user thường, KHÔNG cho admin -->
+  {% if session.get('user_id') and not session.get('is_admin') %}
+  <a href="{{ url_for('messenger') }}" class="support-chat-btn" id="supportChatBtn" title="Chat">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12,2C6.48,2 2,6.48 2,12C2,13.82 2.59,15.5 3.58,16.89L2.05,21.95L7.11,20.42C8.5,21.41 10.18,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2M12,20C10.42,20 8.93,19.53 7.67,18.71L7.42,18.55L4.18,19.46L5.09,16.22L4.93,15.97C4.11,14.71 3.64,13.22 3.64,11.64C3.64,7.37 7.37,3.64 12,3.64C16.63,3.64 20.36,7.37 20.36,12C20.36,16.63 16.63,20.36 12,20.36M16.5,13.93C16.28,13.82 15.23,13.3 15.05,13.23C14.87,13.16 14.74,13.13 14.61,13.34C14.5,13.56 14.09,14.05 13.97,14.18C13.86,14.31 13.74,14.33 13.53,14.21C13.31,14.1 12.62,13.87 11.8,13.15C11.15,12.59 10.71,11.89 10.59,11.68C10.5,11.46 10.58,11.34 10.69,11.23C10.79,11.13 10.91,10.96 11.03,10.85C11.14,10.74 11.17,10.65 11.25,10.53C11.32,10.4 11.29,10.29 11.23,10.18C11.17,10.06 10.71,9.03 10.56,8.59C10.41,8.17 10.26,8.23 10.15,8.22C10.04,8.21 9.91,8.21 9.78,8.21C9.66,8.21 9.46,8.26 9.28,8.47C9.1,8.68 8.54,9.2 8.54,10.23C8.54,11.26 9.31,12.25 9.42,12.38C9.54,12.5 10.71,14.36 12.5,15.27C12.94,15.47 13.29,15.6 13.56,15.69C14,15.83 14.41,15.81 14.73,15.75C15.09,15.69 15.93,15.3 16.09,14.87C16.25,14.44 16.25,14.07 16.19,13.97C16.13,13.87 16,13.82 15.78,13.71L16.5,13.93Z" />
+    </svg>
+    <span class="support-tooltip">💬 Chat</span>
+    <span class="support-chat-badge" id="supportChatBadge">0</span>
+  </a>
+  {% endif %}
+  
   <!-- Dark Mode Toggle Button -->
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
     <svg id="theme-icon-sun" style="display: none;" viewBox="0 0 24 24" fill="currentColor">
@@ -944,13 +1403,22 @@
     // Language Menu Toggle
     function toggleLanguageMenu(event) {
       event.stopPropagation();
-      const menu = event.currentTarget.nextElementSibling;
+      const menu = document.getElementById('languageMenu');
       if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        menu.classList.toggle('show');
       }
     }
     
-    // Close user menu and language menu when clicking outside
+    // More Menu Toggle
+    function toggleMoreMenu(event) {
+      event.stopPropagation();
+      const menu = document.getElementById('moreMenu');
+      if (menu) {
+        menu.classList.toggle('show');
+      }
+    }
+    
+    // Close user menu, language menu, and more menu when clicking outside
     document.addEventListener('click', function(event) {
       const container = document.getElementById('userMenuContainer');
       if (container && !container.contains(event.target)) {
@@ -960,10 +1428,18 @@
       // Close language menu
       const langMenus = document.querySelectorAll('.language-menu');
       langMenus.forEach(menu => {
-        if (!menu.parentElement.contains(event.target)) {
-          menu.style.display = 'none';
+        const langSwitcher = menu.closest('.language-switcher');
+        if (langSwitcher && !langSwitcher.contains(event.target)) {
+          menu.classList.remove('show');
         }
       });
+      
+      // Close more menu
+      const moreMenu = document.getElementById('moreMenu');
+      const moreDropdown = document.querySelector('.nav-dropdown');
+      if (moreMenu && moreDropdown && !moreDropdown.contains(event.target)) {
+        moreMenu.classList.remove('show');
+      }
     });
     
     // Dark Mode Toggle System
@@ -1277,6 +1753,98 @@
         bell.classList.remove('active');
       }
     });
+    
+    // Messenger unread count
+    async function updateMessengerBadge() {
+      try {
+        const response = await fetch('/api/messenger/unread_count');
+        const data = await response.json();
+        
+        if (data.ok) {
+          const badge = document.getElementById('messengerBadge');
+          if (badge) {
+            if (data.unread_count > 0) {
+              badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+              badge.style.display = 'inline-block';
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching messenger unread count:', error);
+      }
+    }
+    
+    // Update messenger badge on page load and periodically
+    document.addEventListener('DOMContentLoaded', () => {
+      const messengerBadge = document.getElementById('messengerBadge');
+      const supportChatBadge = document.getElementById('supportChatBadge');
+      
+      if (messengerBadge) {
+        updateMessengerBadge();
+        // Refresh every 30 seconds
+        setInterval(updateMessengerBadge, 30000);
+      }
+      
+      if (supportChatBadge) {
+        updateSupportChatBadge();
+        // Refresh every 30 seconds
+        setInterval(updateSupportChatBadge, 30000);
+      }
+    });
+    
+    // Update support chat badge (for non-admin users)
+    async function updateSupportChatBadge() {
+      try {
+        const response = await fetch('/api/messenger/unread_count');
+        const data = await response.json();
+        
+        if (data.ok) {
+          const badge = document.getElementById('supportChatBadge');
+          if (badge) {
+            if (data.unread_count > 0) {
+              badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+              badge.style.display = 'flex';
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching support chat unread count:', error);
+      }
+    }
+    
+    // Support Chat Button - Direct contact admin
+    const supportBtn = document.getElementById('supportChatBtn');
+    if (supportBtn) {
+      supportBtn.addEventListener('click', async function(e) {
+        // Only intercept if not on messenger page
+        if (!window.location.pathname.includes('/messenger')) {
+          e.preventDefault();
+          
+          try {
+            const response = await fetch('/api/messenger/contact_admin', {
+              method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.ok) {
+              // Redirect to messenger with conversation ID
+              window.location.href = '/messenger';
+            } else {
+              alert('Lỗi: ' + data.error);
+              window.location.href = '/messenger';
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            window.location.href = '/messenger';
+          }
+        }
+      });
+    }
     {% endif %}
   </script>
   

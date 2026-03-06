@@ -7,12 +7,9 @@ import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.image import MIMEImage
 from datetime import datetime
 from typing import Optional, Dict, List
 import threading
-from pathlib import Path
-import os
 
 logger = logging.getLogger(__name__)
 

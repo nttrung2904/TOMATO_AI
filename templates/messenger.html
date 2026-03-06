@@ -1,0 +1,1227 @@
+{% extends "base.html" %}
+
+{% block title %}Messenger | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .messenger-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 0;
+    height: calc(100vh - 120px);
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    background: white;
+  }
+
+  [data-theme="dark"] .messenger-container {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
+
+  /* Sidebar - Danh sách conversations */
+  .conversations-sidebar {
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    background: #f9fafb;
+  }
+
+  [data-theme="dark"] .conversations-sidebar {
+    background: var(--bg-primary);
+    border-right-color: var(--border-color);
+  }
+
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: white;
+  }
+
+  [data-theme="dark"] .sidebar-header {
+    background: var(--bg-secondary);
+    border-bottom-color: var(--border-color);
+  }
+
+  .sidebar-header h2 {
+    margin: 0 0 12px 0;
+    font-size: 1.5em;
+    color: var(--tomato-700);
+  }
+
+  [data-theme="dark"] .sidebar-header h2 {
+    color: var(--tomato-400);
+  }
+
+  .header-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .contact-admin-btn {
+    flex: 1;
+    padding: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 700;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
+
+  .contact-admin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  .new-chat-btn {
+    flex: 1;
+    padding: 10px;
+    background: var(--tomato-600);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+
+  .new-chat-btn:hover {
+    background: var(--tomato-700);
+    transform: translateY(-1px);
+  }
+
+  .conversations-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+  }
+
+  .conversation-item {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+    border: 1px solid #e0e0e0;
+    position: relative;
+  }
+
+  [data-theme="dark"] .conversation-item {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
+
+  .conversation-item:hover {
+    background: #f0f7ff;
+    border-color: var(--tomato-300);
+  }
+
+  [data-theme="dark"] .conversation-item:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .conversation-item.active {
+    background: #e6f2ff;
+    border-color: var(--tomato-500);
+  }
+
+  [data-theme="dark"] .conversation-item.active {
+    background: rgba(244, 114, 114, 0.1);
+  }
+
+  .conversation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  .conversation-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95em;
+  }
+
+  .conversation-time {
+    font-size: 0.75em;
+    color: var(--text-secondary);
+  }
+
+  .conversation-preview {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .unread-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--tomato-600);
+    color: white;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.75em;
+    font-weight: 700;
+  }
+
+  .admin-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: 700;
+    margin-left: 5px;
+  }
+
+  /* Chat Area */
+  .chat-area {
+    display: flex;
+    flex-direction: column;
+    background: white;
+  }
+
+  [data-theme="dark"] .chat-area {
+    background: var(--bg-primary);
+  }
+
+  .chat-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: white;
+  }
+
+  [data-theme="dark"] .chat-header {
+    background: var(--bg-secondary);
+    border-bottom-color: var(--border-color);
+  }
+
+  .chat-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    color: var(--text-primary);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #f9fafb;
+    scroll-behavior: smooth;
+  }
+
+  [data-theme="dark"] .chat-messages {
+    background: var(--bg-primary);
+  }
+
+  .message {
+    display: flex;
+    margin-bottom: 15px;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message.sent {
+    justify-content: flex-end;
+  }
+
+  .message-content {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    position: relative;
+  }
+
+  .message.received .message-content {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+  }
+
+  [data-theme="dark"] .message.received .message-content {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
+
+  .message.sent .message-content {
+    background: var(--tomato-600);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .message-sender {
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--tomato-700);
+  }
+
+  [data-theme="dark"] .message-sender {
+    color: var(--tomato-400);
+  }
+
+  .message.sent .message-sender {
+    color: rgba(255,255,255,0.9);
+  }
+
+  .message-text {
+    margin: 0;
+    word-wrap: break-word;
+    line-height: 1.5;
+  }
+
+  .message-time {
+    font-size: 0.7em;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  .chat-input-area {
+    padding: 20px;
+    border-top: 1px solid #e0e0e0;
+    background: white;
+  }
+
+  [data-theme="dark"] .chat-input-area {
+    background: var(--bg-secondary);
+    border-top-color: var(--border-color);
+  }
+
+  .chat-input-form {
+    display: flex;
+    gap: 10px;
+  }
+
+  .chat-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 24px;
+    font-size: 0.95em;
+    outline: none;
+    transition: all 0.3s;
+  }
+
+  [data-theme="dark"] .chat-input {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .chat-input:focus {
+    border-color: var(--tomato-500);
+    box-shadow: 0 0 0 3px rgba(244, 114, 114, 0.1);
+  }
+
+  .send-btn {
+    padding: 12px 24px;
+    background: var(--tomato-600);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+
+  .send-btn:hover:not(:disabled) {
+    background: var(--tomato-700);
+    transform: translateY(-1px);
+  }
+
+  .send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Emoji Picker Styles */
+  .emoji-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border-radius: 50%;
+  }
+
+  .emoji-btn:hover {
+    background: rgba(244, 114, 114, 0.1);
+    transform: scale(1.1);
+  }
+
+  .emoji-picker {
+    position: absolute;
+    bottom: 70px;
+    right: 20px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 15px;
+    display: none;
+    max-width: 350px;
+    z-index: 1000;
+  }
+
+  [data-theme="dark"] .emoji-picker {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
+
+  .emoji-picker.show {
+    display: block;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .emoji-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+  }
+
+  [data-theme="dark"] .emoji-tabs {
+    border-bottom-color: var(--border-color);
+  }
+
+  .emoji-tab {
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    font-size: 1.2em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+
+  .emoji-tab:hover {
+    background: rgba(244, 114, 114, 0.1);
+  }
+
+  .emoji-tab.active {
+    background: var(--tomato-100);
+  }
+
+  [data-theme="dark"] .emoji-tab.active {
+    background: rgba(244, 114, 114, 0.2);
+  }
+
+  .emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 5px;
+    max-height: 250px;
+    overflow-y: auto;
+  }
+
+  .emoji-item {
+    padding: 8px;
+    font-size: 1.5em;
+    cursor: pointer;
+    border-radius: 6px;
+    text-align: center;
+    transition: background 0.2s, transform 0.2s;
+    border: none;
+    background: transparent;
+  }
+
+  .emoji-item:hover {
+    background: rgba(244, 114, 114, 0.1);
+    transform: scale(1.2);
+  }
+
+  .sticker-item {
+    font-size: 3em;
+  }
+
+  .emoji-grid::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .emoji-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .emoji-grid::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+  }
+
+  .emoji-grid::-webkit-scrollbar-thumb:hover {
+    background: #999;
+  }
+
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 40px;
+  }
+
+  .empty-state svg {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary);
+  }
+
+  /* Modal cho New Chat */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    animation: fadeIn 0.3s;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s;
+  }
+
+  [data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .close-modal {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+
+  .close-modal:hover {
+    background: #f0f0f0;
+    color: var(--text-primary);
+  }
+
+  [data-theme="dark"] .close-modal:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .user-item {
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  [data-theme="dark"] .user-item {
+    border-color: var(--border-color);
+  }
+
+  .user-item:hover {
+    background: #f0f7ff;
+    border-color: var(--tomato-300);
+  }
+
+  [data-theme="dark"] .user-item:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .user-info {
+    flex: 1;
+  }
+
+  .user-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .user-email {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+  }
+
+  .loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+  }
+
+  .error-message {
+    background: #fee;
+    color: #c33;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+  }
+
+  @media (max-width: 768px) {
+    .messenger-container {
+      grid-template-columns: 1fr;
+      height: calc(100vh - 100px);
+    }
+
+    .conversations-sidebar {
+      display: none;
+    }
+
+    .conversations-sidebar.mobile-show {
+      display: flex;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 999;
+    }
+
+    .message-content {
+      max-width: 85%;
+    }
+  }
+</style>
+
+<div class="messenger-container">
+  <!-- Sidebar - Danh sách conversations -->
+  <div class="conversations-sidebar">
+    <div class="sidebar-header">
+      <h2>💬 Tin nhắn</h2>
+      <div class="header-buttons">
+        {% if not session.is_admin %}
+        <button class="contact-admin-btn" onclick="contactAdmin()" title="Chat với Admin">
+          👨‍💼 Chat Admin
+        </button>
+        {% endif %}
+      </div>
+      <button class="new-chat-btn" onclick="openNewChatModal()">
+        ➕ Chat với người dùng khác
+      </button>
+    </div>
+    
+    <div class="conversations-list" id="conversationsList">
+      {% if conversations %}
+        {% for conv in conversations %}
+          <div class="conversation-item" 
+               onclick="selectConversation('{{ conv.id }}', '{{ conv.other_user.name }}', {{ conv.other_user.is_admin|lower }})"
+               data-conv-id="{{ conv.id }}">
+            <div class="conversation-header">
+              <div class="conversation-name">
+                {{ conv.other_user.name }}
+                {% if conv.other_user.is_admin %}
+                  <span class="admin-badge">ADMIN</span>
+                {% endif %}
+              </div>
+              <div class="conversation-time">
+                {{ conv.last_message.created_at[:16].replace('T', ' ') if conv.last_message else '' }}
+              </div>
+            </div>
+            <div class="conversation-preview">
+              {{ conv.last_message.content[:50] if conv.last_message else 'Không có tin nhắn' }}
+            </div>
+            {% if conv.unread_count_user > 0 %}
+              <span class="unread-badge">{{ conv.unread_count_user }}</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <p>Chưa có cuộc trò chuyện nào.<br>Nhấn "Chat mới" để bắt đầu!</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area">
+    <div class="chat-header" id="chatHeader">
+      <h3 id="chatTitle">Chọn một cuộc trò chuyện</h3>
+    </div>
+    
+    <div class="chat-messages" id="chatMessages">
+      <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        <h3>Chào mừng đến với Messenger</h3>
+        <p>Chọn một cuộc trò chuyện bên trái hoặc bắt đầu chat mới</p>
+      </div>
+    </div>
+    
+    <div class="chat-input-area" id="chatInputArea" style="display: none;">
+      <form class="chat-input-form" onsubmit="sendMessage(event)">
+        <button type="button" class="emoji-btn" onclick="toggleEmojiPicker()" title="Thêm emoji">
+          😊
+        </button>
+        <input type="text" 
+               class="chat-input" 
+               id="messageInput" 
+               placeholder="Nhập tin nhắn..." 
+               autocomplete="off"
+               required>
+        <button type="submit" class="send-btn" id="sendBtn">
+          Gửi 📤
+        </button>
+      </form>
+      
+      <!-- Emoji Picker -->
+      <div class="emoji-picker" id="emojiPicker">
+        <div class="emoji-tabs">
+          <button class="emoji-tab active" onclick="switchEmojiTab('emoji')" data-tab="emoji">😀</button>
+          <button class="emoji-tab" onclick="switchEmojiTab('heart')" data-tab="heart">❤️</button>
+          <button class="emoji-tab" onclick="switchEmojiTab('gesture')" data-tab="gesture">👍</button>
+          <button class="emoji-tab" onclick="switchEmojiTab('food')" data-tab="food">🍕</button>
+          <button class="emoji-tab" onclick="switchEmojiTab('sticker')" data-tab="sticker">🎨</button>
+        </div>
+        <div class="emoji-grid" id="emojiGrid">
+          <!-- Emojis will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cho New Chat -->
+<div class="modal" id="newChatModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Bắt đầu cuộc trò chuyện mới</h3>
+      <button class="close-modal" onclick="closeNewChatModal()">&times;</button>
+    </div>
+    
+    <div class="users-list" id="usersList">
+      {% if other_users %}
+        {% for user in other_users %}
+          <div class="user-item" onclick="startChat('{{ user.id }}')">
+            <div class="user-info">
+              <div class="user-name">
+                {{ user.name }}
+                {% if user.is_admin %}
+                  <span class="admin-badge">ADMIN</span>
+                {% endif %}
+              </div>
+              <div class="user-email">{{ user.email }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <p>Không có người dùng nào khác</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+let currentConversationId = null;
+let currentOtherUserName = null;
+let messagePollingInterval = null;
+let lastMessagesCount = 0;
+let lastMessagesHash = '';
+
+// Chọn conversation
+function selectConversation(convId, userName, isAdmin) {
+  currentConversationId = convId;
+  currentOtherUserName = userName;
+  
+  // Reset hash để load lại messages cho conversation mới
+  lastMessagesHash = '';
+  
+  // Update active state
+  document.querySelectorAll('.conversation-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  document.querySelector(`[data-conv-id="${convId}"]`).classList.add('active');
+  
+  // Update header
+  let adminBadge = isAdmin ? '<span class="admin-badge">ADMIN</span>' : '';
+  document.getElementById('chatTitle').innerHTML = userName + ' ' + adminBadge;
+  
+  // Show input area
+  document.getElementById('chatInputArea').style.display = 'block';
+  
+  // Load messages
+  loadMessages(convId);
+  
+  // Start polling for new messages
+  startMessagePolling();
+}
+
+// Load messages
+async function loadMessages(convId) {
+  try {
+    const response = await fetch(`/api/messenger/messages/${convId}`);
+    const data = await response.json();
+    
+    if (data.ok) {
+      // Tạo hash để kiểm tra xem messages có thay đổi không
+      const messagesHash = JSON.stringify(data.messages.map(m => m.id + m.content));
+      
+      // Chỉ update nếu có thay đổi
+      if (messagesHash !== lastMessagesHash) {
+        lastMessagesHash = messagesHash;
+        lastMessagesCount = data.messages.length;
+        displayMessages(data.messages);
+      }
+    } else {
+      console.error('Failed to load messages:', data.error);
+    }
+  } catch (error) {
+    console.error('Error loading messages:', error);
+  }
+}
+
+// Display messages
+function displayMessages(messages) {
+  const chatMessages = document.getElementById('chatMessages');
+  
+  if (messages.length === 0) {
+    chatMessages.innerHTML = `
+      <div class="empty-state">
+        <p>Chưa có tin nhắn nào.<br>Hãy bắt đầu cuộc trò chuyện!</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Lưu vị trí scroll hiện tại
+  const scrollTop = chatMessages.scrollTop;
+  const scrollHeight = chatMessages.scrollHeight;
+  const clientHeight = chatMessages.clientHeight;
+  
+  // Kiểm tra xem user có đang ở cuối không (tolerance 50px)
+  const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+  
+  let html = '';
+  const currentUserId = '{{ session.user_id }}';
+  
+  messages.forEach(msg => {
+    const isSent = msg.sender_id === currentUserId;
+    const messageClass = isSent ? 'sent' : 'received';
+    const time = new Date(msg.created_at).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+    const senderName = msg.sender_name || 'Unknown';
+    
+    html += `
+      <div class="message ${messageClass}">
+        <div class="message-content">
+          ${!isSent ? `<div class="message-sender">${escapeHtml(senderName)}</div>` : ''}
+          <div class="message-text">${escapeHtml(msg.content)}</div>
+          <div class="message-time">${time}</div>
+        </div>
+      </div>
+    `;
+  });
+  
+  chatMessages.innerHTML = html;
+  
+  // Chỉ scroll xuống bottom nếu đang ở bottom hoặc lần đầu load (scrollTop = 0)
+  if (isAtBottom || scrollTop === 0) {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+// Send message
+async function sendMessage(event) {
+  event.preventDefault();
+  
+  const input = document.getElementById('messageInput');
+  const content = input.value.trim();
+  
+  if (!content || !currentConversationId) return;
+  
+  const sendBtn = document.getElementById('sendBtn');
+  sendBtn.disabled = true;
+  
+  try {
+    // Lấy receiver_id từ conversation_id
+    const convParts = currentConversationId.split('_');
+    const currentUserId = '{{ session.user_id }}';
+    const receiverId = convParts[0] === currentUserId ? convParts[1] : convParts[0];
+    
+    const response = await fetch('/api/messenger/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        receiver_id: receiverId,
+        content: content
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      input.value = '';
+      // Reset hash để load lại messages ngay lập tức
+      lastMessagesHash = '';
+      loadMessages(currentConversationId);
+      // Reload conversations để update preview
+      reloadConversations();
+    } else {
+      alert('Lỗi: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    alert('Không thể gửi tin nhắn');
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// Start polling for new messages
+function startMessagePolling() {
+  // Clear existing interval
+  if (messagePollingInterval) {
+    clearInterval(messagePollingInterval);
+  }
+  
+  // Poll every 3 seconds - CHỈ load messages, không reload conversations
+  messagePollingInterval = setInterval(() => {
+    if (currentConversationId) {
+      loadMessages(currentConversationId);
+    }
+  }, 3000);
+}
+
+// Stop polling
+function stopMessagePolling() {
+  if (messagePollingInterval) {
+    clearInterval(messagePollingInterval);
+    messagePollingInterval = null;
+  }
+}
+
+// Reload conversations
+async function reloadConversations() {
+  try {
+    const response = await fetch('/api/messenger/conversations');
+    const data = await response.json();
+    
+    if (data.ok && data.conversations) {
+      updateConversationsList(data.conversations);
+    }
+  } catch (error) {
+    console.error('Error reloading conversations:', error);
+  }
+}
+
+// Update conversations list
+function updateConversationsList(conversations) {
+  const list = document.getElementById('conversationsList');
+  
+  if (conversations.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <p>Chưa có cuộc trò chuyện nào.<br>Nhấn "Chat mới" để bắt đầu!</p>
+      </div>
+    `;
+    return;
+  }
+  
+  let html = '';
+  conversations.forEach(conv => {
+    const isActive = conv.id === currentConversationId ? 'active' : '';
+    const adminBadge = conv.other_user.is_admin ? '<span class="admin-badge">ADMIN</span>' : '';
+    const time = conv.last_message ? conv.last_message.created_at.substring(0, 16).replace('T', ' ') : '';
+    const preview = conv.last_message ? conv.last_message.content.substring(0, 50) : 'Không có tin nhắn';
+    const unreadBadge = conv.unread_count_user > 0 ? `<span class="unread-badge">${conv.unread_count_user}</span>` : '';
+    
+    html += `
+      <div class="conversation-item ${isActive}" 
+           onclick="selectConversation('${conv.id}', '${conv.other_user.name}', ${conv.other_user.is_admin})"
+           data-conv-id="${conv.id}">
+        <div class="conversation-header">
+          <div class="conversation-name">
+            ${conv.other_user.name}
+            ${adminBadge}
+          </div>
+          <div class="conversation-time">${time}</div>
+        </div>
+        <div class="conversation-preview">${preview}</div>
+        ${unreadBadge}
+      </div>
+    `;
+  });
+  
+  list.innerHTML = html;
+}
+
+// Open new chat modal
+function openNewChatModal() {
+  document.getElementById('newChatModal').classList.add('show');
+}
+
+// Close new chat modal
+function closeNewChatModal() {
+  document.getElementById('newChatModal').classList.remove('show');
+}
+
+// Start chat with user
+async function startChat(userId) {
+  try {
+    const response = await fetch(`/api/messenger/start_chat/${userId}`, {
+      method: 'POST'
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      closeNewChatModal();
+      
+      // Reload conversations
+      await reloadConversations();
+      
+      // Select the conversation
+      selectConversation(data.conversation_id, data.other_user.name, data.other_user.is_admin);
+    } else {
+      alert('Lỗi: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error starting chat:', error);
+    alert('Không thể bắt đầu chat');
+  }
+}
+
+// Contact admin - quick support
+async function contactAdmin() {
+  try {
+    const response = await fetch('/api/messenger/contact_admin', {
+      method: 'POST'
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      // Reload conversations
+      await reloadConversations();
+      
+      // Select the admin conversation
+      selectConversation(data.conversation_id, data.admin.name, true);
+      
+      // Show success message
+      const chatMessages = document.getElementById('chatMessages');
+      if (chatMessages.innerHTML.includes('empty-state')) {
+        // Add welcome message
+        setTimeout(() => {
+          const input = document.getElementById('messageInput');
+          input.placeholder = 'Xin chào Admin! Tôi cần hỗ trợ về...';
+          input.focus();
+        }, 500);
+      }
+    } else {
+      alert('Lỗi: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error contacting admin:', error);
+    alert('Không thể kết nối với Admin. Vui lòng thử lại sau.');
+  }
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Close modal when clicking outside
+document.getElementById('newChatModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeNewChatModal();
+  }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  stopMessagePolling();
+});
+
+// ============= EMOJI PICKER =============
+const emojiData = {
+  emoji: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '👏', '🙌', '👐', '🤲', '🤝', '🙏'],
+  heart: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💌', '💋', '💏', '💑', '🥰', '😘', '😍', '🤩', '😻', '💐', '🌹', '🌺', '🌸', '🌼', '🌻', '🌷', '💒', '👰', '🤵', '💍', '💎'],
+  gesture: ['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤏', '💪', '🦾', '🙏', '✍️', '👏', '🙌', '👐', '🤲', '🤝', '👊', '✊', '🤛', '🤜', '🤌', '👎', '🖕', '🤘', '🤟', '🙌', '👐', '🤷', '🤦', '🙋', '🙆', '💁', '🙅', '🙎', '🤸', '🚶', '🏃', '💃', '🕺'],
+  food: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧈', '🍳', '🧇', '🥞', '🧈', '🍖', '🍗', '🥩', '🥓', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🥙', '🧆', '🥚', '🍳', '🥘', '🍲', '🥣', '🥗', '🍿', '🧈', '🧂', '🥫', '🍱', '🍘', '🍙', '🍚', '🍛', '🍜', '🍝', '🍠', '🍢', '🍣', '🍤', '🍥', '🥮', '🍡', '🥟', '🥠', '🥡', '🦀', '🦞', '🦐', '🦑', '🦪', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼', '🥛', '☕', '🍵', '🧃', '🥤', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾'],
+  sticker: ['🎉', '🎊', '🎈', '🎁', '🎀', '🏆', '🥇', '🥈', '🥉', '⭐', '🌟', '✨', '💫', '🔥', '💥', '💯', '✔️', '❌', '❓', '❗', '💢', '💬', '💭', '💤', '🎵', '🎶', '🔔', '🔕', '📢', '📣', '🎯', '🎮', '🎲', '🎰', '🧩', '♠️', '♥️', '♦️', '♣️', '🃏', '🀄', '🎴', '🌈', '☀️', '⭐', '🌙', '⚡', '☃️', '🎃', '🎄', '🎅', '🤶', '🦌', '🌺', '🌸', '🌼', '🌻', '🌷', '💐', '🦋', '🐝', '🐞', '🐌', '🦄', '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁']
+};
+
+let currentEmojiTab = 'emoji';
+
+// Toggle emoji picker
+function toggleEmojiPicker() {
+  const picker = document.getElementById('emojiPicker');
+  picker.classList.toggle('show');
+  if (picker.classList.contains('show')) {
+    loadEmojis(currentEmojiTab);
+  }
+}
+
+// Switch emoji tab
+function switchEmojiTab(tab) {
+  currentEmojiTab = tab;
+  
+  // Update active tab
+  document.querySelectorAll('.emoji-tab').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  
+  // Load emojis for this tab
+  loadEmojis(tab);
+}
+
+// Load emojis into grid
+function loadEmojis(tab) {
+  const grid = document.getElementById('emojiGrid');
+  const emojis = emojiData[tab] || emojiData.emoji;
+  
+  grid.innerHTML = emojis.map(emoji => {
+    const className = tab === 'sticker' ? 'emoji-item sticker-item' : 'emoji-item';
+    return `<button type="button" class="${className}" onclick="insertEmoji('${emoji}')">${emoji}</button>`;
+  }).join('');
+}
+
+// Insert emoji into input
+function insertEmoji(emoji) {
+  const input = document.getElementById('messageInput');
+  const cursorPos = input.selectionStart;
+  const textBefore = input.value.substring(0, cursorPos);
+  const textAfter = input.value.substring(cursorPos);
+  
+  input.value = textBefore + emoji + textAfter;
+  
+  // Set cursor position after emoji
+  const newCursorPos = cursorPos + emoji.length;
+  input.setSelectionRange(newCursorPos, newCursorPos);
+  input.focus();
+  
+  // Close picker (optional)
+  // document.getElementById('emojiPicker').classList.remove('show');
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('emojiPicker');
+  const emojiBtn = document.querySelector('.emoji-btn');
+  
+  if (picker && !picker.contains(e.target) && e.target !== emojiBtn) {
+    picker.classList.remove('show');
+  }
+});
+
+// Auto-reload conversations every 10 seconds
+setInterval(reloadConversations, 10000);
+</script>
+{% endblock %}

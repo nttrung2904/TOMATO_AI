@@ -1559,8 +1559,8 @@ button[type=submit]:disabled {
 /* Dark Mode Toggle Button */
 .theme-toggle {
     position: fixed;
-    top: 80px;
-    right: var(--space-6);
+    bottom: 170px;
+    right: 30px;
     width: 56px;
     height: 56px;
     border-radius: var(--radius-full);
@@ -1571,7 +1571,7 @@ button[type=submit]:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: var(--z-fixed);
+    z-index: 998;
     transition: all var(--transition-base);
     color: white;
     font-size: 24px;

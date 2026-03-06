@@ -44,10 +44,8 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from collections import Counter, defaultdict
 import time
-import hashlib
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Tuple, Any
 import requests
-from decimal import Decimal
 from payment import VNPayPayment, MoMoPayment, get_client_ip
 from notifications import (
     init_email_service, 
@@ -95,10 +93,6 @@ if GEMINI_API_KEY:
         GEMINI_MODEL = None
 else:
     print("[WARNING] GEMINI_API_KEY not found - chatbot will not work")
-
-# Lưu ý: Các tiện ích trích xuất đặc trưng sâu được cung cấp bởi `utils.py` (get_feature_extractor,
-# compute_embedding). Tránh duplicate MobileNetV2/preprocess_input ở đây để ngăn
-# import không nhất quán và khởi tạo trùng lặp.
 
 # ----------------- CUSTOM EXCEPTIONS -----------------
 class AppException(Exception):
@@ -675,8 +669,6 @@ app.logger.info('  MAX_LOADED_MODELS: %s', MAX_LOADED_MODELS)
 # Phát hiện và tải cấu hình model
 FULL_MODEL_MAP = discover_models(MODELS_DIR, ARCHITECTURES, app.logger)
 app.logger.info('Discovered %d model configurations', len(FULL_MODEL_MAP))
-# Cache cho chatbot
-# Không cần CHAT_DATASET nữa vì dùng Gemini API
 
 # Model LRU Cache với tự động dọn dẹp
 class ModelLRUCache:
@@ -6571,76 +6563,6 @@ def get_upcoming_care_tasks(user_id, days_ahead=7):
     return sorted(upcoming, key=lambda x: x['days_until'])
 
 
-# ==================== Smart Notification System ====================
-
-def schedule_care_reminders():
-    """
-    Background task to send care reminders to users
-    Should be called periodically (e.g., every hour)
-    """
-    try:
-        users = load_users()
-        
-        for user_id in users.keys():
-            upcoming = get_upcoming_care_tasks(user_id, days_ahead=1)
-            
-            for task in upcoming:
-                # Send notification for tasks due today
-                if task['days_until'] == 0 and not task.get('notified_today', False):
-                    create_notification(
-                        user_id=user_id,
-                        title=f'⏰ Nhắc nhở chăm sóc',
-                        message=f'{task["title"]} - {task.get("description", "")}',
-                        notification_type='reminder',
-                        link='/dashboard'
-                    )
-                    
-                    # Mark as notified
-                    task['notified_today'] = True
-                    save_care_schedule(task)
-        
-        app.logger.info('Care reminders sent successfully')
-        
-    except Exception as e:
-        app.logger.error(f'Error sending care reminders: {e}')
-
-
-def send_weather_alert(user_id, risk_level, city):
-    """Send weather-based disease risk alert"""
-    if risk_level == 'high':
-        create_notification(
-            user_id=user_id,
-            title='⚠️ Cảnh báo thời tiết',
-            message=f'Nguy cơ bệnh cao tại {city}. Kiểm tra cây của bạn!',
-            notification_type='warning',
-            link='/'
-        )
-
-
-def check_weather_alerts_for_users():
-    """Check weather and send alerts to users if high risk"""
-    try:
-        users = load_users()
-        
-        # Check weather for common cities
-        cities = ['Hanoi', 'Ho Chi Minh City', 'Da Nang', 'Can Tho', 'Hai Phong']
-        
-        for city in cities:
-            weather = fetch_weather_from_api(city=city)
-            if weather:
-                risk = assess_disease_risk_from_weather(weather)
-                
-                if risk['risk_level'] == 'high':
-                    # Send to all users (or filter by user's location if available)
-                    for user_id in users.keys():
-                        send_weather_alert(user_id, 'high', city)
-        
-        app.logger.info('Weather alerts checked')
-        
-    except Exception as e:
-        app.logger.error(f'Error checking weather alerts: {e}')
-
-
 # ==================== Wiki Knowledge Base ====================
 
 def load_wiki_articles():
@@ -10264,79 +10186,6 @@ def api_clear_cache():
 
 # ==================== COMPUTER VISION ENHANCEMENT ENDPOINTS ====================
 
-# Grad-CAM feature temporarily disabled due to model compatibility issues
-# @app.route('/api/gradcam', methods=['POST'])
-# def api_gradcam():
-#     """Generate Grad-CAM heatmap for disease localization."""
-#     try:
-#         # Check if file is uploaded or if we should use image_path
-#         if 'file' in request.files:
-#             file = request.files['file']
-#             raw_bytes = file.read()
-#             arr = np.frombuffer(raw_bytes, np.uint8)
-#             img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-#         elif 'image_path' in request.form:
-#             # Read from saved image path
-#             image_path = request.form.get('image_path')
-#             full_path = BASE_DIR / image_path.lstrip('/')
-#             if not full_path.exists():
-#                 return {'ok': False, 'error': f'Image file not found: {image_path}'}, 404
-#             img_bgr = cv2.imread(str(full_path))
-#         else:
-#             return {'ok': False, 'error': 'No file uploaded or image_path provided'}, 400
-#         
-#         if img_bgr is None:
-#             return {'ok': False, 'error': 'Invalid image file'}, 400
-#         
-#         model_name = request.form.get('model', DEFAULT_MODEL)
-#         pipeline_key = request.form.get('pipeline', DEFAULT_PIPELINE)
-#         
-#         # Load model
-#         model, model_class_names = load_model_by_name(model_name, pipeline_key)
-#         
-#         # Preprocess image
-#         pipeline_fn = PIPELINES[pipeline_key][0]  # Extract function from tuple
-#         img_processed = pipeline_fn(img_bgr)
-#         img_processed = cv2.resize(img_processed, (224, 224))
-#         img_array = np.expand_dims(img_processed.astype('float32'), axis=0)  # Already normalized by pipeline
-#         
-#         # Get prediction
-#         preds = model.predict(img_array, verbose=0)
-#         pred_class_idx = int(np.argmax(preds[0]))
-#         confidence = float(preds[0][pred_class_idx])
-#         pred_class = model_class_names[pred_class_idx]
-#         
-#         # Generate Grad-CAM
-#         from utils import generate_gradcam, overlay_heatmap_on_image
-#         heatmap = generate_gradcam(model, img_array, pred_class_idx)
-#         
-#         if heatmap is None:
-#             return {'ok': False, 'error': 'Failed to generate Grad-CAM'}, 500
-#         
-#         # Overlay heatmap on original image
-#         overlayed = overlay_heatmap_on_image(img_bgr, heatmap)
-#         
-#         # Encode to base64
-#         import base64
-#         _, buffer = cv2.imencode('.jpg', overlayed)
-#         img_base64 = base64.b64encode(buffer).decode('utf-8')
-#         
-#         return {
-#             'ok': True,
-#             'prediction': {
-#                 'class': pred_class,
-#                 'confidence': confidence,
-#                 'model': model_name,
-#                 'pipeline': pipeline_key
-#             },
-#             'heatmap_image': f'data:image/jpeg;base64,{img_base64}'
-#         }
-#         
-#     except Exception as e:
-#         app.logger.exception("Error generating Grad-CAM")
-#         return {'ok': False, 'error': str(e)}, 500
-
-
 @app.route('/api/enhance_image', methods=['POST'])
 def api_enhance_image():
     """Enhance image quality before prediction."""
@@ -10553,63 +10402,482 @@ def api_webcam_predict():
         return {'ok': False, 'error': str(e)}, 500
 
 
-@app.route('/debug_preprocess', methods=['POST'])
-def debug_preprocess():
-    """Debug endpoint: accept an uploaded file and pipeline key, run preprocessing and
-    return JSON with shape/dtype/min/max and a small base64 preview for inspection.
-    Useful to reproduce channel/shape issues without loading the model.
-    """
-    if 'file' not in request.files:
-        return {"ok": False, "message": "No file provided"}, 400
-    f = request.files['file']
-    pipeline_key = request.form.get('pipeline') or request.args.get('pipeline')
-    if not pipeline_key:
-        return {"ok": False, "message": "Missing pipeline key"}, 400
-    raw = f.read()
-    import base64
-    import io as _io
+# ============= MESSENGER/CHAT SYSTEM =============
+
+def get_conversation(user1_id, user2_id):
+    """Lấy hoặc tạo conversation giữa 2 users."""
     try:
-        arr = np.frombuffer(raw, np.uint8)
-        img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img_bgr is None:
-            return {"ok": False, "message": "Cannot decode image"}, 400
-        # Run preprocessing
-        try:
-            x = preprocess_image_for_model(img_bgr, pipeline_key)
-        except Exception as e:
-            return {"ok": False, "message": f"Preprocess error: {e}"}, 500
-
-        # Prepare preview: take first image, convert to uint8 preview
-        preview = None
-        try:
-            img = x[0]
-            # clamp and scale to 0-255
-            p = np.clip(img, 0.0, 1.0)
-            p = (p * 255.0).astype('uint8')
-            # if single channel, expand
-            if p.ndim == 2:
-                p = np.stack([p]*3, axis=-1)
-            if p.shape[2] == 1:
-                p = np.concatenate([p, p, p], axis=2)
-            # encode to PNG
-            ok, buf = cv2.imencode('.png', cv2.cvtColor(p, cv2.COLOR_RGB2BGR))
-            if ok:
-                preview = base64.b64encode(buf.tobytes()).decode('ascii')
-        except Exception:
-            preview = None
-
-        info = {
-            "ok": True,
-            "shape": x.shape,
-            "dtype": str(x.dtype),
-            "min": float(x.min()),
-            "max": float(x.max()),
-            "preview_png_base64": preview
+        conversations_file = BASE_DIR / 'data' / 'conversations.jsonl'
+        conversations_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Sort IDs để đảm bảo consistency
+        participant_ids = sorted([user1_id, user2_id])
+        conv_id = f"{participant_ids[0]}_{participant_ids[1]}"
+        
+        # Tìm conversation hiện có
+        if conversations_file.exists():
+            with open(conversations_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        conv = json.loads(line)
+                        if conv['id'] == conv_id:
+                            return conv
+        
+        # Tạo conversation mới
+        conversation = {
+            'id': conv_id,
+            'participants': participant_ids,
+            'created_at': datetime.now().isoformat(),
+            'last_message_at': datetime.now().isoformat(),
+            'unread_count': {participant_ids[0]: 0, participant_ids[1]: 0}
         }
-        return info
+        
+        with open(conversations_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(conversation, ensure_ascii=False) + '\n')
+        
+        return conversation
+        
     except Exception as e:
-        app.logger.exception('Error in debug_preprocess')
-        return {"ok": False, "message": str(e)}, 500
+        app.logger.exception('Error in get_conversation')
+        return None
+
+def get_user_conversations(user_id):
+    """Lấy tất cả conversations của user."""
+    try:
+        conversations_file = BASE_DIR / 'data' / 'conversations.jsonl'
+        if not conversations_file.exists():
+            return []
+        
+        user_convs = []
+        with open(conversations_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    conv = json.loads(line)
+                    if user_id in conv['participants']:
+                        # Lấy thông tin user kia
+                        other_user_id = [uid for uid in conv['participants'] if uid != user_id][0]
+                        
+                        # Xử lý trường hợp admin (không có trong users.jsonl)
+                        if other_user_id == 'admin':
+                            conv['other_user'] = {
+                                'id': 'admin',
+                                'name': 'Quản trị viên',
+                                'email': ADMIN_USERNAME,
+                                'is_admin': True
+                            }
+                        else:
+                            other_user = get_user_by_id(other_user_id)
+                            if other_user:
+                                conv['other_user'] = {
+                                    'id': other_user['id'],
+                                    'name': other_user.get('full_name', 'Unknown'),
+                                    'email': other_user.get('email', ''),
+                                    'is_admin': False
+                                }
+                            else:
+                                # Skip conversation nếu không tìm thấy user
+                                continue
+                        
+                        # Lấy tin nhắn cuối
+                        last_msg = get_last_message(conv['id'])
+                        conv['last_message'] = last_msg
+                        conv['unread_count_user'] = conv.get('unread_count', {}).get(user_id, 0)
+                        
+                        user_convs.append(conv)
+        
+        # Sắp xếp theo thời gian tin nhắn cuối
+        user_convs.sort(key=lambda x: x.get('last_message_at', ''), reverse=True)
+        return user_convs
+        
+    except Exception as e:
+        app.logger.exception('Error in get_user_conversations')
+        return []
+
+def get_last_message(conversation_id):
+    """Lấy tin nhắn cuối cùng của conversation."""
+    try:
+        messages_file = BASE_DIR / 'data' / 'messages.jsonl'
+        if not messages_file.exists():
+            return None
+        
+        last_msg = None
+        with open(messages_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    msg = json.loads(line)
+                    if msg['conversation_id'] == conversation_id:
+                        last_msg = msg
+        
+        return last_msg
+        
+    except Exception as e:
+        app.logger.exception('Error in get_last_message')
+        return None
+
+def get_conversation_messages(conversation_id, limit=100):
+    """Lấy tin nhắn của conversation."""
+    try:
+        messages_file = BASE_DIR / 'data' / 'messages.jsonl'
+        if not messages_file.exists():
+            return []
+        
+        messages = []
+        with open(messages_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    msg = json.loads(line)
+                    if msg['conversation_id'] == conversation_id:
+                        messages.append(msg)
+        
+        # Sắp xếp theo thời gian
+        messages.sort(key=lambda x: x['created_at'])
+        
+        # Giới hạn số lượng
+        return messages[-limit:]
+        
+    except Exception as e:
+        app.logger.exception('Error in get_conversation_messages')
+        return []
+
+def send_message(conversation_id, sender_id, content):
+    """Gửi tin nhắn."""
+    try:
+        messages_file = BASE_DIR / 'data' / 'messages.jsonl'
+        conversations_file = BASE_DIR / 'data' / 'conversations.jsonl'
+        messages_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Tạo message
+        message = {
+            'id': str(uuid4()),
+            'conversation_id': conversation_id,
+            'sender_id': sender_id,
+            'content': content,
+            'created_at': datetime.now().isoformat(),
+            'read': False
+        }
+        
+        # Lưu message
+        with open(messages_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(message, ensure_ascii=False) + '\n')
+        
+        # Cập nhật conversation
+        conversations = []
+        if conversations_file.exists():
+            with open(conversations_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        conv = json.loads(line)
+                        if conv['id'] == conversation_id:
+                            conv['last_message_at'] = datetime.now().isoformat()
+                            # Tăng unread count cho người nhận
+                            receiver_id = [uid for uid in conv['participants'] if uid != sender_id][0]
+                            if 'unread_count' not in conv:
+                                conv['unread_count'] = {}
+                            conv['unread_count'][receiver_id] = conv['unread_count'].get(receiver_id, 0) + 1
+                        conversations.append(conv)
+            
+            # Ghi lại toàn bộ conversations
+            with open(conversations_file, 'w', encoding='utf-8') as f:
+                for conv in conversations:
+                    f.write(json.dumps(conv, ensure_ascii=False) + '\n')
+        
+        return message
+        
+    except Exception as e:
+        app.logger.exception('Error in send_message')
+        return None
+
+def mark_messages_as_read(conversation_id, user_id):
+    """Đánh dấu tin nhắn đã đọc."""
+    try:
+        messages_file = BASE_DIR / 'data' / 'messages.jsonl'
+        conversations_file = BASE_DIR / 'data' / 'conversations.jsonl'
+        
+        # Cập nhật messages
+        if messages_file.exists():
+            messages = []
+            with open(messages_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        msg = json.loads(line)
+                        if msg['conversation_id'] == conversation_id and msg['sender_id'] != user_id:
+                            msg['read'] = True
+                        messages.append(msg)
+            
+            with open(messages_file, 'w', encoding='utf-8') as f:
+                for msg in messages:
+                    f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+        
+        # Reset unread count trong conversation
+        if conversations_file.exists():
+            conversations = []
+            with open(conversations_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        conv = json.loads(line)
+                        if conv['id'] == conversation_id:
+                            if 'unread_count' not in conv:
+                                conv['unread_count'] = {}
+                            conv['unread_count'][user_id] = 0
+                        conversations.append(conv)
+            
+            with open(conversations_file, 'w', encoding='utf-8') as f:
+                for conv in conversations:
+                    f.write(json.dumps(conv, ensure_ascii=False) + '\n')
+        
+        return True
+        
+    except Exception as e:
+        app.logger.exception('Error in mark_messages_as_read')
+        return False
+
+def get_all_users_for_chat():
+    """Lấy danh sách tất cả users có thể chat (bao gồm admin)."""
+    try:
+        users = load_users()
+        # Filter và format
+        chat_users = []
+        
+        # Thêm admin vào đầu danh sách
+        chat_users.append({
+            'id': 'admin',
+            'name': 'Quản trị viên',
+            'email': ADMIN_USERNAME,
+            'is_admin': True
+        })
+        
+        for user in users:
+            chat_users.append({
+                'id': user['id'],
+                'name': user.get('full_name', 'Unknown'),
+                'email': user.get('email', ''),
+                'is_admin': False
+            })
+        return chat_users
+    except Exception as e:
+        app.logger.exception('Error in get_all_users_for_chat')
+        return []
+
+@app.route('/messenger')
+@login_required
+def messenger():
+    """Trang messenger chính."""
+    user_id = session['user_id']
+    conversations = get_user_conversations(user_id)
+    
+    # Lấy danh sách users để bắt đầu chat mới
+    all_users = get_all_users_for_chat()
+    # Lọc bỏ user hiện tại
+    other_users = [u for u in all_users if u['id'] != user_id]
+    
+    # Tính tổng số tin nhắn chưa đọc
+    total_unread = sum(conv.get('unread_count_user', 0) for conv in conversations)
+    
+    return render_template('messenger.html', 
+                         conversations=conversations,
+                         other_users=other_users,
+                         total_unread=total_unread)
+
+@app.route('/api/messenger/conversations', methods=['GET'])
+@login_required
+def api_get_conversations():
+    """API lấy danh sách conversations."""
+    user_id = session['user_id']
+    conversations = get_user_conversations(user_id)
+    return jsonify({'ok': True, 'conversations': conversations})
+
+@app.route('/api/messenger/messages/<conversation_id>', methods=['GET'])
+@login_required
+def api_get_messages(conversation_id):
+    """API lấy tin nhắn của conversation."""
+    user_id = session['user_id']
+    
+    # Kiểm tra user có thuộc conversation không
+    conversations_file = BASE_DIR / 'data' / 'conversations.jsonl'
+    if conversations_file.exists():
+        with open(conversations_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    conv = json.loads(line)
+                    if conv['id'] == conversation_id:
+                        if user_id not in conv['participants']:
+                            return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
+                        break
+            else:
+                return jsonify({'ok': False, 'error': 'Conversation not found'}), 404
+    else:
+        return jsonify({'ok': False, 'error': 'Conversation not found'}), 404
+    
+    # Đánh dấu đã đọc
+    mark_messages_as_read(conversation_id, user_id)
+    
+    # Lấy tin nhắn
+    messages = get_conversation_messages(conversation_id)
+    
+    # Thêm thông tin sender
+    for msg in messages:
+        sender_id = msg['sender_id']
+        
+        # Xử lý trường hợp admin
+        if sender_id == 'admin':
+            msg['sender_name'] = 'Quản trị viên'
+            msg['sender_email'] = ADMIN_USERNAME
+        else:
+            sender = get_user_by_id(sender_id)
+            if sender:
+                msg['sender_name'] = sender.get('full_name', 'Unknown')
+                msg['sender_email'] = sender.get('email', '')
+            else:
+                msg['sender_name'] = 'Unknown'
+                msg['sender_email'] = ''
+    
+    return jsonify({'ok': True, 'messages': messages})
+
+@app.route('/api/messenger/send', methods=['POST'])
+@login_required
+def api_send_message():
+    """API gửi tin nhắn."""
+    try:
+        user_id = session['user_id']
+        data = request.get_json()
+        
+        receiver_id = data.get('receiver_id')
+        content = data.get('content', '').strip()
+        
+        if not receiver_id or not content:
+            return jsonify({'ok': False, 'error': 'Missing data'}), 400
+        
+        # Xử lý trường hợp receiver là admin (không cần kiểm tra trong database)
+        if receiver_id != 'admin':
+            # Kiểm tra receiver có tồn tại
+            receiver = get_user_by_id(receiver_id)
+            if not receiver:
+                return jsonify({'ok': False, 'error': 'Receiver not found'}), 404
+        
+        # Lấy hoặc tạo conversation
+        conversation = get_conversation(user_id, receiver_id)
+        if not conversation:
+            return jsonify({'ok': False, 'error': 'Failed to create conversation'}), 500
+        
+        # Gửi tin nhắn
+        message = send_message(conversation['id'], user_id, content)
+        if not message:
+            return jsonify({'ok': False, 'error': 'Failed to send message'}), 500
+        
+        # Thêm thông tin sender
+        if user_id == 'admin':
+            message['sender_name'] = 'Quản trị viên'
+            message['sender_email'] = ADMIN_USERNAME
+        else:
+            sender = get_user_by_id(user_id)
+            if sender:
+                message['sender_name'] = sender.get('full_name', 'Unknown')
+                message['sender_email'] = sender.get('email', '')
+            else:
+                message['sender_name'] = 'Unknown'
+                message['sender_email'] = ''
+        
+        return jsonify({
+            'ok': True, 
+            'message': message,
+            'conversation_id': conversation['id']
+        })
+        
+    except Exception as e:
+        app.logger.exception('Error in api_send_message')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/messenger/start_chat/<user_id>', methods=['POST'])
+@login_required
+def api_start_chat(user_id):
+    """API bắt đầu chat với user."""
+    try:
+        current_user_id = session['user_id']
+        
+        # Xử lý trường hợp chat với admin
+        if user_id == 'admin':
+            other_user = {
+                'id': 'admin',
+                'full_name': 'Quản trị viên',
+                'email': ADMIN_USERNAME
+            }
+        else:
+            # Kiểm tra user có tồn tại
+            other_user = get_user_by_id(user_id)
+            if not other_user:
+                return jsonify({'ok': False, 'error': 'User not found'}), 404
+        
+        # Lấy hoặc tạo conversation
+        conversation = get_conversation(current_user_id, user_id)
+        if not conversation:
+            return jsonify({'ok': False, 'error': 'Failed to create conversation'}), 500
+        
+        return jsonify({
+            'ok': True,
+            'conversation_id': conversation['id'],
+            'other_user': {
+                'id': other_user['id'],
+                'name': other_user.get('full_name', 'Unknown'),
+                'email': other_user.get('email', ''),
+                'is_admin': user_id == 'admin'
+            }
+        })
+        
+    except Exception as e:
+        app.logger.exception('Error in api_start_chat')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/messenger/unread_count', methods=['GET'])
+@login_required
+def api_unread_count():
+    """API lấy số tin nhắn chưa đọc."""
+    try:
+        user_id = session['user_id']
+        conversations = get_user_conversations(user_id)
+        total_unread = sum(conv.get('unread_count_user', 0) for conv in conversations)
+        
+        return jsonify({'ok': True, 'unread_count': total_unread})
+        
+    except Exception as e:
+        app.logger.exception('Error in api_unread_count')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/messenger/contact_admin', methods=['POST'])
+@login_required
+def api_contact_admin():
+    """API để liên hệ nhanh với admin."""
+    try:
+        user_id = session['user_id']
+        
+        # Admin trong hệ thống có user_id = 'admin' (không lưu trong users.jsonl)
+        # Tạo admin virtual user
+        admin_id = 'admin'
+        admin_info = {
+            'id': admin_id,
+            'name': 'Quản trị viên',
+            'email': ADMIN_USERNAME,
+            'is_admin': True
+        }
+        
+        # Kiểm tra không cho admin chat với chính mình
+        if user_id == admin_id:
+            return jsonify({'ok': False, 'error': 'Admin không thể chat với chính mình'}), 400
+        
+        # Lấy hoặc tạo conversation với admin
+        conversation = get_conversation(user_id, admin_id)
+        if not conversation:
+            return jsonify({'ok': False, 'error': 'Không thể tạo cuộc trò chuyện'}), 500
+        
+        return jsonify({
+            'ok': True,
+            'conversation_id': conversation['id'],
+            'admin': admin_info
+        })
+        
+    except Exception as e:
+        app.logger.exception('Error in api_contact_admin')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 
 # ============= FLASK ERROR HANDLERS =============
 
