@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ stream.title }} - Live Streaming{% endblock %}
+
+{% block content %}
+<style>
+  .stream-detail {
+    max-width: 1400px;
+    margin: 30px auto;
+    padding: 0 20px;
+  }
+  
+  .stream-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+  
+  .video-player {
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    position: relative;
+  }
+  
+  .video-player.live {
+    border: 3px solid #ff0000;
+  }
+  
+  .video-player iframe {
+    width: 100%;
+    height: 600px;
+    border: none;
+  }
+  
+  @media (max-width: 768px) {
+    .video-player iframe {
+      height: 400px;
+    }
+  }
+  
+  .stream-status-banner {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 1em;
+    font-weight: 700;
+    text-transform: uppercase;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .banner-live {
+    background: #ff0000;
+    color: white;
+    animation: pulse 2s infinite;
+  }
+  
+  .banner-scheduled {
+    background: #ffa500;
+    color: white;
+  }
+  
+  .banner-ended {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  
+  .stream-details {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-top: 20px;
+  }
+  
+  [data-theme="dark"] .stream-details {
+    background: var(--bg-secondary);
+  }
+  
+  .stream-title {
+    font-size: 2em;
+    font-weight: 800;
+    margin: 0 0 15px 0;
+    color: #333;
+    line-height: 1.3;
+  }
+  
+  [data-theme="dark"] .stream-title {
+    color: var(--text-primary);
+  }
+  
+  .stream-meta {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    color: #666;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .stream-meta {
+    color: var(--text-secondary);
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1em;
+  }
+  
+  .stream-description {
+    font-size: 1.1em;
+    line-height: 1.8;
+    color: #555;
+    margin-bottom: 25px;
+  }
+  
+  [data-theme="dark"] .stream-description {
+    color: var(--text-secondary);
+  }
+  
+  .instructor-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    margin-top: 25px;
+    color: white;
+  }
+  
+  .instructor-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    flex-shrink: 0;
+  }
+  
+  .instructor-info h3 {
+    margin: 0 0 8px 0;
+    font-size: 1.4em;
+  }
+  
+  .instructor-info p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1em;
+  }
+  
+  .scheduled-info {
+    background: #fff3cd;
+    border-left: 4px solid #ffa500;
+    padding: 20px 25px;
+    border-radius: 10px;
+    margin-top: 25px;
+  }
+  
+  [data-theme="dark"] .scheduled-info {
+    background: rgba(255, 165, 0, 0.2);
+  }
+  
+  .scheduled-info h3 {
+    margin: 0 0 10px 0;
+    color: #856404;
+    font-size: 1.2em;
+  }
+  
+  [data-theme="dark"] .scheduled-info h3 {
+    color: #ffa500;
+  }
+  
+  .scheduled-info p {
+    margin: 0;
+    color: #856404;
+    font-size: 1.05em;
+  }
+  
+  [data-theme="dark"] .scheduled-info p {
+    color: #ffd666;
+  }
+  
+  .countdown {
+    font-size: 2em;
+    font-weight: 700;
+    margin-top: 15px;
+    text-align: center;
+    color: #856404;
+  }
+  
+  [data-theme="dark"] .countdown {
+    color: #ffa500;
+  }
+  
+  .stream-tags {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  
+  .tag {
+    padding: 8px 16px;
+    background: #f0f0f0;
+    border-radius: 20px;
+    font-size: 0.9em;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .tag {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  
+  .placeholder-content {
+    width: 100%;
+    height: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    gap: 20px;
+  }
+  
+  @media (max-width: 768px) {
+    .placeholder-content {
+      height: 400px;
+    }
+  }
+  
+  .placeholder-content h2 {
+    font-size: 2.5em;
+    margin: 0;
+  }
+  
+  .placeholder-content p {
+    font-size: 1.3em;
+    margin: 0;
+    opacity: 0.9;
+  }
+  
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    margin-bottom: 20px;
+  }
+  
+  [data-theme="dark"] .back-button {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .back-button:hover {
+    border-color: #667eea;
+    transform: translateX(-5px);
+  }
+</style>
+
+<div class="stream-detail">
+  <a href="{{ url_for('live_streaming') }}" class="back-button">
+    ← Quay lại danh sách
+  </a>
+  
+  <div class="stream-container">
+    <div class="main-content">
+      <div class="video-player {% if stream.status == 'live' %}live{% endif %}">
+        {% if stream.status == 'live' %}
+          <div class="stream-status-banner banner-live">
+            <span style="width: 12px; height: 12px; background: white; border-radius: 50%; display: inline-block;"></span>
+            <span>ĐANG PHÁT TRỰC TIẾP</span>
+          </div>
+          <iframe 
+            src="https://www.youtube.com/embed/{{ stream.youtube_id }}?autoplay=1&rel=0&modestbranding=1"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        {% elif stream.status == 'ended' %}
+          <div class="stream-status-banner banner-ended">
+            <span>✓ ĐÃ KẾT THÚC</span>
+          </div>
+          <iframe 
+            src="https://www.youtube.com/embed/{{ stream.youtube_id }}?rel=0&modestbranding=1"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        {% else %}
+          <div class="placeholder-content">
+            <h2>📅</h2>
+            <h2>Buổi live chưa bắt đầu</h2>
+            <p>Hãy quay lại vào thời gian đã lên lịch</p>
+          </div>
+        {% endif %}
+      </div>
+      
+      <div class="stream-details">
+        <h1 class="stream-title">{{ stream.title }}</h1>
+        
+        <div class="stream-meta">
+          <div class="meta-item">
+            {% if stream.status == 'live' %}
+              <span style="color: #ff0000;">🔴</span>
+              <span style="color: #ff0000; font-weight: 700;">LIVE</span>
+            {% elif stream.status == 'scheduled' %}
+              <span>📅</span>
+              <span>Sắp diễn ra</span>
+            {% else %}
+              <span>✓</span>
+              <span>Đã kết thúc</span>
+            {% endif %}
+          </div>
+          <div class="meta-item">
+            <span>👁️</span>
+            <span>{{ stream.views }} lượt xem</span>
+          </div>
+          <div class="meta-item">
+            <span>📂</span>
+            <span>{{ stream.category|title }}</span>
+          </div>
+        </div>
+        
+        <p class="stream-description">{{ stream.description }}</p>
+        
+        {% if stream.status == 'scheduled' %}
+          <div class="scheduled-info">
+            <h3>🕐 Thời gian phát sóng</h3>
+            <p>{{ stream.scheduled_time if stream.scheduled_time else 'Sẽ được thông báo sau' }}</p>
+            <div class="countdown" id="countdown">
+              Đang tính toán...
+            </div>
+          </div>
+        {% endif %}
+        
+        <div class="instructor-card">
+          <div class="instructor-avatar">👨‍🏫</div>
+          <div class="instructor-info">
+            <h3>{{ stream.instructor }}</h3>
+            <p>Giảng viên trực tiếp</p>
+          </div>
+        </div>
+        
+        {% if stream.tags %}
+          <div class="stream-tags">
+            {% for tag in stream.tags %}
+              <span class="tag">🏷️ {{ tag }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if stream.status == 'scheduled' and stream.scheduled_time %}
+<script>
+  // Countdown timer
+  const scheduledTime = new Date("{{ stream.scheduled_time }}").getTime();
+  
+  function updateCountdown() {
+    const now = new Date().getTime();
+    const distance = scheduledTime - now;
+    
+    if (distance < 0) {
+      document.getElementById('countdown').innerHTML = "Buổi live đã bắt đầu! Vui lòng tải lại trang.";
+      return;
+    }
+    
+    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+    
+    let countdownText = '';
+    if (days > 0) countdownText += days + " ngày ";
+    if (hours > 0 || days > 0) countdownText += hours + " giờ ";
+    if (minutes > 0 || hours > 0 || days > 0) countdownText += minutes + " phút ";
+    countdownText += seconds + " giây";
+    
+    document.getElementById('countdown').innerHTML = countdownText;
+  }
+  
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+</script>
+{% endif %}
+
+{% endblock %}

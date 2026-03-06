@@ -8769,6 +8769,294 @@ def admin_rebuild_samples():
         app.logger.exception('Error triggering rebuild of sample features')
         return {"ok": False, "message": str(e)}, 500
 
+# ==================== Video Tutorials & Live Streaming ====================
+
+def load_video_tutorials():
+    """Load all video tutorials"""
+    tutorials = []
+    tutorials_file = BASE_DIR / 'data' / 'video_tutorials.jsonl'
+    
+    if tutorials_file.exists():
+        with open(tutorials_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        tutorials.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return tutorials
+
+def load_live_streams():
+    """Load all live streams"""
+    streams = []
+    streams_file = BASE_DIR / 'data' / 'live_streams.jsonl'
+    
+    if streams_file.exists():
+        with open(streams_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        streams.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    
+    return streams
+
+def get_video_tutorial_by_id(tutorial_id):
+    """Get video tutorial by ID"""
+    tutorials = load_video_tutorials()
+    for tutorial in tutorials:
+        if tutorial['id'] == tutorial_id:
+            return tutorial
+    return None
+
+def get_live_stream_by_id(stream_id):
+    """Get live stream by ID"""
+    streams = load_live_streams()
+    for stream in streams:
+        if stream['id'] == stream_id:
+            return stream
+    return None
+
+def save_video_tutorials(tutorials):
+    """Save all video tutorials"""
+    tutorials_file = BASE_DIR / 'data' / 'video_tutorials.jsonl'
+    tutorials_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(tutorials_file, 'w', encoding='utf-8') as f:
+        for tutorial in tutorials:
+            f.write(json.dumps(tutorial, ensure_ascii=False) + '\n')
+
+def save_live_streams(streams):
+    """Save all live streams"""
+    streams_file = BASE_DIR / 'data' / 'live_streams.jsonl'
+    streams_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(streams_file, 'w', encoding='utf-8') as f:
+        for stream in streams:
+            f.write(json.dumps(stream, ensure_ascii=False) + '\n')
+
+def increment_video_views(tutorial_id):
+    """Increment views count for a video tutorial"""
+    try:
+        tutorials = load_video_tutorials()
+        for tutorial in tutorials:
+            if tutorial['id'] == tutorial_id:
+                tutorial['views'] = tutorial.get('views', 0) + 1
+                break
+        save_video_tutorials(tutorials)
+    except Exception as e:
+        app.logger.error(f'Error incrementing video views: {e}')
+
+def increment_stream_views(stream_id):
+    """Increment views count for a live stream"""
+    try:
+        streams = load_live_streams()
+        for stream in streams:
+            if stream['id'] == stream_id:
+                stream['views'] = stream.get('views', 0) + 1
+                break
+        save_live_streams(streams)
+    except Exception as e:
+        app.logger.error(f'Error incrementing stream views: {e}')
+
+def toggle_video_like(tutorial_id, user_id):
+    """Toggle like for a video tutorial"""
+    try:
+        tutorials = load_video_tutorials()
+        for tutorial in tutorials:
+            if tutorial['id'] == tutorial_id:
+                if 'liked_by' not in tutorial:
+                    tutorial['liked_by'] = []
+                
+                if user_id in tutorial['liked_by']:
+                    tutorial['liked_by'].remove(user_id)
+                    tutorial['likes'] = tutorial.get('likes', 0) - 1
+                    liked = False
+                else:
+                    tutorial['liked_by'].append(user_id)
+                    tutorial['likes'] = tutorial.get('likes', 0) + 1
+                    liked = True
+                
+                save_video_tutorials(tutorials)
+                return liked
+        return False
+    except Exception as e:
+        app.logger.error(f'Error toggling video like: {e}')
+        return False
+
+@app.route('/tutorials')
+def video_tutorials():
+    """Video tutorials page"""
+    try:
+        tutorials = load_video_tutorials()
+        
+        # Get filter parameters
+        category = request.args.get('category', '').strip()
+        level = request.args.get('level', '').strip()
+        search_query = request.args.get('q', '').strip()
+        
+        # Filter tutorials
+        filtered_tutorials = tutorials
+        
+        if category:
+            filtered_tutorials = [t for t in filtered_tutorials if t.get('category') == category]
+        
+        if level:
+            filtered_tutorials = [t for t in filtered_tutorials if t.get('level') == level]
+        
+        if search_query:
+            search_lower = search_query.lower()
+            filtered_tutorials = [
+                t for t in filtered_tutorials 
+                if search_lower in t.get('title', '').lower() 
+                or search_lower in t.get('description', '').lower()
+                or any(search_lower in tag.lower() for tag in t.get('tags', []))
+            ]
+        
+        # Sort by views (popular) by default
+        sort_by = request.args.get('sort', 'popular')
+        if sort_by == 'popular':
+            filtered_tutorials = sorted(filtered_tutorials, key=lambda x: x.get('views', 0), reverse=True)
+        elif sort_by == 'recent':
+            filtered_tutorials = sorted(filtered_tutorials, key=lambda x: x.get('created_at', ''), reverse=True)
+        elif sort_by == 'likes':
+            filtered_tutorials = sorted(filtered_tutorials, key=lambda x: x.get('likes', 0), reverse=True)
+        
+        # Get categories and levels for filters
+        categories = list(set(t.get('category', '') for t in tutorials if t.get('category')))
+        levels = ['beginner', 'intermediate', 'advanced']
+        
+        # Get featured/popular tutorials for sidebar
+        popular_tutorials = sorted(tutorials, key=lambda x: x.get('views', 0), reverse=True)[:5]
+        
+        return render_template('video_tutorials.html',
+                             tutorials=filtered_tutorials,
+                             popular_tutorials=popular_tutorials,
+                             categories=categories,
+                             levels=levels,
+                             selected_category=category,
+                             selected_level=level,
+                             search_query=search_query,
+                             sort_by=sort_by)
+    except Exception as e:
+        app.logger.error(f'Error loading video tutorials: {e}')
+        flash('Lỗi khi tải video tutorials', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/tutorials/<tutorial_id>')
+def video_tutorial_detail(tutorial_id):
+    """Video tutorial detail page"""
+    try:
+        tutorial = get_video_tutorial_by_id(tutorial_id)
+        
+        if not tutorial:
+            flash('Không tìm thấy video tutorial', 'warning')
+            return redirect(url_for('video_tutorials'))
+        
+        # Increment views
+        increment_video_views(tutorial_id)
+        tutorial['views'] = tutorial.get('views', 0) + 1
+        
+        # Get user like status
+        user_liked = False
+        if 'user_id' in session:
+            user_liked = session['user_id'] in tutorial.get('liked_by', [])
+        
+        # Get related tutorials (same category or tags)
+        all_tutorials = load_video_tutorials()
+        related = []
+        for t in all_tutorials:
+            if t['id'] != tutorial_id:
+                score = 0
+                if t.get('category') == tutorial.get('category'):
+                    score += 5
+                common_tags = set(t.get('tags', [])) & set(tutorial.get('tags', []))
+                score += len(common_tags) * 2
+                if score > 0:
+                    t['relevance_score'] = score
+                    related.append(t)
+        
+        related.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        related = related[:5]
+        
+        return render_template('video_tutorial_detail.html',
+                             tutorial=tutorial,
+                             related_tutorials=related,
+                             user_liked=user_liked)
+    except Exception as e:
+        app.logger.error(f'Error loading video tutorial: {e}')
+        flash('Lỗi khi tải video tutorial', 'error')
+        return redirect(url_for('video_tutorials'))
+
+@app.route('/live-streaming')
+def live_streaming():
+    """Live streaming page"""
+    try:
+        streams = load_live_streams()
+        
+        # Separate streams by status
+        live_streams = [s for s in streams if s.get('status') == 'live']
+        scheduled_streams = [s for s in streams if s.get('status') == 'scheduled']
+        ended_streams = [s for s in streams if s.get('status') == 'ended']
+        
+        # Sort by scheduled time
+        scheduled_streams = sorted(scheduled_streams, key=lambda x: x.get('scheduled_time', ''))
+        ended_streams = sorted(ended_streams, key=lambda x: x.get('scheduled_time', ''), reverse=True)[:10]
+        
+        return render_template('live_streaming.html',
+                             live_streams=live_streams,
+                             scheduled_streams=scheduled_streams,
+                             ended_streams=ended_streams)
+    except Exception as e:
+        app.logger.error(f'Error loading live streams: {e}')
+        flash('Lỗi khi tải live streaming', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/live-streaming/<stream_id>')
+def live_stream_detail(stream_id):
+    """Live stream detail page"""
+    try:
+        stream = get_live_stream_by_id(stream_id)
+        
+        if not stream:
+            flash('Không tìm thấy live stream', 'warning')
+            return redirect(url_for('live_streaming'))
+        
+        # Increment views for live and ended streams
+        if stream.get('status') in ['live', 'ended']:
+            increment_stream_views(stream_id)
+            stream['views'] = stream.get('views', 0) + 1
+        
+        return render_template('live_stream_detail.html', stream=stream)
+    except Exception as e:
+        app.logger.error(f'Error loading live stream: {e}')
+        flash('Lỗi khi tải live stream', 'error')
+        return redirect(url_for('live_streaming'))
+
+@app.route('/api/video/<tutorial_id>/like', methods=['POST'])
+def video_like(tutorial_id):
+    """Toggle like for video tutorial"""
+    try:
+        if 'user_id' not in session:
+            return {'success': False, 'message': 'Vui lòng đăng nhập'}, 401
+        
+        user_id = session['user_id']
+        liked = toggle_video_like(tutorial_id, user_id)
+        
+        tutorial = get_video_tutorial_by_id(tutorial_id)
+        likes = tutorial.get('likes', 0) if tutorial else 0
+        
+        return {
+            'success': True,
+            'liked': liked,
+            'likes': likes
+        }
+    except Exception as e:
+        app.logger.error(f'Error liking video tutorial: {e}')
+        return {'success': False, 'message': str(e)}, 500
+
 # ==================== Admin Wiki Management ====================
 
 @app.route('/admin/wiki')

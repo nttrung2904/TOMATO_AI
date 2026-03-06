@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Streaming - Phát trực tiếp - Tomato Disease Detection{% endblock %}
+
+{% block content %}
+<style>
+  .live-hero {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+    color: white;
+    padding: 80px 20px;
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .live-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: moveBackground 20s linear infinite;
+  }
+  
+  @keyframes moveBackground {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+  }
+  
+  [data-theme="dark"] .live-hero {
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  }
+  
+  .live-hero h1 {
+    font-size: 3em;
+    margin: 0 0 15px 0;
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .live-hero p {
+    font-size: 1.2em;
+    opacity: 0.95;
+    max-width: 700px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .streams-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+  }
+  
+  .section-title {
+    font-size: 2em;
+    font-weight: 700;
+    margin: 40px 0 25px 0;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  [data-theme="dark"] .section-title {
+    color: var(--text-primary);
+  }
+  
+  .live-badge {
+    background: #ff0000;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 5px;
+    font-size: 0.5em;
+    font-weight: 700;
+    text-transform: uppercase;
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  
+  .streams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+  
+  .stream-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+  }
+  
+  [data-theme="dark"] .stream-card {
+    background: var(--bg-secondary);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  
+  .stream-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+  }
+  
+  .stream-card.live {
+    border: 3px solid #ff0000;
+  }
+  
+  .stream-thumbnail {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+    overflow: hidden;
+  }
+  
+  .stream-thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .stream-status-badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    font-weight: 700;
+    text-transform: uppercase;
+    z-index: 10;
+  }
+  
+  .status-live {
+    background: #ff0000;
+    color: white;
+    animation: pulse 2s infinite;
+  }
+  
+  .status-scheduled {
+    background: #ffa500;
+    color: white;
+  }
+  
+  .status-ended {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+  }
+  
+  .stream-viewers {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+  
+  .stream-info {
+    padding: 20px;
+  }
+  
+  .stream-title {
+    font-size: 1.15em;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: #333;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  [data-theme="dark"] .stream-title {
+    color: var(--text-primary);
+  }
+  
+  .stream-description {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 12px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  [data-theme="dark"] .stream-description {
+    color: var(--text-secondary);
+  }
+  
+  .stream-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85em;
+    color: #888;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .stream-meta {
+    color: var(--text-tertiary);
+    border-top-color: var(--bg-tertiary);
+  }
+  
+  .stream-instructor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .stream-time {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .no-streams {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  
+  [data-theme="dark"] .no-streams {
+    background: var(--bg-secondary);
+  }
+  
+  .no-streams h3 {
+    font-size: 2em;
+    margin-bottom: 15px;
+  }
+  
+  .empty-section {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-top: 20px;
+  }
+  
+  [data-theme="dark"] .empty-section {
+    background: var(--bg-tertiary);
+  }
+</style>
+
+<div class="live-hero">
+  <h1>🎥 Live Streaming</h1>
+  <p>Tham gia các buổi phát trực tiếp về chăm sóc cây cà chua và nhận diện bệnh</p>
+</div>
+
+<div class="streams-container">
+  {% if live_streams %}
+    <h2 class="section-title">
+      🔴 Đang phát trực tiếp
+      <span class="live-badge">LIVE</span>
+    </h2>
+    <div class="streams-grid">
+      {% for stream in live_streams %}
+        <a href="{{ url_for('live_stream_detail', stream_id=stream.id) }}" style="text-decoration: none;">
+          <div class="stream-card live">
+            <div class="stream-thumbnail">
+              <img src="https://img.youtube.com/vi/{{ stream.youtube_id }}/maxresdefault.jpg" 
+                   onerror="this.src='https://img.youtube.com/vi/{{ stream.youtube_id }}/hqdefault.jpg'"
+                   alt="{{ stream.title }}">
+              <div class="stream-status-badge status-live">🔴 LIVE</div>
+              <div class="stream-viewers">👁️ {{ stream.views }}</div>
+            </div>
+            <div class="stream-info">
+              <h3 class="stream-title">{{ stream.title }}</h3>
+              <p class="stream-description">{{ stream.description }}</p>
+              <div class="stream-meta">
+                <div class="stream-instructor">
+                  <span>👨‍🏫</span>
+                  <span>{{ stream.instructor }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+  
+  {% if scheduled_streams %}
+    <h2 class="section-title">📅 Sắp diễn ra</h2>
+    <div class="streams-grid">
+      {% for stream in scheduled_streams %}
+        <a href="{{ url_for('live_stream_detail', stream_id=stream.id) }}" style="text-decoration: none;">
+          <div class="stream-card">
+            <div class="stream-thumbnail">
+              <img src="https://img.youtube.com/vi/{{ stream.youtube_id }}/maxresdefault.jpg" 
+                   onerror="this.src='https://img.youtube.com/vi/{{ stream.youtube_id }}/hqdefault.jpg'"
+                   alt="{{ stream.title }}">
+              <div class="stream-status-badge status-scheduled">📅 SẮP DIỄN RA</div>
+            </div>
+            <div class="stream-info">
+              <h3 class="stream-title">{{ stream.title }}</h3>
+              <p class="stream-description">{{ stream.description }}</p>
+              <div class="stream-meta">
+                <div class="stream-instructor">
+                  <span>👨‍🏫</span>
+                  <span>{{ stream.instructor }}</span>
+                </div>
+                <div class="stream-time">
+                  <span>🕐</span>
+                  <span>{{ stream.scheduled_time[:10] if stream.scheduled_time else 'TBA' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% elif not live_streams %}
+    <div class="empty-section">
+      <p>⏳ Chưa có buổi live stream nào được lên lịch</p>
+    </div>
+  {% endif %}
+  
+  {% if ended_streams %}
+    <h2 class="section-title">📼 Đã kết thúc</h2>
+    <div class="streams-grid">
+      {% for stream in ended_streams %}
+        <a href="{{ url_for('live_stream_detail', stream_id=stream.id) }}" style="text-decoration: none;">
+          <div class="stream-card">
+            <div class="stream-thumbnail">
+              <img src="https://img.youtube.com/vi/{{ stream.youtube_id }}/maxresdefault.jpg" 
+                   onerror="this.src='https://img.youtube.com/vi/{{ stream.youtube_id }}/hqdefault.jpg'"
+                   alt="{{ stream.title }}">
+              <div class="stream-status-badge status-ended">✓ ĐÃ KẾT THÚC</div>
+              <div class="stream-viewers">👁️ {{ stream.views }}</div>
+            </div>
+            <div class="stream-info">
+              <h3 class="stream-title">{{ stream.title }}</h3>
+              <p class="stream-description">{{ stream.description }}</p>
+              <div class="stream-meta">
+                <div class="stream-instructor">
+                  <span>👨‍🏫</span>
+                  <span>{{ stream.instructor }}</span>
+                </div>
+                <div class="stream-time">
+                  <span>📅</span>
+                  <span>{{ stream.scheduled_time[:10] if stream.scheduled_time else 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+  
+  {% if not live_streams and not scheduled_streams and not ended_streams %}
+    <div class="no-streams">
+      <h3>😔 Chưa có live stream nào</h3>
+      <p>Hãy quay lại sau để xem các buổi live stream mới nhất!</p>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

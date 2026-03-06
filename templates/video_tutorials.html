@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+
+{% block title %}Video Tutorials - Hướng dẫn Video - Tomato Disease Detection{% endblock %}
+
+{% block content %}
+<style>
+  .video-hero {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 80px 20px;
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .video-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: moveBackground 20s linear infinite;
+  }
+  
+  @keyframes moveBackground {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+  }
+  
+  [data-theme="dark"] .video-hero {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  }
+  
+  .video-hero h1 {
+    font-size: 3em;
+    margin: 0 0 15px 0;
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+  
+  .video-hero p {
+    font-size: 1.2em;
+    opacity: 0.95;
+    max-width: 700px;
+    margin: 0 auto 35px;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .video-search {
+    max-width: 700px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .video-search form {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .video-search input {
+    flex: 1;
+    padding: 18px 24px;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.05em;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    transition: all 0.3s;
+  }
+  
+  .video-search button {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+    border: none;
+    padding: 12px 32px;
+    border-radius: 50px;
+    color: white;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.3s;
+  }
+  
+  .video-search button:hover {
+    background: linear-gradient(135deg, #ee5a6f, #ff6b6b);
+    transform: scale(1.05);
+  }
+  
+  .video-filters {
+    max-width: 1200px;
+    margin: 0 auto 30px;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0 20px;
+  }
+  
+  .filter-select {
+    padding: 12px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    background: white;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .filter-select {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .filter-select:hover {
+    border-color: #f5576c;
+    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.2);
+  }
+  
+  .video-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+  }
+  
+  .video-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  
+  [data-theme="dark"] .video-card {
+    background: var(--bg-secondary);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  
+  .video-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+  }
+  
+  .video-thumbnail {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%; /* 16:9 aspect ratio */
+    background: #000;
+    overflow: hidden;
+  }
+  
+  .video-thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .video-play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  
+  .video-card:hover .video-play-icon {
+    transform: translate(-50%, -50%) scale(1.1);
+    background: #f5576c;
+  }
+  
+  .video-play-icon svg {
+    width: 30px;
+    height: 30px;
+    fill: #f5576c;
+    margin-left: 4px;
+  }
+  
+  .video-card:hover .video-play-icon svg {
+    fill: white;
+  }
+  
+  .video-duration {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+  
+  .video-info {
+    padding: 20px;
+  }
+  
+  .video-title {
+    font-size: 1.15em;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: #333;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  [data-theme="dark"] .video-title {
+    color: var(--text-primary);
+  }
+  
+  .video-instructor {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+  }
+  
+  [data-theme="dark"] .video-instructor {
+    color: var(--text-secondary);
+  }
+  
+  .video-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85em;
+    color: #888;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .video-meta {
+    color: var(--text-tertiary);
+    border-top-color: var(--bg-tertiary);
+  }
+  
+  .video-stats {
+    display: flex;
+    gap: 15px;
+  }
+  
+  .video-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .badge-beginner {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
+  
+  .badge-intermediate {
+    background: #fff3e0;
+    color: #f57c00;
+  }
+  
+  .badge-advanced {
+    background: #fce4ec;
+    color: #c2185b;
+  }
+  
+  .sidebar {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  
+  .popular-videos h2 {
+    font-size: 1.8em;
+    margin-bottom: 20px;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .popular-videos h2 {
+    color: var(--text-primary);
+  }
+  
+  .no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+  }
+  
+  .no-results h3 {
+    font-size: 2em;
+    margin-bottom: 15px;
+  }
+</style>
+
+<div class="video-hero">
+  <h1>🎥 Video Tutorials</h1>
+  <p>Khám phá các video hướng dẫn chi tiết về chăm sóc cây cà chua và nhận diện bệnh</p>
+  
+  <div class="video-search">
+    <form method="GET" action="{{ url_for('video_tutorials') }}">
+      <input type="text" name="q" placeholder="Tìm kiếm video..." value="{{ search_query or '' }}">
+      <button type="submit">🔍 Tìm kiếm</button>
+    </form>
+  </div>
+</div>
+
+<div class="video-filters">
+  <form method="GET" action="{{ url_for('video_tutorials') }}" style="display: contents;">
+    <input type="hidden" name="q" value="{{ search_query or '' }}">
+    
+    <select name="category" class="filter-select" onchange="this.form.submit()">
+      <option value="">Tất cả danh mục</option>
+      {% for cat in categories %}
+        <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>
+          {{ cat|replace('_', ' ')|title }}
+        </option>
+      {% endfor %}
+    </select>
+    
+    <select name="level" class="filter-select" onchange="this.form.submit()">
+      <option value="">Tất cả cấp độ</option>
+      {% for lv in levels %}
+        <option value="{{ lv }}" {% if lv == selected_level %}selected{% endif %}>
+          {{ lv|title }}
+        </option>
+      {% endfor %}
+    </select>
+    
+    <select name="sort" class="filter-select" onchange="this.form.submit()">
+      <option value="popular" {% if sort_by == 'popular' %}selected{% endif %}>Phổ biến nhất</option>
+      <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Mới nhất</option>
+      <option value="likes" {% if sort_by == 'likes' %}selected{% endif %}>Nhiều lượt thích</option>
+    </select>
+  </form>
+</div>
+
+{% if tutorials %}
+  <div class="video-grid">
+    {% for tutorial in tutorials %}
+      <a href="{{ url_for('video_tutorial_detail', tutorial_id=tutorial.id) }}" style="text-decoration: none;">
+        <div class="video-card">
+          <div class="video-thumbnail">
+            <img src="https://img.youtube.com/vi/{{ tutorial.youtube_id }}/maxresdefault.jpg" 
+                 onerror="this.src='https://img.youtube.com/vi/{{ tutorial.youtube_id }}/hqdefault.jpg'"
+                 alt="{{ tutorial.title }}">
+            <div class="video-play-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
+              </svg>
+            </div>
+            <div class="video-duration">{{ tutorial.duration }}</div>
+          </div>
+          <div class="video-info">
+            <h3 class="video-title">{{ tutorial.title }}</h3>
+            <div class="video-instructor">👨‍🏫 {{ tutorial.instructor }}</div>
+            <span class="video-badge badge-{{ tutorial.level }}">{{ tutorial.level }}</span>
+            <div class="video-meta">
+              <div class="video-stats">
+                <span>👁️ {{ tutorial.views }}</span>
+                <span>❤️ {{ tutorial.likes }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="no-results">
+    <h3>😔 Không tìm thấy video</h3>
+    <p>Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc</p>
+  </div>
+{% endif %}
+
+{% if popular_tutorials and not search_query %}
+  <div class="sidebar">
+    <div class="popular-videos">
+      <h2>🔥 Video phổ biến</h2>
+      <div class="video-grid">
+        {% for tutorial in popular_tutorials[:3] %}
+          <a href="{{ url_for('video_tutorial_detail', tutorial_id=tutorial.id) }}" style="text-decoration: none;">
+            <div class="video-card">
+              <div class="video-thumbnail">
+                <img src="https://img.youtube.com/vi/{{ tutorial.youtube_id }}/maxresdefault.jpg" 
+                     onerror="this.src='https://img.youtube.com/vi/{{ tutorial.youtube_id }}/hqdefault.jpg'"
+                     alt="{{ tutorial.title }}">
+                <div class="video-play-icon">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
+                  </svg>
+                </div>
+                <div class="video-duration">{{ tutorial.duration }}</div>
+              </div>
+              <div class="video-info">
+                <h3 class="video-title">{{ tutorial.title }}</h3>
+                <div class="video-instructor">👨‍🏫 {{ tutorial.instructor }}</div>
+                <div class="video-meta">
+                  <div class="video-stats">
+                    <span>👁️ {{ tutorial.views }}</span>
+                    <span>❤️ {{ tutorial.likes }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}

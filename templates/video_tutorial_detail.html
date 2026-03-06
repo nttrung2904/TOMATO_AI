@@ -1,0 +1,454 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ tutorial.title }} - Video Tutorial{% endblock %}
+
+{% block content %}
+<style>
+  .tutorial-detail {
+    max-width: 1400px;
+    margin: 30px auto;
+    padding: 0 20px;
+  }
+  
+  .tutorial-container {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+  
+  @media (max-width: 968px) {
+    .tutorial-container {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .video-player {
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  }
+  
+  .video-player iframe {
+    width: 100%;
+    height: 600px;
+    border: none;
+  }
+  
+  @media (max-width: 768px) {
+    .video-player iframe {
+      height: 400px;
+    }
+  }
+  
+  .video-details {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-top: 20px;
+  }
+  
+  [data-theme="dark"] .video-details {
+    background: var(--bg-secondary);
+  }
+  
+  .tutorial-title {
+    font-size: 2em;
+    font-weight: 800;
+    margin: 0 0 15px 0;
+    color: #333;
+    line-height: 1.3;
+  }
+  
+  [data-theme="dark"] .tutorial-title {
+    color: var(--text-primary);
+  }
+  
+  .tutorial-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    color: #666;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  [data-theme="dark"] .tutorial-meta {
+    color: var(--text-secondary);
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .tutorial-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .tutorial-description {
+    font-size: 1.1em;
+    line-height: 1.8;
+    color: #555;
+    margin-bottom: 25px;
+  }
+  
+  [data-theme="dark"] .tutorial-description {
+    color: var(--text-secondary);
+  }
+  
+  .tutorial-actions {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  
+  .btn-like {
+    padding: 12px 24px;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    background: white;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  [data-theme="dark"] .btn-like {
+    background: var(--bg-tertiary);
+    border-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .btn-like:hover {
+    border-color: #f5576c;
+    background: #fff5f7;
+  }
+  
+  .btn-like.liked {
+    border-color: #f5576c;
+    background: #f5576c;
+    color: white;
+  }
+  
+  .tutorial-tags {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  
+  .tag {
+    padding: 8px 16px;
+    background: #f0f0f0;
+    border-radius: 20px;
+    font-size: 0.9em;
+    color: #666;
+  }
+  
+  [data-theme="dark"] .tag {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .sidebar-widget {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  
+  [data-theme="dark"] .sidebar-widget {
+    background: var(--bg-secondary);
+  }
+  
+  .sidebar-widget h3 {
+    font-size: 1.3em;
+    margin: 0 0 20px 0;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .sidebar-widget h3 {
+    color: var(--text-primary);
+  }
+  
+  .related-video {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s;
+  }
+  
+  [data-theme="dark"] .related-video {
+    border-bottom-color: var(--bg-tertiary);
+  }
+  
+  .related-video:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  
+  .related-video:hover {
+    opacity: 0.8;
+  }
+  
+  .related-thumbnail {
+    width: 120px;
+    height: 68px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+  }
+  
+  .related-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .related-info {
+    flex: 1;
+  }
+  
+  .related-title {
+    font-size: 0.95em;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    color: #333;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  [data-theme="dark"] .related-title {
+    color: var(--text-primary);
+  }
+  
+  .related-stats {
+    font-size: 0.8em;
+    color: #888;
+  }
+  
+  [data-theme="dark"] .related-stats {
+    color: var(--text-tertiary);
+  }
+  
+  .instructor-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-top: 20px;
+  }
+  
+  [data-theme="dark"] .instructor-info {
+    background: var(--bg-tertiary);
+  }
+  
+  .instructor-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+  }
+  
+  .instructor-details h4 {
+    margin: 0 0 5px 0;
+    font-size: 1.1em;
+    color: #333;
+  }
+  
+  [data-theme="dark"] .instructor-details h4 {
+    color: var(--text-primary);
+  }
+  
+  .instructor-details p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9em;
+  }
+  
+  [data-theme="dark"] .instructor-details p {
+    color: var(--text-secondary);
+  }
+  
+  .level-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .level-beginner {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
+  
+  .level-intermediate {
+    background: #fff3e0;
+    color: #f57c00;
+  }
+  
+  .level-advanced {
+    background: #fce4ec;
+    color: #c2185b;
+  }
+</style>
+
+<div class="tutorial-detail">
+  <div class="tutorial-container">
+    <div class="main-content">
+      <div class="video-player">
+        <iframe 
+          src="https://www.youtube.com/embed/{{ tutorial.youtube_id }}?rel=0&modestbranding=1"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+      
+      <div class="video-details">
+        <h1 class="tutorial-title">{{ tutorial.title }}</h1>
+        
+        <div class="tutorial-meta">
+          <div class="tutorial-meta-item">
+            <span>👁️</span>
+            <span>{{ tutorial.views }} lượt xem</span>
+          </div>
+          <div class="tutorial-meta-item">
+            <span>❤️</span>
+            <span id="likes-count">{{ tutorial.likes }}</span>
+            <span>lượt thích</span>
+          </div>
+          <div class="tutorial-meta-item">
+            <span>⏱️</span>
+            <span>{{ tutorial.duration }}</span>
+          </div>
+          <div class="tutorial-meta-item">
+            <span class="level-badge level-{{ tutorial.level }}">
+              {{ tutorial.level }}
+            </span>
+          </div>
+        </div>
+        
+        <p class="tutorial-description">{{ tutorial.description }}</p>
+        
+        <div class="tutorial-actions">
+          {% if session.get('user_id') %}
+            <button class="btn-like {% if user_liked %}liked{% endif %}" id="like-btn" onclick="toggleLike('{{ tutorial.id }}')">
+              <span id="like-icon">{% if user_liked %}❤️{% else %}🤍{% endif %}</span>
+              <span>{{ 'Đã thích' if user_liked else 'Thích' }}</span>
+            </button>
+          {% else %}
+            <button class="btn-like" onclick="alert('Vui lòng đăng nhập để thích video'); window.location.href='{{ url_for('login') }}'">
+              <span>🤍</span>
+              <span>Thích</span>
+            </button>
+          {% endif %}
+        </div>
+        
+        <div class="instructor-info">
+          <div class="instructor-avatar">👨‍🏫</div>
+          <div class="instructor-details">
+            <h4>{{ tutorial.instructor }}</h4>
+            <p>Giảng viên</p>
+          </div>
+        </div>
+        
+        {% if tutorial.tags %}
+          <div class="tutorial-tags">
+            {% for tag in tutorial.tags %}
+              <span class="tag">🏷️ {{ tag }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div class="sidebar">
+      {% if related_tutorials %}
+        <div class="sidebar-widget">
+          <h3>📚 Video liên quan</h3>
+          {% for related in related_tutorials %}
+            <a href="{{ url_for('video_tutorial_detail', tutorial_id=related.id) }}" class="related-video">
+              <div class="related-thumbnail">
+                <img src="https://img.youtube.com/vi/{{ related.youtube_id }}/mqdefault.jpg" alt="{{ related.title }}">
+              </div>
+              <div class="related-info">
+                <h4 class="related-title">{{ related.title }}</h4>
+                <div class="related-stats">
+                  👁️ {{ related.views }} • ❤️ {{ related.likes }}
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleLike(tutorialId) {
+  fetch(`/api/video/${tutorialId}/like`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      const likeBtn = document.getElementById('like-btn');
+      const likeIcon = document.getElementById('like-icon');
+      const likesCount = document.getElementById('likes-count');
+      
+      if (data.liked) {
+        likeBtn.classList.add('liked');
+        likeIcon.textContent = '❤️';
+        likeBtn.querySelector('span:last-child').textContent = 'Đã thích';
+      } else {
+        likeBtn.classList.remove('liked');
+        likeIcon.textContent = '🤍';
+        likeBtn.querySelector('span:last-child').textContent = 'Thích';
+      }
+      
+      likesCount.textContent = data.likes;
+    } else {
+      alert(data.message || 'Có lỗi xảy ra');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Có lỗi xảy ra khi thích video');
+  });
+}
+</script>
+
+{% endblock %}
