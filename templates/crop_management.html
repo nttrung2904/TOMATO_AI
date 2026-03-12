@@ -1,0 +1,1086 @@
+{% extends 'base.html' %}
+
+{% block title %}Quản lý mùa vụ - Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .crop-container {
+    max-width: 1400px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .crop-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .crop-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+
+  [data-theme="dark"] .crop-header h1 {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .crop-header p {
+    color: #6b7280;
+    font-size: 1.1rem;
+  }
+
+  [data-theme="dark"] .crop-header p {
+    color: #9ca3af;
+  }
+
+  .crop-actions {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: #10b981;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+  }
+
+  .filter-tab {
+    padding: 10px 20px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: #6b7280;
+  }
+
+  [data-theme="dark"] .filter-tab {
+    background: #374151;
+    border-color: #4b5563;
+    color: #9ca3af;
+  }
+
+  .filter-tab.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+  }
+
+  .filter-tab:hover:not(.active) {
+    border-color: #10b981;
+    color: #10b981;
+  }
+
+  .crops-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+  }
+
+  .crop-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  [data-theme="dark"] .crop-card {
+    background: #1f2937;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  }
+
+  .crop-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  }
+
+  .crop-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #10b981, #059669);
+  }
+
+  .crop-card.status-planning::before { background: #6b7280; }
+  .crop-card.status-growing::before { background: #10b981; }
+  .crop-card.status-harvested::before { background: #3b82f6; }
+
+  .crop-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+  }
+
+  .crop-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 5px;
+  }
+
+  [data-theme="dark"] .crop-title {
+    color: #f9fafb;
+  }
+
+  .crop-variety {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  [data-theme="dark"] .crop-variety {
+    color: #9ca3af;
+  }
+
+  .status-badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-badge.planning {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  .status-badge.growing {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .status-badge.harvested {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  [data-theme="dark"] .status-badge.planning {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  [data-theme="dark"] .status-badge.growing {
+    background: #064e3b;
+    color: #6ee7b7;
+  }
+
+  [data-theme="dark"] .status-badge.harvested {
+    background: #1e3a8a;
+    color: #93c5fd;
+  }
+
+  .crop-info {
+    margin: 15px 0;
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 10px 0;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.95rem;
+  }
+
+  [data-theme="dark"] .info-row {
+    border-bottom-color: #374151;
+  }
+
+  .info-row:last-child {
+    border-bottom: none;
+  }
+
+  .info-label {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  [data-theme="dark"] .info-label {
+    color: #9ca3af;
+  }
+
+  .info-value {
+    color: #111827;
+    font-weight: 600;
+  }
+
+  [data-theme="dark"] .info-value {
+    color: #f9fafb;
+  }
+
+  .health-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .health-dot.healthy { background: #10b981; }
+  .health-dot.monitoring { background: #f59e0b; }
+  .health-dot.diseased { background: #ef4444; }
+
+  .crop-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  [data-theme="dark"] .crop-card-actions {
+    border-top-color: #374151;
+  }
+
+  .btn-small {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    flex: 1;
+  }
+
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+
+  .btn-danger {
+    background: #ef4444;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #dc2626;
+  }
+
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+  }
+
+  .modal.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    margin: 20px;
+  }
+
+  [data-theme="dark"] .modal-content {
+    background: #1f2937;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .modal-header h2 {
+    color: #f9fafb;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  [data-theme="dark"] .form-group label {
+    color: #d1d5db;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select,
+  [data-theme="dark"] .form-group textarea {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+
+  .form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  .section-divider {
+    margin: 30px 0;
+    border-top: 2px solid #e5e7eb;
+    padding-top: 20px;
+  }
+
+  [data-theme="dark"] .section-divider {
+    border-top-color: #374151;
+  }
+
+  .section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .section-title {
+    color: #f9fafb;
+  }
+
+  .activities-list,
+  .expenses-list {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .activity-item,
+  .expense-item {
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+
+  [data-theme="dark"] .activity-item,
+  [data-theme="dark"] .expense-item {
+    background: #374151;
+  }
+
+  .activity-date,
+  .expense-date {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 5px;
+  }
+
+  .activity-text,
+  .expense-text {
+    font-weight: 600;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .activity-text,
+  [data-theme="dark"] .expense-text {
+    color: #f9fafb;
+  }
+
+  .activity-note,
+  .expense-note {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 5px;
+  }
+
+  .expense-amount {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ef4444;
+  }
+
+  .total-expenses {
+    padding: 15px;
+    background: #fef2f2;
+    border-radius: 8px;
+    margin-top: 15px;
+    text-align: center;
+  }
+
+  [data-theme="dark"] .total-expenses {
+    background: #7f1d1d;
+  }
+
+  .total-expenses-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  .total-expenses-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #ef4444;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+  }
+
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+  }
+
+  .empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .crop-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .filter-tabs {
+      margin-left: 0;
+    }
+
+    .crops-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="crop-container">
+  <div class="crop-header">
+    <h1>🌱 Quản lý mùa vụ cà chua</h1>
+    <p>Theo dõi và quản lý các mùa vụ trồng cà chua của bạn</p>
+  </div>
+
+  <div class="crop-actions">
+    <button class="btn btn-primary" onclick="openAddCropModal()">
+      <span>➕</span>
+      <span>Thêm mùa vụ mới</span>
+    </button>
+
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-status="">Tất cả</button>
+      <button class="filter-tab" data-status="planning">Lên kế hoạch</button>
+      <button class="filter-tab" data-status="growing">Đang trồng</button>
+      <button class="filter-tab" data-status="harvested">Đã thu hoạch</button>
+    </div>
+  </div>
+
+  <div class="crops-grid" id="cropsGrid">
+    <div class="empty-state">
+      <div class="empty-state-icon">🌱</div>
+      <p>Đang tải dữ liệu...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Crop Modal -->
+<div class="modal" id="cropModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Thêm mùa vụ mới</h2>
+      <button class="modal-close" onclick="closeCropModal()">&times;</button>
+    </div>
+    
+    <form id="cropForm" onsubmit="submitCrop(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tên cà chua *</label>
+          <input type="text" id="cropName" placeholder="VD: Cà chua Cherry" required>
+        </div>
+        <div class="form-group">
+          <label>Giống *</label>
+          <select id="variety" required>
+            <option value="">Chọn giống...</option>
+            <option value="Cherry Tomato">Cherry (Cà chua bi)</option>
+            <option value="Beefsteak Tomato">Beefsteak (Bò)</option>
+            <option value="Roma VF">Roma VF</option>
+            <option value="Plum Tomato">Plum (Mận)</option>
+            <option value="Grape Tomato">Grape (Nho)</option>
+            <option value="Campari Tomato">Campari</option>
+            <option value="Heirloom Tomato">Heirloom (Truyền thống)</option>
+            <option value="Hybrid F1">Hybrid F1 (Lai)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Diện tích *</label>
+          <input type="text" id="area" placeholder="VD: 500 m², 2 hecta" required>
+        </div>
+        <div class="form-group">
+          <label>Vị trí</label>
+          <input type="text" id="location" placeholder="VD: Nhà kính 1, Luống A1">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ngày gieo trồng *</label>
+          <input type="date" id="plantingDate" required>
+        </div>
+        <div class="form-group">
+          <label>Dự kiến thu hoạch *</label>
+          <input type="date" id="expectedHarvest" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Trạng thái</label>
+          <select id="status">
+            <option value="planning">Lên kế hoạch</option>
+            <option value="growing">Đang trồng</option>
+            <option value="harvested">Đã thu hoạch</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Giai đoạn</label>
+          <select id="stage">
+            <option value="seedling">Gieo hạt/Ươm</option>
+            <option value="vegetative">Sinh trưởng</option>
+            <option value="flowering">Ra hoa</option>
+            <option value="fruiting">Kết trái</option>
+            <option value="completed">Hoàn thành</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Mục tiêu năng suất</label>
+        <input type="text" id="yieldTarget" placeholder="VD: 2000 kg, 5 tấn">
+      </div>
+
+      <div class="form-group">
+        <label>Ghi chú</label>
+        <textarea id="notes" placeholder="Ghi chú thêm về mùa vụ..."></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeCropModal()">Hủy</button>
+        <button type="submit" class="btn btn-primary">💾 Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Crop Detail Modal -->
+<div class="modal" id="detailModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="detailTitle">Chi tiết mùa vụ</h2>
+      <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+    </div>
+    
+    <div id="detailContent">
+      <!-- Will be populated by JavaScript -->
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFilter = '';
+let allCrops = [];
+let editingCropId = null;
+
+// Load crops
+async function loadCrops() {
+  try {
+    let url = '/api/crops';
+    if (currentFilter) {
+      url += `?status=${currentFilter}`;
+    }
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.ok) {
+      allCrops = data.crops;
+      displayCrops(allCrops);
+    }
+  } catch (error) {
+    console.error('Error loading crops:', error);
+    document.getElementById('cropsGrid').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <p>Không thể tải dữ liệu mùa vụ</p>
+      </div>
+    `;
+  }
+}
+
+// Display crops
+function displayCrops(crops) {
+  const grid = document.getElementById('cropsGrid');
+  
+  if (crops.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🌱</div>
+        <p>Chưa có mùa vụ nào</p>
+        <button class="btn btn-primary" onclick="openAddCropModal()">
+          <span>➕</span>
+          <span>Thêm mùa vụ đầu tiên</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+  
+  grid.innerHTML = crops.map(crop => {
+    const statusText = {
+      'planning': 'Lên kế hoạch',
+      'growing': 'Đang trồng',
+      'harvested': 'Đã thu hoạch'
+    }[crop.status] || crop.status;
+    
+    const healthText = {
+      'healthy': 'Khỏe mạnh',
+      'monitoring': 'Theo dõi',
+      'diseased': 'Bệnh'
+    }[crop.health_status] || crop.health_status;
+    
+    return `
+      <div class="crop-card status-${crop.status}">
+        <div class="crop-card-header">
+          <div>
+            <div class="crop-title">${crop.crop_name}</div>
+            <div class="crop-variety">${crop.variety}</div>
+          </div>
+          <span class="status-badge ${crop.status}">${statusText}</span>
+        </div>
+        
+        <div class="crop-info">
+          <div class="info-row">
+            <span class="info-label">📏 Diện tích:</span>
+            <span class="info-value">${crop.area}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">📅 Ngày trồng:</span>
+            <span class="info-value">${new Date(crop.planting_date).toLocaleDateString('vi-VN')}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">🎯 Dự kiến:</span>
+            <span class="info-value">${new Date(crop.expected_harvest).toLocaleDateString('vi-VN')}</span>
+          </div>
+          ${crop.location ? `
+          <div class="info-row">
+            <span class="info-label">📍 Vị trí:</span>
+            <span class="info-value">${crop.location}</span>
+          </div>
+          ` : ''}
+          <div class="info-row">
+            <span class="info-label">💚 Tình trạng:</span>
+            <span class="health-status">
+              <span class="health-dot ${crop.health_status}"></span>
+              <span class="info-value">${healthText}</span>
+            </span>
+          </div>
+        </div>
+        
+        <div class="crop-card-actions">
+          <button class="btn btn-primary btn-small" onclick="viewCropDetail('${crop.id}')">
+            👁️ Chi tiết
+          </button>
+          <button class="btn btn-secondary btn-small" onclick="editCrop('${crop.id}')">
+            ✏️ Sửa
+          </button>
+          <button class="btn btn-danger btn-small" onclick="deleteCrop('${crop.id}', '${crop.crop_name}')">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Open add crop modal
+function openAddCropModal() {
+  editingCropId = null;
+  document.getElementById('modalTitle').textContent = 'Thêm mùa vụ mới';
+  document.getElementById('cropForm').reset();
+  
+  // Set default dates
+  const today = new Date().toISOString().split('T')[0];
+  const futureDate = new Date();
+  futureDate.setMonth(futureDate.getMonth() + 3);
+  const future = futureDate.toISOString().split('T')[0];
+  
+  document.getElementById('plantingDate').value = today;
+  document.getElementById('expectedHarvest').value = future;
+  
+  document.getElementById('cropModal').classList.add('active');
+}
+
+// Close crop modal
+function closeCropModal() {
+  document.getElementById('cropModal').classList.remove('active');
+  editingCropId = null;
+}
+
+// Submit crop
+async function submitCrop(event) {
+  event.preventDefault();
+  
+  const cropData = {
+    crop_name: document.getElementById('cropName').value,
+    variety: document.getElementById('variety').value,
+    area: document.getElementById('area').value,
+    location: document.getElementById('location').value,
+    planting_date: document.getElementById('plantingDate').value,
+    expected_harvest: document.getElementById('expectedHarvest').value,
+    status: document.getElementById('status').value,
+    stage: document.getElementById('stage').value,
+    yield_target: document.getElementById('yieldTarget').value,
+    notes: document.getElementById('notes').value
+  };
+
+  try {
+    let url, method;
+    if (editingCropId) {
+      url = `/api/crops/${editingCropId}/update`;
+      method = 'POST';
+    } else {
+      url = '/api/crops/add';
+      method = 'POST';
+    }
+
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(cropData)
+    });
+
+    const data = await response.json();
+
+    if (data.ok) {
+      if (window.showToast) {
+        window.showToast('✅ ' + data.message, 'success');
+      } else {
+        alert(data.message);
+      }
+      closeCropModal();
+      loadCrops();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (error) {
+    console.error('Error saving crop:', error);
+    if (window.showToast) {
+      window.showToast('❌ ' + error.message, 'error');
+    } else {
+      alert('Lỗi: ' + error.message);
+    }
+  }
+}
+
+// View crop detail
+async function viewCropDetail(cropId) {
+  try {
+    const response = await fetch(`/api/crops/${cropId}`);
+    const data = await response.json();
+    
+    if (data.ok) {
+      const crop = data.crop;
+      
+      // Calculate total expenses
+      const totalExpenses = crop.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      
+      // Build detail HTML
+      const detailHTML = `
+        <div class="crop-info">
+          <div class="info-row">
+            <span class="info-label">Tên cà chua:</span>
+            <span class="info-value">${crop.crop_name}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Giống:</span>
+            <span class="info-value">${crop.variety}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Diện tích:</span>
+            <span class="info-value">${crop.area}</span>
+          </div>
+          ${crop.location ? `
+          <div class="info-row">
+            <span class="info-label">Vị trí:</span>
+            <span class="info-value">${crop.location}</span>
+          </div>
+          ` : ''}
+          <div class="info-row">
+            <span class="info-label">Ngày trồng:</span>
+            <span class="info-value">${new Date(crop.planting_date).toLocaleDateString('vi-VN')}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Dự kiến thu hoạch:</span>
+            <span class="info-value">${new Date(crop.expected_harvest).toLocaleDateString('vi-VN')}</span>
+          </div>
+          ${crop.actual_harvest ? `
+          <div class="info-row">
+            <span class="info-label">Thu hoạch thực tế:</span>
+            <span class="info-value">${new Date(crop.actual_harvest).toLocaleDateString('vi-VN')}</span>
+          </div>
+          ` : ''}
+          ${crop.yield_target ? `
+          <div class="info-row">
+            <span class="info-label">Mục tiêu năng suất:</span>
+            <span class="info-value">${crop.yield_target}</span>
+          </div>
+          ` : ''}
+          ${crop.yield_actual ? `
+          <div class="info-row">
+            <span class="info-label">Năng suất thực tế:</span>
+            <span class="info-value">${crop.yield_actual}</span>
+          </div>
+          ` : ''}
+          ${crop.notes ? `
+          <div class="info-row">
+            <span class="info-label">Ghi chú:</span>
+            <span class="info-value">${crop.notes}</span>
+          </div>
+          ` : ''}
+        </div>
+
+        <div class="section-divider">
+          <h3 class="section-title">📝 Hoạt động (${crop.activities.length})</h3>
+          <div class="activities-list">
+            ${crop.activities.length > 0 ? crop.activities.map(act => `
+              <div class="activity-item">
+                <div class="activity-date">📅 ${new Date(act.date).toLocaleDateString('vi-VN')}</div>
+                <div class="activity-text">${act.activity}</div>
+                ${act.note ? `<div class="activity-note">${act.note}</div>` : ''}
+              </div>
+            `).join('') : '<p style="color: #6b7280;">Chưa có hoạt động nào</p>'}
+          </div>
+        </div>
+
+        <div class="section-divider">
+          <h3 class="section-title">💰 Chi phí (${crop.expenses.length})</h3>
+          <div class="expenses-list">
+            ${crop.expenses.length > 0 ? crop.expenses.map(exp => `
+              <div class="expense-item">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div class="expense-date">📅 ${new Date(exp.date).toLocaleDateString('vi-VN')}</div>
+                    <div class="expense-text">${exp.type}</div>
+                    ${exp.note ? `<div class="expense-note">${exp.note}</div>` : ''}
+                  </div>
+                  <div class="expense-amount">${exp.amount.toLocaleString('vi-VN')}đ</div>
+                </div>
+              </div>
+            `).join('') : '<p style="color: #6b7280;">Chưa có chi phí nào</p>'}
+          </div>
+          ${crop.expenses.length > 0 ? `
+          <div class="total-expenses">
+            <div class="total-expenses-label">Tổng chi phí</div>
+            <div class="total-expenses-value">${totalExpenses.toLocaleString('vi-VN')}đ</div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+      
+      document.getElementById('detailTitle').textContent = crop.crop_name;
+      document.getElementById('detailContent').innerHTML = detailHTML;
+      document.getElementById('detailModal').classList.add('active');
+    }
+  } catch (error) {
+    console.error('Error loading crop detail:', error);
+    if (window.showToast) {
+      window.showToast('❌ Không thể tải chi tiết', 'error');
+    }
+  }
+}
+
+// Close detail modal
+function closeDetailModal() {
+  document.getElementById('detailModal').classList.remove('active');
+}
+
+// Edit crop
+async function editCrop(cropId) {
+  try {
+    const response = await fetch(`/api/crops/${cropId}`);
+    const data = await response.json();
+    
+    if (data.ok) {
+      const crop = data.crop;
+      editingCropId = cropId;
+      
+      document.getElementById('modalTitle').textContent = 'Chỉnh sửa mùa vụ';
+      document.getElementById('cropName').value = crop.crop_name;
+      document.getElementById('variety').value = crop.variety;
+      document.getElementById('area').value = crop.area;
+      document.getElementById('location').value = crop.location || '';
+      document.getElementById('plantingDate').value = crop.planting_date;
+      document.getElementById('expectedHarvest').value = crop.expected_harvest;
+      document.getElementById('status').value = crop.status;
+      document.getElementById('stage').value = crop.stage;
+      document.getElementById('yieldTarget').value = crop.yield_target || '';
+      document.getElementById('notes').value = crop.notes || '';
+      
+      document.getElementById('cropModal').classList.add('active');
+    }
+  } catch (error) {
+    console.error('Error loading crop for edit:', error);
+  }
+}
+
+// Delete crop
+async function deleteCrop(cropId, cropName) {
+  if (!confirm(`Bạn có chắc muốn xóa mùa vụ "${cropName}"?\nHành động này không thể hoàn tác.`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/crops/${cropId}/delete`, {
+      method: 'POST'
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      if (window.showToast) {
+        window.showToast('✅ ' + data.message, 'success');
+      } else {
+        alert(data.message);
+      }
+      loadCrops();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (error) {
+    console.error('Error deleting crop:', error);
+    if (window.showToast) {
+      window.showToast('❌ ' + error.message, 'error');
+    }
+  }
+}
+
+// Filter tabs
+document.querySelectorAll('.filter-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    currentFilter = this.getAttribute('data-status');
+    loadCrops();
+  });
+});
+
+// Close modals on background click
+document.getElementById('cropModal').addEventListener('click', function(e) {
+  if (e.target.id === 'cropModal') {
+    closeCropModal();
+  }
+});
+
+document.getElementById('detailModal').addEventListener('click', function(e) {
+  if (e.target.id === 'detailModal') {
+    closeDetailModal();
+  }
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', loadCrops);
+</script>
+
+{% endblock %}

@@ -8289,6 +8289,339 @@ def api_update_outbreak_status(outbreak_id):
         return jsonify({'ok': False, 'error': 'Không thể cập nhật'}), 500
 
 
+# ==================== CROP MANAGEMENT SYSTEM ROUTES ====================
+
+@app.route('/crop-management')
+@login_required
+def crop_management():
+    """Crop management page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+    
+    return render_template('crop_management.html')
+
+@app.route('/api/crops', methods=['GET'])
+@login_required
+def api_get_crops():
+    """Get user's crops"""
+    try:
+        user_id = session.get('user_id')
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        crops = []
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop.get('user_id') == user_id:
+                                crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        # Sort by planting_date descending
+        crops.sort(key=lambda x: x.get('planting_date', ''), reverse=True)
+        
+        # Filter by status if provided
+        status = request.args.get('status')
+        if status:
+            crops = [c for c in crops if c.get('status') == status]
+        
+        return jsonify({
+            'ok': True,
+            'crops': crops,
+            'total': len(crops)
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error getting crops: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/crops/add', methods=['POST'])
+@login_required
+def api_add_crop():
+    """Add new crop"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['crop_name', 'variety', 'area', 'planting_date', 'expected_harvest']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'ok': False, 'error': f'Thiếu thông tin: {field}'}), 400
+        
+        # Create crop record
+        crop_id = f"crop{random.randint(1000, 9999)}"
+        crop = {
+            'id': crop_id,
+            'user_id': user_id,
+            'crop_name': data['crop_name'],
+            'variety': data['variety'],
+            'area': data['area'],
+            'planting_date': data['planting_date'],
+            'expected_harvest': data['expected_harvest'],
+            'actual_harvest': None,
+            'status': data.get('status', 'planning'),  # planning, growing, harvested
+            'stage': data.get('stage', 'seedling'),  # seedling, vegetative, flowering, fruiting, completed
+            'health_status': 'healthy',  # healthy, monitoring, diseased
+            'yield_target': data.get('yield_target', ''),
+            'yield_actual': None,
+            'location': data.get('location', ''),
+            'notes': data.get('notes', ''),
+            'expenses': [],
+            'activities': [],
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        # Add initial activity
+        if data.get('planting_date'):
+            crop['activities'].append({
+                'date': data['planting_date'],
+                'activity': 'Bắt đầu mùa vụ',
+                'note': f"Khởi tạo mùa vụ {data['crop_name']}"
+            })
+        
+        # Save to file
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        with open(crops_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'New crop added: {crop_id} by user {user_id}')
+        
+        return jsonify({
+            'ok': True,
+            'crop': crop,
+            'message': 'Đã thêm mùa vụ mới'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error adding crop: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể thêm mùa vụ'}), 500
+
+@app.route('/api/crops/<crop_id>', methods=['GET'])
+@login_required
+def api_get_crop_detail(crop_id):
+    """Get crop detail"""
+    try:
+        user_id = session.get('user_id')
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                return jsonify({'ok': True, 'crop': crop})
+                        except json.JSONDecodeError:
+                            continue
+        
+        return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+    
+    except Exception as e:
+        app.logger.error(f'Error getting crop detail: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/crops/<crop_id>/update', methods=['POST'])
+@login_required
+def api_update_crop(crop_id):
+    """Update crop information"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        updated_crops = []
+        found = False
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                # Update fields
+                                for key in ['crop_name', 'variety', 'area', 'location', 'notes', 
+                                           'status', 'stage', 'health_status', 'yield_target', 
+                                           'yield_actual', 'actual_harvest', 'expected_harvest']:
+                                    if key in data:
+                                        crop[key] = data[key]
+                                crop['updated_at'] = datetime.utcnow().isoformat()
+                                found = True
+                            updated_crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        # Write back
+        with open(crops_file, 'w', encoding='utf-8') as f:
+            for crop in updated_crops:
+                f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        return jsonify({
+            'ok': True,
+            'message': 'Đã cập nhật thông tin mùa vụ'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error updating crop: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể cập nhật'}), 500
+
+@app.route('/api/crops/<crop_id>/activity', methods=['POST'])
+@login_required
+def api_add_crop_activity(crop_id):
+    """Add activity to crop"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        if not data.get('activity'):
+            return jsonify({'ok': False, 'error': 'Thiếu thông tin hoạt động'}), 400
+        
+        new_activity = {
+            'date': data.get('date', datetime.utcnow().strftime('%Y-%m-%d')),
+            'activity': data['activity'],
+            'note': data.get('note', '')
+        }
+        
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        updated_crops = []
+        found = False
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                crop['activities'].append(new_activity)
+                                crop['updated_at'] = datetime.utcnow().isoformat()
+                                found = True
+                            updated_crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        # Write back
+        with open(crops_file, 'w', encoding='utf-8') as f:
+            for crop in updated_crops:
+                f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        return jsonify({
+            'ok': True,
+            'activity': new_activity,
+            'message': 'Đã thêm hoạt động'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error adding activity: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể thêm hoạt động'}), 500
+
+@app.route('/api/crops/<crop_id>/expense', methods=['POST'])
+@login_required
+def api_add_crop_expense(crop_id):
+    """Add expense to crop"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        if not data.get('type') or not data.get('amount'):
+            return jsonify({'ok': False, 'error': 'Thiếu thông tin chi phí'}), 400
+        
+        new_expense = {
+            'date': data.get('date', datetime.utcnow().strftime('%Y-%m-%d')),
+            'type': data['type'],
+            'amount': float(data['amount']),
+            'note': data.get('note', '')
+        }
+        
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        updated_crops = []
+        found = False
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                crop['expenses'].append(new_expense)
+                                crop['updated_at'] = datetime.utcnow().isoformat()
+                                found = True
+                            updated_crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        # Write back
+        with open(crops_file, 'w', encoding='utf-8') as f:
+            for crop in updated_crops:
+                f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        return jsonify({
+            'ok': True,
+            'expense': new_expense,
+            'message': 'Đã thêm chi phí'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error adding expense: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể thêm chi phí'}), 500
+
+@app.route('/api/crops/<crop_id>/delete', methods=['POST'])
+@login_required
+def api_delete_crop(crop_id):
+    """Delete crop"""
+    try:
+        user_id = session.get('user_id')
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        remaining_crops = []
+        found = False
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                found = True
+                                continue  # Skip this crop (delete it)
+                            remaining_crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        # Write back
+        with open(crops_file, 'w', encoding='utf-8') as f:
+            for crop in remaining_crops:
+                f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        return jsonify({
+            'ok': True,
+            'message': 'Đã xóa mùa vụ'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error deleting crop: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể xóa'}), 500
+
+
 @app.route('/history/clear', methods=['POST'])
 def clear_history():
     """Xóa lịch sử dự đoán"""
