@@ -1,0 +1,778 @@
+{% extends 'base.html' %}
+
+{% block title %}Bản đồ dịch bệnh - Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .outbreak-container {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .outbreak-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  [data-theme="dark"] .outbreak-header {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+  }
+
+  .outbreak-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .outbreak-header p {
+    margin: 0;
+    opacity: 0.9;
+  }
+
+  .outbreak-controls {
+    background: white;
+    padding: 15px 20px;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  [data-theme="dark"] .outbreak-controls {
+    background: #1f2937;
+    border-bottom-color: #374151;
+  }
+
+  .filter-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .filter-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+
+  [data-theme="dark"] .filter-group label {
+    color: #d1d5db;
+  }
+
+  .filter-group select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+  }
+
+  [data-theme="dark"] .filter-group select {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+
+  .btn-report {
+    margin-left: auto;
+    padding: 10px 20px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-report:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  .map-container {
+    flex: 1;
+    position: relative;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  .legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+  }
+
+  [data-theme="dark"] .legend {
+    background: #1f2937;
+    border: 1px solid #374151;
+  }
+
+  .legend h4 {
+    margin: 0 0 10px 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .legend h4 {
+    color: #f9fafb;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+  }
+
+  .legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  .severity-low { background: #10b981; }
+  .severity-medium { background: #f59e0b; }
+  .severity-high { background: #ef4444; }
+  .status-monitoring { opacity: 0.6; }
+  .status-resolved { opacity: 0.3; }
+
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+
+  [data-theme="dark"] .modal-content {
+    background: #1f2937;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #111827;
+  }
+
+  [data-theme="dark"] .modal-header h2 {
+    color: #f9fafb;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  [data-theme="dark"] .form-group label {
+    color: #d1d5db;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select,
+  [data-theme="dark"] .form-group textarea {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+
+  .form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-primary {
+    background: #ef4444;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #dc2626;
+  }
+
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    padding: 10px;
+    background: rgba(255,255,255,0.95);
+    font-size: 0.9rem;
+  }
+
+  [data-theme="dark"] .stats-bar {
+    background: rgba(31, 41, 55, 0.95);
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .stat-item strong {
+    font-weight: 700;
+  }
+
+  /* Popup styles */
+  .leaflet-popup-content {
+    margin: 15px;
+    min-width: 250px;
+  }
+
+  .popup-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #111827;
+  }
+
+  .popup-info {
+    margin: 8px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .popup-info strong {
+    min-width: 100px;
+  }
+
+  .severity-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .severity-badge.low { background: #10b981; }
+  .severity-badge.medium { background: #f59e0b; }
+  .severity-badge.high { background: #ef4444; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .status-badge.active { background: #ef4444; color: white; }
+  .status-badge.monitoring { background: #f59e0b; color: white; }
+  .status-badge.resolved { background: #10b981; color: white; }
+
+  @media (max-width: 768px) {
+    .outbreak-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .btn-report {
+      margin-left: 0;
+    }
+
+    .legend {
+      bottom: 10px;
+      left: 10px;
+      padding: 10px;
+      font-size: 0.8rem;
+    }
+  }
+</style>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<div class="outbreak-container">
+  <div class="outbreak-header">
+    <h1>🗺️ Bản đồ dịch bệnh cà chua</h1>
+    <p>Theo dõi và báo cáo dịch bệnh trong khu vực của bạn</p>
+  </div>
+
+  <div class="outbreak-controls">
+    <div class="filter-group">
+      <label>Mức độ:</label>
+      <select id="severityFilter">
+        <option value="">Tất cả</option>
+        <option value="low">Nhẹ</option>
+        <option value="medium">Trung bình</option>
+        <option value="high">Nghiêm trọng</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Trạng thái:</label>
+      <select id="statusFilter">
+        <option value="">Tất cả</option>
+        <option value="active">Đang hoạt động</option>
+        <option value="monitoring">Theo dõi</option>
+        <option value="resolved">Đã giải quyết</option>
+      </select>
+    </div>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        📍 <strong id="totalOutbreaks">0</strong> điểm dịch
+      </div>
+      <div class="stat-item">
+        🔴 <strong id="activeOutbreaks">0</strong> nghiêm trọng
+      </div>
+    </div>
+
+    {% if session.get('user_id') %}
+    <button class="btn-report" onclick="openReportModal()">
+      <span>⚠️</span>
+      <span>Báo cáo dịch bệnh</span>
+    </button>
+    {% endif %}
+  </div>
+
+  <div class="map-container">
+    <div id="map"></div>
+    
+    <div class="legend">
+      <h4>Chú thích</h4>
+      <div class="legend-item">
+        <div class="legend-color severity-low"></div>
+        <span>Nhẹ</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color severity-medium"></div>
+        <span>Trung bình</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color severity-high"></div>
+        <span>Nghiêm trọng</span>
+      </div>
+      <hr style="margin: 10px 0; border: none; border-top: 1px solid #e5e7eb;">
+      <div class="legend-item">
+        <div class="legend-color severity-high status-monitoring"></div>
+        <span>Đang theo dõi</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color severity-high status-resolved"></div>
+        <span>Đã giải quyết</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal" id="reportModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Báo cáo dịch bệnh mới</h2>
+      <button class="modal-close" onclick="closeReportModal()">&times;</button>
+    </div>
+    
+    <form id="reportForm" onsubmit="submitReport(event)">
+      <div class="form-group">
+        <label>Tên bệnh *</label>
+        <select id="diseaseName" required>
+          <option value="">Chọn bệnh...</option>
+          <option value="Early Blight">Bệnh Sương Mai (Early Blight)</option>
+          <option value="Late Blight">Bệnh Mốc Sương (Late Blight)</option>
+          <option value="Leaf Blight">Bệnh Cháy Lá (Leaf Blight)</option>
+          <option value="Bacterial Wilt">Bệnh Héo Xanh Vi Khuẩn (Bacterial Wilt)</option>
+          <option value="Mosaic Virus">Bệnh Khảm Lá (Mosaic Virus)</option>
+          <option value="Leaf Spot">Bệnh Đốm Lá (Leaf Spot)</option>
+          <option value="Septoria">Bệnh Septoria</option>
+          <option value="Spider Mites">Nhện đỏ (Spider Mites)</option>
+          <option value="Yellow Leaf Curl">Bệnh Xoăn Lá Vàng</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Vị trí *</label>
+        <input type="text" id="locationName" placeholder="VD: Đà Lạt, Lâm Đồng" required>
+        <small style="color: #6b7280;">Click vào bản đồ để chọn tọa độ chính xác</small>
+      </div>
+
+      <div class="form-group" style="display: none;">
+        <input type="number" step="any" id="latitude" required>
+        <input type="number" step="any" id="longitude" required>
+      </div>
+
+      <div class="form-group">
+        <label>Mức độ nghiêm trọng *</label>
+        <select id="severity" required>
+          <option value="low">Nhẹ</option>
+          <option value="medium">Trung bình</option>
+          <option value="high">Nghiêm trọng</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Diện tích ảnh hưởng</label>
+        <input type="text" id="affectedArea" placeholder="VD: 5 hecta">
+      </div>
+
+      <div class="form-group">
+        <label>Mô tả chi tiết *</label>
+        <textarea id="description" placeholder="Mô tả tình trạng dịch bệnh, triệu chứng, thời gian phát hiện..." required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Số điện thoại liên hệ</label>
+        <input type="tel" id="contact" placeholder="VD: 0901234567">
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeReportModal()">Hủy</button>
+        <button type="submit" class="btn btn-primary">🚨 Báo cáo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+let map;
+let markers = [];
+let allOutbreaks = [];
+let selectedLat = null;
+let selectedLng = null;
+
+// Initialize map
+function initMap() {
+  // Center on Vietnam
+  map = L.map('map').setView([11.9404, 108.4583], 8);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  // Click to select location for reporting
+  map.on('click', function(e) {
+    if (document.getElementById('reportModal').classList.contains('active')) {
+      selectedLat = e.latlng.lat;
+      selectedLng = e.latlng.lng;
+      document.getElementById('latitude').value = selectedLat;
+      document.getElementById('longitude').value = selectedLng;
+      
+      // Show notification
+      if (window.showToast) {
+        window.showToast('✅ Đã chọn vị trí trên bản đồ', 'success');
+      }
+    }
+  });
+
+  loadOutbreaks();
+}
+
+// Load outbreaks data
+async function loadOutbreaks() {
+  try {
+    const severityFilter = document.getElementById('severityFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    
+    let url = '/api/outbreaks?';
+    if (severityFilter) url += `severity=${severityFilter}&`;
+    if (statusFilter) url += `status=${statusFilter}&`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.ok) {
+      allOutbreaks = data.outbreaks;
+      displayOutbreaks(allOutbreaks);
+      updateStats(allOutbreaks);
+    }
+  } catch (error) {
+    console.error('Error loading outbreaks:', error);
+    if (window.showToast) {
+      window.showToast('❌ Không thể tải dữ liệu dịch bệnh', 'error');
+    }
+  }
+}
+
+// Display outbreaks on map
+function displayOutbreaks(outbreaks) {
+  // Clear existing markers
+  markers.forEach(marker => marker.remove());
+  markers = [];
+
+  outbreaks.forEach(outbreak => {
+    const severity = outbreak.severity;
+    const status = outbreak.status;
+    
+    // Choose marker color
+    let color = '#10b981'; // low
+    if (severity === 'medium') color = '#f59e0b';
+    if (severity === 'high') color = '#ef4444';
+    
+    // Adjust opacity based on status
+    let fillOpacity = 0.8;
+    if (status === 'monitoring') fillOpacity = 0.5;
+    if (status === 'resolved') fillOpacity = 0.3;
+    
+    const marker = L.circleMarker([outbreak.lat, outbreak.lng], {
+      radius: 12,
+      fillColor: color,
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: fillOpacity
+    }).addTo(map);
+
+    // Create popup
+    const severityText = {
+      'low': 'Nhẹ',
+      'medium': 'Trung bình',
+      'high': 'Nghiêm trọng'
+    }[severity];
+
+    const statusText = {
+      'active': 'Đang hoạt động',
+      'monitoring': 'Đang theo dõi',
+      'resolved': 'Đã giải quyết'
+    }[status];
+
+    const popupContent = `
+      <div class="popup-title">${outbreak.disease_name_vn || outbreak.disease_name}</div>
+      <div class="popup-info">
+        <strong>📍 Vị trí:</strong>
+        <span>${outbreak.location}</span>
+      </div>
+      <div class="popup-info">
+        <strong>⚠️ Mức độ:</strong>
+        <span class="severity-badge ${severity}">${severityText}</span>
+      </div>
+      <div class="popup-info">
+        <strong>📊 Trạng thái:</strong>
+        <span class="status-badge ${status}">${statusText}</span>
+      </div>
+      <div class="popup-info">
+        <strong>📏 Diện tích:</strong>
+        <span>${outbreak.affected_area}</span>
+      </div>
+      <div class="popup-info">
+        <strong>👤 Báo cáo:</strong>
+        <span>${outbreak.reported_by}</span>
+      </div>
+      <div class="popup-info">
+        <strong>📅 Ngày:</strong>
+        <span>${new Date(outbreak.reported_date).toLocaleDateString('vi-VN')}</span>
+      </div>
+      <div class="popup-info">
+        <strong>📝 Mô tả:</strong>
+        <span>${outbreak.description}</span>
+      </div>
+      ${outbreak.contact ? `
+      <div class="popup-info">
+        <strong>📞 Liên hệ:</strong>
+        <span>${outbreak.contact}</span>
+      </div>
+      ` : ''}
+    `;
+
+    marker.bindPopup(popupContent, {
+      maxWidth: 300
+    });
+
+    markers.push(marker);
+  });
+}
+
+// Update statistics
+function updateStats(outbreaks) {
+  const total = outbreaks.length;
+  const active = outbreaks.filter(o => o.status === 'active').length;
+  const high = outbreaks.filter(o => o.severity === 'high').length;
+  
+  document.getElementById('totalOutbreaks').textContent = total;
+  document.getElementById('activeOutbreaks').textContent = high;
+}
+
+// Open report modal
+function openReportModal() {
+  document.getElementById('reportModal').classList.add('active');
+  // Default to center of map
+  const center = map.getCenter();
+  selectedLat = center.lat;
+  selectedLng = center.lng;
+  document.getElementById('latitude').value = selectedLat;
+  document.getElementById('longitude').value = selectedLng;
+}
+
+// Close report modal
+function closeReportModal() {
+  document.getElementById('reportModal').classList.remove('active');
+  document.getElementById('reportForm').reset();
+}
+
+// Submit report
+async function submitReport(event) {
+  event.preventDefault();
+  
+  const diseaseSelect = document.getElementById('diseaseName');
+  const diseaseName = diseaseSelect.value;
+  const diseaseNameVn = diseaseSelect.options[diseaseSelect.selectedIndex].text;
+  
+  const reportData = {
+    disease_name: diseaseName,
+    disease_name_vn: diseaseNameVn,
+    location: document.getElementById('locationName').value,
+    lat: document.getElementById('latitude').value,
+    lng: document.getElementById('longitude').value,
+    severity: document.getElementById('severity').value,
+    affected_area: document.getElementById('affectedArea').value || 'Chưa xác định',
+    description: document.getElementById('description').value,
+    contact: document.getElementById('contact').value
+  };
+
+  try {
+    const response = await fetch('/api/outbreaks/report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(reportData)
+    });
+
+    const data = await response.json();
+
+    if (data.ok) {
+      if (window.showToast) {
+        window.showToast('✅ Đã báo cáo dịch bệnh thành công!', 'success');
+      } else {
+        alert('Đã báo cáo dịch bệnh thành công!');
+      }
+      closeReportModal();
+      loadOutbreaks(); // Reload map
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (error) {
+    console.error('Error reporting outbreak:', error);
+    if (window.showToast) {
+      window.showToast('❌ Không thể báo cáo: ' + error.message, 'error');
+    } else {
+      alert('Không thể báo cáo: ' + error.message);
+    }
+  }
+}
+
+// Event listeners
+document.getElementById('severityFilter').addEventListener('change', loadOutbreaks);
+document.getElementById('statusFilter').addEventListener('change', loadOutbreaks);
+
+// Close modal on background click
+document.getElementById('reportModal').addEventListener('click', function(e) {
+  if (e.target.id === 'reportModal') {
+    closeReportModal();
+  }
+});
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initMap);
+</script>
+
+{% endblock %}

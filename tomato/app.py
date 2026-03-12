@@ -1,4 +1,4 @@
-import io
+﻿import io
 import sys
 
 # Fix Windows console encoding FIRST (before any print statements)
@@ -6364,17 +6364,29 @@ def update_quest_progress(user_id, quest_type, increment=1):
 
 def get_user_daily_quests(user_id):
     """Get user's daily quests with progress"""
-    progress = load_user_quest_progress(user_id)
-    
-    quests_with_progress = []
-    for quest in DAILY_QUESTS:
-        q = quest.copy()
-        q['progress'] = progress['quests'][quest['id']]['progress']
-        q['completed'] = progress['quests'][quest['id']]['completed']
-        q['percentage'] = min(100, int(q['progress'] / q['target'] * 100))
-        quests_with_progress.append(q)
-    
-    return quests_with_progress
+    try:
+        progress = load_user_quest_progress(user_id)
+        
+        quests_with_progress = []
+        for quest in DAILY_QUESTS:
+            q = quest.copy()
+            # FIXED: Safely get progress data
+            quest_progress = progress.get('quests', {}).get(quest['id'], {'progress': 0, 'completed': False})
+            q['progress'] = quest_progress.get('progress', 0)
+            q['completed'] = quest_progress.get('completed', False)
+            q['percentage'] = min(100, int(q['progress'] / q['target'] * 100)) if q['target'] > 0 else 0
+            quests_with_progress.append(q)
+        
+        return quests_with_progress
+    except Exception as e:
+        app.logger.error(f'Error getting daily quests: {e}')
+        # Return quests with 0 progress on error
+        return [{
+            **quest,
+            'progress': 0,
+            'completed': False,
+            'percentage': 0
+        } for quest in DAILY_QUESTS]
 
 
 # ==================== Farmer Dashboard Analytics ====================
@@ -6429,9 +6441,14 @@ def get_farmer_dashboard_data(user_id):
         healthy_count = len([h for h in recent_scans if h.get('disease') == 'Healthy'])
         health_score = int((healthy_count / len(recent_scans) * 100)) if recent_scans else 100
         
-        # Farm game stats
-        total_harvested = sum([p.get('harvested', 0) for p in farm_progress])
-        active_plants = len([p for p in farm_progress if p.get('stage', 0) < 4])
+        # Farm game stats - FIXED: Handle farm_progress correctly (it's a dict, not a list)
+        if farm_progress and isinstance(farm_progress, dict):
+            plants_list = farm_progress.get('plants', [])
+            total_harvested = sum([p.get('harvested', 0) for p in plants_list])
+            active_plants = len([p for p in plants_list if p.get('stage', 0) < 4])
+        else:
+            total_harvested = 0
+            active_plants = 0
         
         # Calculate streak (consecutive days with scans)
         streak = 0
@@ -8123,6 +8140,153 @@ def api_toggle_follow(user_id):
     except Exception as e:
         app.logger.error(f'Error toggling follow: {e}')
         return {'ok': False, 'error': 'Lỗi khi follow người dùng'}, 500
+
+
+# ==================== DISEASE OUTBREAK MAP ROUTES ====================
+
+@app.route('/outbreak-map')
+def outbreak_map():
+    """Disease outbreak map page"""
+    return render_template('outbreak_map.html')
+
+@app.route('/api/outbreaks', methods=['GET'])
+def api_get_outbreaks():
+    """Get all disease outbreaks"""
+    try:
+        outbreaks_file = BASE_DIR / 'data' / 'disease_outbreaks.jsonl'
+        outbreaks = []
+        
+        if outbreaks_file.exists():
+            with open(outbreaks_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            outbreak = json.loads(line)
+                            outbreaks.append(outbreak)
+                        except json.JSONDecodeError:
+                            continue
+        
+        # Filter by status if provided
+        status = request.args.get('status')
+        if status:
+            outbreaks = [o for o in outbreaks if o.get('status') == status]
+        
+        # Filter by severity if provided
+        severity = request.args.get('severity')
+        if severity:
+            outbreaks = [o for o in outbreaks if o.get('severity') == severity]
+        
+        return jsonify({
+            'ok': True,
+            'outbreaks': outbreaks,
+            'total': len(outbreaks)
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error getting outbreaks: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/outbreaks/report', methods=['POST'])
+@login_required
+def api_report_outbreak():
+    """Report a new disease outbreak"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['disease_name', 'location', 'lat', 'lng', 'severity', 'description']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'ok': False, 'error': f'Thiếu thông tin: {field}'}), 400
+        
+        # Get user info
+        user_email = session.get('user_email')
+        user = get_user_by_email(user_email)
+        reporter_name = user.get('full_name', user_email) if user else user_email
+        
+        # Create outbreak record
+        outbreak_id = f"out{random.randint(1000, 9999)}"
+        outbreak = {
+            'id': outbreak_id,
+            'disease_name': data['disease_name'],
+            'disease_name_vn': data.get('disease_name_vn', data['disease_name']),
+            'location': data['location'],
+            'lat': float(data['lat']),
+            'lng': float(data['lng']),
+            'severity': data['severity'],  # low, medium, high
+            'affected_area': data.get('affected_area', 'Chưa xác định'),
+            'reported_by': reporter_name,
+            'reported_date': datetime.utcnow().isoformat(),
+            'description': data['description'],
+            'status': 'active',  # active, monitoring, resolved
+            'contact': data.get('contact', '')
+        }
+        
+        # Save to file
+        outbreaks_file = BASE_DIR / 'data' / 'disease_outbreaks.jsonl'
+        with open(outbreaks_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(outbreak, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'New outbreak reported: {outbreak_id} by {reporter_name}')
+        
+        return jsonify({
+            'ok': True,
+            'outbreak': outbreak,
+            'message': 'Đã báo cáo dịch bệnh thành công'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error reporting outbreak: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể báo cáo dịch bệnh'}), 500
+
+@app.route('/api/outbreaks/<outbreak_id>/update', methods=['POST'])
+@login_required
+def api_update_outbreak_status(outbreak_id):
+    """Update outbreak status (admin only)"""
+    try:
+        if not session.get('is_admin'):
+            return jsonify({'ok': False, 'error': 'Chỉ admin mới có quyền cập nhật'}), 403
+        
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['active', 'monitoring', 'resolved']:
+            return jsonify({'ok': False, 'error': 'Trạng thái không hợp lệ'}), 400
+        
+        outbreaks_file = BASE_DIR / 'data' / 'disease_outbreaks.jsonl'
+        updated_outbreaks = []
+        found = False
+        
+        if outbreaks_file.exists():
+            with open(outbreaks_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            outbreak = json.loads(line)
+                            if outbreak['id'] == outbreak_id:
+                                outbreak['status'] = new_status
+                                outbreak['updated_at'] = datetime.utcnow().isoformat()
+                                found = True
+                            updated_outbreaks.append(outbreak)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy dịch bệnh'}), 404
+        
+        # Write back
+        with open(outbreaks_file, 'w', encoding='utf-8') as f:
+            for outbreak in updated_outbreaks:
+                f.write(json.dumps(outbreak, ensure_ascii=False) + '\n')
+        
+        return jsonify({
+            'ok': True,
+            'message': 'Đã cập nhật trạng thái'
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error updating outbreak: {e}')
+        return jsonify({'ok': False, 'error': 'Không thể cập nhật'}), 500
 
 
 @app.route('/history/clear', methods=['POST'])

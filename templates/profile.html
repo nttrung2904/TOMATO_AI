@@ -216,8 +216,8 @@
   }
   
   .menu-item.active {
-    background: var(--tomato-500);
-    color: white;
+    background: var(--tomato-500) !important;
+    color: white !important;
     font-weight: 600;
   }
   
@@ -225,10 +225,13 @@
     background: #f8f9fa;
   }
   
-  .menu-item.active {
-    background: var(--tomato-500);
-    color: white;
-    font-weight: 600;
+  [data-theme="dark"] .menu-item:hover {
+    background: #374151;
+  }
+  
+  [data-theme="dark"] .menu-item.active {
+    background: var(--tomato-500) !important;
+    color: white !important;
   }
   
   .menu-icon {
@@ -1462,10 +1465,6 @@
         <span class="menu-icon">📍</span>
         <span>Địa chỉ</span>
       </div>
-      <div class="menu-item" data-href="/dashboard">
-        <span class="menu-icon">🌱</span>
-        <span>Dashboard</span>
-      </div>
     </div>
     {% endif %}
     
@@ -1998,24 +1997,26 @@ function showSection(section, element) {
     // Add active to clicked item
     if (element) {
       element.classList.add('active');
-      element.style.background = 'var(--tomato-500)';
-      element.style.color = 'white';
+      element.style.setProperty('background', 'var(--tomato-500)', 'important');
+      element.style.setProperty('color', 'white', 'important');
       console.log('Added active class to clicked element');
     }
     
-    // Update sections
+    // Update sections - FIXED: Set style.display directly to override inline styles
     const sections = document.querySelectorAll('.section');
     console.log('Total sections:', sections.length);
     
     sections.forEach(s => {
       s.classList.remove('active');
-      console.log('Removed active from section:', s.id);
+      s.style.display = 'none'; // Explicitly hide all sections
+      console.log('Hidden section:', s.id);
     });
     
     const sectionElement = document.getElementById(section + '-section');
     if (sectionElement) {
       sectionElement.classList.add('active');
-      console.log('✅ Section activated:', section + '-section');
+      sectionElement.style.display = 'block'; // Explicitly show the active section
+      console.log('✅ Section activated and displayed:', section + '-section');
     } else {
       console.error('❌ Section not found:', section + '-section');
       
@@ -2350,6 +2351,19 @@ document.addEventListener('DOMContentLoaded', () => {
     input.style.cursor = 'text';
   });
   
+  // FIXED: Initialize section visibility on page load
+  console.log('Initializing section visibility...');
+  const allSections = document.querySelectorAll('.section');
+  allSections.forEach(s => {
+    if (s.classList.contains('active')) {
+      s.style.display = 'block';
+      console.log('✅ Initial active section:', s.id);
+    } else {
+      s.style.display = 'none';
+      console.log('Hidden section:', s.id);
+    }
+  });
+  
   console.log('=== Initialization complete ===');
 });
 
@@ -2669,6 +2683,16 @@ function renderAchievements(achievements, filter = 'all') {
 }
 
 // ==================== QUESTS FUNCTIONS ====================
+
+// Quest type to icon mapping
+const QUEST_ICONS = {
+  'scan': '📸',
+  'post': '✍️',
+  'comment': '💬',
+  'like': '❤️',
+  'game': '🎮'
+};
+
 async function loadQuests() {
   try {
     const response = await fetch('/api/quests/daily');
@@ -2679,15 +2703,16 @@ async function loadQuests() {
       
       const questsHtml = quests.map(quest => {
         const completed = quest.completed;
-        const progressPercent = (quest.progress / quest.target) * 100;
+        const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
+        const icon = QUEST_ICONS[quest.type] || '📋';
         
         return `
           <div class="quest-card ${completed ? 'completed' : ''}">
             <div class="quest-header">
-              <div class="quest-icon">${quest.icon}</div>
+              <div class="quest-icon">${icon}</div>
               <div class="quest-info">
-                <div class="quest-name">${quest.name}</div>
-                <div class="quest-desc">${quest.description}</div>
+                <div class="quest-name">${quest.title || 'Nhiệm vụ'}</div>
+                <div class="quest-desc">${quest.desc || ''}</div>
               </div>
               ${completed ? '<div class="quest-check">✅</div>' : ''}
             </div>
@@ -2700,7 +2725,7 @@ async function loadQuests() {
             </div>
             
             <div class="quest-reward">
-              🎁 Phần thưởng: <strong>+${quest.reward_points} điểm</strong>
+              🎁 Phần thưởng: <strong>+${quest.reward || 0} điểm</strong>
             </div>
           </div>
         `;
