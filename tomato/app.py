@@ -22,6 +22,7 @@ import cv2
 import json
 import random
 import hashlib
+import re
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response, jsonify
 from functools import wraps
@@ -7606,6 +7607,461 @@ def leaderboard():
 
 # ==================== Community & Social Network ====================
 
+SOCIAL_STOP_WORDS = {
+    'about', 'again', 'anh', 'bạn', 'benh', 'biet', 'biết', 'care', 'chia', 'chiase',
+    'chăm', 'cho', 'cua', 'cũng', 'dang', 'đang', 'đây', 'dieu', 'điều', 'duoc', 'được',
+    'farm', 'hien', 'hiện', 'hoi', 'hỏi', 'hom', 'hôm', 'kinh', 'kinhnghiem', 'lam', 'làm',
+    'link', 'loai', 'loại', 'luon', 'luôn', 'minh', 'mình', 'mot', 'một', 'ngay', 'người',
+    'nhieu', 'nhiều', 'post', 'share', 'tham', 'them', 'thêm', 'thi', 'thì', 'this', 'trai',
+    'trong', 'tuoi', 'tui', 'vay', 'vậy', 'về', 'viet', 'viết', 'with'
+}
+
+
+def parse_iso_datetime(value):
+    """Parse ISO datetime safely."""
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_post_topics(content, limit=5):
+    """Extract lightweight discussion topics from post text."""
+    if not content:
+        return []
+
+    lowered = content.lower()
+    hashtags = [tag.strip('_') for tag in re.findall(r'#([0-9A-Za-zÀ-ỹ_]+)', lowered)]
+    words = re.findall(r'[0-9A-Za-zÀ-ỹ]+', lowered)
+
+    candidates = []
+    for word in words:
+        if word.isdigit() or len(word) < 4 or word in SOCIAL_STOP_WORDS:
+            continue
+        candidates.append(word.strip('_'))
+
+    topics = []
+    seen = set()
+    for topic, _ in Counter(hashtags + candidates).most_common():
+        if not topic or topic in seen:
+            continue
+        seen.add(topic)
+        topics.append(topic)
+        if len(topics) >= limit:
+            break
+
+    return topics
+
+
+def normalize_post(post):
+    """Normalize post payload for backward compatibility."""
+    normalized = dict(post)
+    normalized.setdefault('likes', 0)
+    normalized.setdefault('comments', 0)
+    normalized.setdefault('shares', 0)
+    normalized.setdefault('saves', 0)
+    normalized.setdefault('user_name', 'Anonymous')
+    topics = normalized.get('topics')
+    if not isinstance(topics, list) or not topics:
+        normalized['topics'] = extract_post_topics(normalized.get('content', ''))
+    return normalized
+
+
+def _rewrite_jsonl_without_matching(file_path, predicate):
+    """Remove JSONL records that match predicate and return removed count."""
+    if not file_path.exists():
+        return 0
+
+    kept_records = []
+    removed_count = 0
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            if predicate(record):
+                removed_count += 1
+            else:
+                kept_records.append(record)
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for record in kept_records:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+    return removed_count
+
+
+def load_saved_posts(user_id=None):
+    """Load saved posts across users or for a single user."""
+    saved_posts = []
+    saved_file = BASE_DIR / 'data' / 'saved_posts.jsonl'
+
+    if saved_file.exists():
+        with open(saved_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if user_id is None or record.get('user_id') == user_id:
+                    saved_posts.append(record)
+
+    return saved_posts
+
+
+def get_saved_post_ids(user_id):
+    """Return saved post IDs for a user."""
+    if not user_id:
+        return set()
+    return {record.get('post_id') for record in load_saved_posts(user_id) if record.get('post_id')}
+
+
+def toggle_saved_post(post_id, user_id):
+    """Toggle saved state for a post."""
+    saved_file = BASE_DIR / 'data' / 'saved_posts.jsonl'
+    saved_file.parent.mkdir(parents=True, exist_ok=True)
+
+    saved_posts = load_saved_posts()
+    existing_record = next(
+        (
+            record for record in saved_posts
+            if record.get('post_id') == post_id and record.get('user_id') == user_id
+        ),
+        None
+    )
+
+    if existing_record:
+        saved_posts.remove(existing_record)
+        is_saved = False
+    else:
+        saved_posts.append({
+            'post_id': post_id,
+            'user_id': user_id,
+            'created_at': datetime.now().isoformat()
+        })
+        is_saved = True
+
+    with open(saved_file, 'w', encoding='utf-8') as f:
+        for record in saved_posts:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+    saves_count = len([record for record in saved_posts if record.get('post_id') == post_id])
+    update_post(post_id, {'saves': saves_count})
+
+    return is_saved, saves_count
+
+
+def load_post_shares(post_id=None):
+    """Load share events for community posts."""
+    shares = []
+    shares_file = BASE_DIR / 'data' / 'post_shares.jsonl'
+
+    if shares_file.exists():
+        with open(shares_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if post_id is None or record.get('post_id') == post_id:
+                    shares.append(record)
+
+    return shares
+
+
+def record_post_share(post_id, user_id=None, channel='copy_link'):
+    """Record a share event for analytics and counters."""
+    shares_file = BASE_DIR / 'data' / 'post_shares.jsonl'
+    shares_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(shares_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps({
+            'post_id': post_id,
+            'user_id': user_id,
+            'channel': channel,
+            'created_at': datetime.now().isoformat()
+        }, ensure_ascii=False) + '\n')
+
+    share_count = len(load_post_shares(post_id))
+    update_post(post_id, {'shares': share_count})
+    return share_count
+
+
+def sync_user_follow_cache(follower_id, following_id, is_following):
+    """Keep lightweight follow arrays in users.jsonl aligned with follow graph."""
+    users = load_users()
+    changed = False
+
+    for user in users:
+        if user.get('id') == follower_id:
+            following = list(user.get('following', []))
+            if is_following and following_id not in following:
+                following.append(following_id)
+                user['following'] = following
+                changed = True
+            if not is_following and following_id in following:
+                following.remove(following_id)
+                user['following'] = following
+                changed = True
+
+        if user.get('id') == following_id:
+            followers = list(user.get('followers', []))
+            if is_following and follower_id not in followers:
+                followers.append(follower_id)
+                user['followers'] = followers
+                changed = True
+            if not is_following and follower_id in followers:
+                followers.remove(follower_id)
+                user['followers'] = followers
+                changed = True
+
+    if changed:
+        save_users(users)
+
+
+def annotate_posts_for_user(posts, current_user_id=None, likes=None, saved_post_ids=None):
+    """Attach per-user state flags to posts."""
+    if not current_user_id:
+        return posts
+
+    if likes is None:
+        likes = load_post_likes()
+    if saved_post_ids is None:
+        saved_post_ids = get_saved_post_ids(current_user_id)
+
+    user_likes = {like.get('post_id') for like in likes if like.get('user_id') == current_user_id}
+
+    for post in posts:
+        post['liked_by_user'] = post.get('id') in user_likes
+        post['saved_by_user'] = post.get('id') in saved_post_ids
+
+    return posts
+
+
+def get_user_interest_topics(user_id, posts=None):
+    """Derive coarse interest topics from authored, liked and saved posts."""
+    if not user_id:
+        return []
+
+    posts = posts or load_posts()
+    posts_by_id = {post.get('id'): post for post in posts}
+    topic_counter = Counter()
+
+    for post in posts:
+        if post.get('user_id') == user_id:
+            topic_counter.update(post.get('topics', []))
+
+    liked_post_ids = {
+        like.get('post_id') for like in load_post_likes()
+        if like.get('user_id') == user_id
+    }
+    saved_post_ids = get_saved_post_ids(user_id)
+
+    for post_id in liked_post_ids | saved_post_ids:
+        post = posts_by_id.get(post_id)
+        if post:
+            topic_counter.update(post.get('topics', []))
+
+    return [topic for topic, _ in topic_counter.most_common(6)]
+
+
+def score_post_for_feed(post, current_user_id=None, following_ids=None, interest_topics=None):
+    """Score post for personalized feed ranking."""
+    following_ids = following_ids or set()
+    interest_topics = interest_topics or []
+
+    score = (
+        post.get('likes', 0) * 2.0 +
+        post.get('comments', 0) * 3.0 +
+        post.get('shares', 0) * 3.5 +
+        post.get('saves', 0) * 2.5
+    )
+
+    created_at = parse_iso_datetime(post.get('created_at'))
+    if created_at:
+        age_hours = max((datetime.now() - created_at).total_seconds() / 3600, 0)
+        score += max(0, 72 - age_hours) / 6
+
+    if current_user_id and post.get('user_id') == current_user_id:
+        score += 8
+    if post.get('user_id') in following_ids:
+        score += 20
+
+    topic_overlap = len(set(post.get('topics', [])) & set(interest_topics))
+    score += topic_overlap * 12
+
+    return score
+
+
+def get_trending_posts(posts, limit=5):
+    """Return trending posts using recent engagement."""
+    recent_cutoff = datetime.now() - timedelta(days=14)
+    recent_posts = [
+        post for post in posts
+        if (parse_iso_datetime(post.get('created_at')) or datetime.min) >= recent_cutoff
+    ]
+    candidate_posts = recent_posts or posts
+    ranked = sorted(
+        candidate_posts,
+        key=lambda post: (
+            score_post_for_feed(post),
+            parse_iso_datetime(post.get('created_at')) or datetime.min
+        ),
+        reverse=True
+    )
+    return ranked[:limit]
+
+
+def build_community_feed(posts, current_user_id=None, feed_type='latest', limit=20):
+    """Build feed variants for the community page."""
+    normalized_posts = [normalize_post(post) for post in posts]
+    following_ids = set()
+    if current_user_id:
+        following_ids = {
+            follow.get('following_id') for follow in load_user_follows()
+            if follow.get('follower_id') == current_user_id
+        }
+
+    if feed_type == 'saved':
+        saved_post_ids = get_saved_post_ids(current_user_id)
+        filtered = [post for post in normalized_posts if post.get('id') in saved_post_ids]
+        filtered.sort(key=lambda post: parse_iso_datetime(post.get('created_at')) or datetime.min, reverse=True)
+        return filtered[:limit]
+
+    if feed_type == 'following':
+        filtered = [post for post in normalized_posts if post.get('user_id') in following_ids]
+        filtered.sort(key=lambda post: parse_iso_datetime(post.get('created_at')) or datetime.min, reverse=True)
+        return filtered[:limit]
+
+    if feed_type == 'trending':
+        return get_trending_posts(normalized_posts, limit=limit)
+
+    if feed_type == 'for_you' and current_user_id:
+        interest_topics = get_user_interest_topics(current_user_id, posts=normalized_posts)
+        ranked = sorted(
+            normalized_posts,
+            key=lambda post: (
+                score_post_for_feed(post, current_user_id, following_ids, interest_topics),
+                parse_iso_datetime(post.get('created_at')) or datetime.min
+            ),
+            reverse=True
+        )
+        return ranked[:limit]
+
+    normalized_posts.sort(
+        key=lambda post: parse_iso_datetime(post.get('created_at')) or datetime.min,
+        reverse=True
+    )
+    return normalized_posts[:limit]
+
+
+def get_suggested_users(current_user_id, limit=5):
+    """Suggest users based on network and topic overlap."""
+    if not current_user_id:
+        return []
+
+    users = load_users()
+    follows = load_user_follows()
+    posts = load_posts()
+
+    following_ids = {
+        follow.get('following_id') for follow in follows
+        if follow.get('follower_id') == current_user_id
+    }
+    user_topics = set(get_user_interest_topics(current_user_id, posts=posts))
+
+    suggestions = []
+    for user in users:
+        candidate_id = user.get('id')
+        if not candidate_id or candidate_id == current_user_id or candidate_id in following_ids:
+            continue
+
+        candidate_posts = [post for post in posts if post.get('user_id') == candidate_id]
+        candidate_topics = {topic for post in candidate_posts for topic in post.get('topics', [])}
+        candidate_stats = get_user_stats(candidate_id)
+
+        mutual_count = len({
+            follow.get('follower_id') for follow in follows
+            if follow.get('following_id') == candidate_id
+        } & following_ids)
+        topic_overlap = len(user_topics & candidate_topics)
+        activity_score = (
+            candidate_stats.get('posts_count', 0) * 3 +
+            candidate_stats.get('followers_count', 0) * 2 +
+            candidate_stats.get('total_likes', 0) +
+            candidate_stats.get('shares_received', 0) * 2
+        )
+        score = mutual_count * 18 + topic_overlap * 14 + activity_score
+
+        if score <= 0:
+            continue
+
+        if mutual_count:
+            reason = f'{mutual_count} kết nối chung'
+        elif topic_overlap:
+            reason = f'Cùng quan tâm: {", ".join(sorted(user_topics & candidate_topics)[:2])}'
+        else:
+            reason = 'Tác giả đang hoạt động tốt trong cộng đồng'
+
+        suggestions.append({
+            'id': candidate_id,
+            'full_name': user.get('full_name', 'Anonymous'),
+            'followers_count': candidate_stats.get('followers_count', 0),
+            'posts_count': candidate_stats.get('posts_count', 0),
+            'mutual_count': mutual_count,
+            'reason': reason,
+            'score': score
+        })
+
+    suggestions.sort(key=lambda item: (item.get('score', 0), item.get('followers_count', 0)), reverse=True)
+    return suggestions[:limit]
+
+
+def get_social_highlights(current_user_id, posts, suggested_users=None):
+    """Build compact social stats for the sidebar."""
+    suggested_users = suggested_users or []
+    if not current_user_id:
+        return {
+            'active_authors': len({post.get('user_id') for post in posts if post.get('user_id')}),
+            'recent_posts': len([
+                post for post in posts
+                if (parse_iso_datetime(post.get('created_at')) or datetime.min) >= datetime.now() - timedelta(days=7)
+            ]),
+            'top_topic': get_trending_posts(posts, limit=1)[0].get('topics', ['cộng đồng'])[0] if posts else 'cộng đồng',
+            'saved_posts': 0,
+            'network_posts': 0,
+            'suggested_users': 0
+        }
+
+    following_ids = {
+        follow.get('following_id') for follow in load_user_follows()
+        if follow.get('follower_id') == current_user_id
+    }
+    interest_topics = get_user_interest_topics(current_user_id, posts=posts)
+
+    return {
+        'active_authors': len({post.get('user_id') for post in posts if post.get('user_id')}),
+        'recent_posts': len([
+            post for post in posts
+            if (parse_iso_datetime(post.get('created_at')) or datetime.min) >= datetime.now() - timedelta(days=7)
+        ]),
+        'top_topic': interest_topics[0] if interest_topics else 'cộng đồng',
+        'saved_posts': len(get_saved_post_ids(current_user_id)),
+        'network_posts': len([post for post in posts if post.get('user_id') in following_ids]),
+        'suggested_users': len(suggested_users)
+    }
+
 def load_posts():
     """Load all posts"""
     posts = []
@@ -7616,7 +8072,7 @@ def load_posts():
             for line in f:
                 if line.strip():
                     try:
-                        posts.append(json.loads(line))
+                        posts.append(normalize_post(json.loads(line)))
                     except json.JSONDecodeError:
                         continue
     
@@ -7648,6 +8104,9 @@ def save_post(post):
     # Initialize counters
     post.setdefault('likes', 0)
     post.setdefault('comments', 0)
+    post.setdefault('shares', 0)
+    post.setdefault('saves', 0)
+    post.setdefault('topics', extract_post_topics(post.get('content', '')))
     
     with open(posts_file, 'a', encoding='utf-8') as f:
         f.write(json.dumps(post, ensure_ascii=False) + '\n')
@@ -7697,6 +8156,10 @@ def delete_post(post_id):
                     posts.append(post)
     
     if deleted:
+        for file_name in ('post_comments.jsonl', 'post_likes.jsonl', 'saved_posts.jsonl', 'post_shares.jsonl'):
+            file_path = BASE_DIR / 'data' / file_name
+            _rewrite_jsonl_without_matching(file_path, lambda record: record.get('post_id') == post_id)
+
         with open(posts_file, 'w', encoding='utf-8') as f:
             for post in posts:
                 f.write(json.dumps(post, ensure_ascii=False) + '\n')
@@ -7855,6 +8318,11 @@ def toggle_follow(follower_id, following_id):
     with open(follows_file, 'w', encoding='utf-8') as f:
         for follow in follows:
             f.write(json.dumps(follow, ensure_ascii=False) + '\n')
+
+    try:
+        sync_user_follow_cache(follower_id, following_id, is_following)
+    except Exception:
+        app.logger.exception('Failed to sync user follow cache')
     
     return is_following
 
@@ -7868,12 +8336,16 @@ def get_user_stats(user_id):
     following = [f for f in follows if f.get('follower_id') == user_id]
     
     total_likes = sum(p.get('likes', 0) for p in user_posts)
+    total_shares = sum(p.get('shares', 0) for p in user_posts)
+    saves_received = sum(p.get('saves', 0) for p in user_posts)
     
     return {
         'posts_count': len(user_posts),
         'followers_count': len(followers),
         'following_count': len(following),
-        'total_likes': total_likes
+        'total_likes': total_likes,
+        'total_shares': total_shares,
+        'saves_received': saves_received
     }
 
 @app.route('/community')
@@ -7881,27 +8353,34 @@ def community():
     """Community feed page"""
     posts = load_posts()
     likes = load_post_likes()
-    follows = load_user_follows()
-    
-    # Sort by created_at descending
-    posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-    
-    # Add liked status for current user
     current_user_id = session.get('user_id')
-    if current_user_id:
-        user_likes = {like['post_id'] for like in likes if like.get('user_id') == current_user_id}
-        for post in posts:
-            post['liked_by_user'] = post['id'] in user_likes
-    
-    # Get trending posts (most likes + comments in last 7 days)
-    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    trending = [p for p in posts if p.get('created_at', '') >= week_ago]
-    trending.sort(key=lambda x: x.get('likes', 0) + x.get('comments', 0), reverse=True)
-    trending = trending[:5]
+    feed_type = request.args.get('feed', 'for_you' if current_user_id else 'latest')
+    allowed_feeds = {'for_you', 'following', 'trending', 'saved', 'latest'}
+    if feed_type not in allowed_feeds:
+        feed_type = 'for_you' if current_user_id else 'latest'
+
+    if not current_user_id and feed_type in {'for_you', 'saved', 'following'}:
+        feed_type = 'latest'
+
+    feed_posts = build_community_feed(posts, current_user_id=current_user_id, feed_type=feed_type, limit=20)
+    saved_post_ids = get_saved_post_ids(current_user_id)
+    annotate_posts_for_user(feed_posts, current_user_id, likes=likes, saved_post_ids=saved_post_ids)
+
+    trending = get_trending_posts(posts, limit=5)
+    annotate_posts_for_user(trending, current_user_id, likes=likes, saved_post_ids=saved_post_ids)
+
+    suggested_users = []
+    if current_user_id and not session.get('is_admin'):
+        suggested_users = get_suggested_users(current_user_id, limit=5)
+
+    social_highlights = get_social_highlights(current_user_id, posts, suggested_users)
     
     return render_template('community.html',
-                         posts=posts[:20],
+                         posts=feed_posts,
                          trending=trending,
+                         feed_type=feed_type,
+                         suggested_users=suggested_users,
+                         social_highlights=social_highlights,
                          datetime=datetime)
 
 @app.route('/community/post/<post_id>')
@@ -7920,14 +8399,31 @@ def post_detail(post_id):
     
     # Get liked status
     current_user_id = session.get('user_id')
-    if current_user_id:
-        likes = load_post_likes()
-        user_likes = {like['post_id'] for like in likes if like.get('user_id') == current_user_id}
-        post['liked_by_user'] = post['id'] in user_likes
+    likes = load_post_likes()
+    saved_post_ids = get_saved_post_ids(current_user_id)
+    annotate_posts_for_user([post], current_user_id, likes=likes, saved_post_ids=saved_post_ids)
+
+    related_posts = [
+        candidate for candidate in posts
+        if candidate.get('id') != post_id and (
+            candidate.get('user_id') == post.get('user_id') or
+            set(candidate.get('topics', [])) & set(post.get('topics', []))
+        )
+    ]
+    related_posts = sorted(
+        related_posts,
+        key=lambda candidate: (
+            len(set(candidate.get('topics', [])) & set(post.get('topics', []))),
+            score_post_for_feed(candidate)
+        ),
+        reverse=True
+    )[:3]
+    annotate_posts_for_user(related_posts, current_user_id, likes=likes, saved_post_ids=saved_post_ids)
     
     return render_template('post_detail.html',
                          post=post,
                          comments=comments,
+                         related_posts=related_posts,
                          datetime=datetime)
 
 @app.route('/api/community/post', methods=['POST'])
@@ -8054,6 +8550,47 @@ def api_toggle_like(post_id):
         app.logger.error(f'Error toggling like: {e}')
         return {'ok': False, 'error': 'Lỗi khi like bài viết'}, 500
 
+@app.route('/api/community/post/<post_id>/save', methods=['POST'])
+@login_required
+def api_toggle_save_post(post_id):
+    """Toggle save post for current user."""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không thể lưu bài viết'}, 403
+
+        user_id = session.get('user_id')
+        is_saved, saves_count = toggle_saved_post(post_id, user_id)
+        return {
+            'ok': True,
+            'saved': is_saved,
+            'saves_count': saves_count
+        }
+    except Exception as e:
+        app.logger.error(f'Error saving post: {e}')
+        return {'ok': False, 'error': 'Lỗi khi lưu bài viết'}, 500
+
+@app.route('/api/community/post/<post_id>/share', methods=['POST'])
+def api_share_post(post_id):
+    """Record share action and return share link."""
+    try:
+        posts = load_posts()
+        post = next((item for item in posts if item.get('id') == post_id), None)
+        if not post:
+            return {'ok': False, 'error': 'Không tìm thấy bài viết'}, 404
+
+        data = request.get_json(silent=True) or {}
+        channel = data.get('channel', 'copy_link')
+        share_count = record_post_share(post_id, session.get('user_id'), channel=channel)
+
+        return {
+            'ok': True,
+            'share_count': share_count,
+            'share_url': url_for('post_detail', post_id=post_id, _external=True)
+        }
+    except Exception as e:
+        app.logger.error(f'Error sharing post: {e}')
+        return {'ok': False, 'error': 'Lỗi khi chia sẻ bài viết'}, 500
+
 @app.route('/api/community/post/<post_id>/delete', methods=['POST'])
 @login_required
 def api_delete_post(post_id):
@@ -8132,10 +8669,13 @@ def api_toggle_follow(user_id):
             return {'ok': False, 'error': 'Không thể follow chính mình'}, 400
         
         is_following = toggle_follow(current_user_id, user_id)
+        target_stats = get_user_stats(user_id)
         
         return {
             'ok': True,
-            'is_following': is_following
+            'is_following': is_following,
+            'followers_count': target_stats.get('followers_count', 0),
+            'following_count': target_stats.get('following_count', 0)
         }
     except Exception as e:
         app.logger.error(f'Error toggling follow: {e}')

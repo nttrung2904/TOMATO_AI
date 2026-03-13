@@ -25,11 +25,11 @@
             <div style="font-size: 0.9em; color: #999;">Bài viết</div>
           </div>
           <div>
-            <div style="font-weight: 700; font-size: 1.5em; color: var(--tomato-600);">{{ stats.followers_count }}</div>
+            <div id="followersCount" style="font-weight: 700; font-size: 1.5em; color: var(--tomato-600);">{{ stats.followers_count }}</div>
             <div style="font-size: 0.9em; color: #999;">Người theo dõi</div>
           </div>
           <div>
-            <div style="font-weight: 700; font-size: 1.5em; color: var(--tomato-600);">{{ stats.following_count }}</div>
+            <div id="followingCount" style="font-weight: 700; font-size: 1.5em; color: var(--tomato-600);">{{ stats.following_count }}</div>
             <div style="font-size: 0.9em; color: #999;">Đang theo dõi</div>
           </div>
           <div>
@@ -71,6 +71,18 @@
       <div style="font-size: 2.5em; margin-bottom: 10px;">💰</div>
       <div style="font-size: 2em; font-weight: 700; margin-bottom: 5px;">{{ user.total_orders|default(0) }}</div>
       <div style="opacity: 0.9;">Đơn hàng</div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%); color: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(24,90,157,0.28);">
+      <div style="font-size: 2.5em; margin-bottom: 10px;">🔗</div>
+      <div style="font-size: 2em; font-weight: 700; margin-bottom: 5px;">{{ stats.total_shares }}</div>
+      <div style="opacity: 0.9;">Lượt chia sẻ nhận được</div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(253,160,133,0.28);">
+      <div style="font-size: 2.5em; margin-bottom: 10px;">📌</div>
+      <div style="font-size: 2em; font-weight: 700; margin-bottom: 5px;">{{ stats.saves_received }}</div>
+      <div style="opacity: 0.9;">Lượt lưu bài viết</div>
     </div>
   </div>
 
@@ -155,6 +167,11 @@ function toggleFollow() {
       } else {
         btn.textContent = '+ Theo dõi';
         btn.style.background = 'var(--tomato-600)';
+      }
+
+      const followersCount = document.getElementById('followersCount');
+      if (followersCount && typeof data.followers_count === 'number') {
+        followersCount.textContent = data.followers_count;
       }
     } else {
       alert('⚠️ ' + data.error);

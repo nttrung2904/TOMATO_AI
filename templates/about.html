@@ -3,59 +3,262 @@
 {% block title %}Giới thiệu | Tomato AI{% endblock %}
 
 {% block content %}
-    <section id="about" class="card" style="margin-top:18px">
-      <div class="about-header">
-        <img src="{{ url_for('static', filename='images/tomato.svg') }}" alt="logo" style="width:50px; height:50px;">
-        <h1 style="margin:0;">Về dự án Tomato AI</h1>
+<section id="about" class="about-shell">
+  <header class="about-hero">
+    <div class="hero-left">
+      <div class="hero-badge">Tomato AI Platform</div>
+      <h1>Giới thiệu nền tảng Tomato AI</h1>
+      <p>
+        Tomato AI là nền tảng số hỗ trợ canh tác cà chua theo hướng dữ liệu, kết hợp năng lực phân tích bệnh bằng học sâu,
+        tư vấn kiến thức, theo dõi mùa vụ, giao tiếp cộng đồng và thương mại điện tử trong một hệ sinh thái thống nhất.
+      </p>
+    </div>
+    <div class="hero-right">
+      <div class="hero-stat">
+        <strong>8</strong>
+        <span>kiến trúc AI dự đoán</span>
       </div>
+      <div class="hero-stat">
+        <strong>5</strong>
+        <span>pipeline tiền xử lý ảnh</span>
+      </div>
+      <div class="hero-stat highlight">
+        <strong>Social + Commerce</strong>
+        <span>nâng cấp toàn diện 2026</span>
+      </div>
+    </div>
+  </header>
 
-      <div class="about-section">
-        <div class="about-text">
-          <h3>Bối cảnh và Mục tiêu</h3>
-          <p>
-            Cây cà chua là một trong những loại cây trồng phổ biến và có giá trị kinh tế cao, tuy nhiên lại rất nhạy cảm với các loại bệnh do nấm, vi khuẩn và virus gây ra. Việc phát hiện bệnh muộn hoặc chẩn đoán sai có thể dẫn đến thiệt hại nghiêm trọng về năng suất và kinh tế cho người nông dân.
-          </p>
-          <p>
-            Dự án <strong>Detecting Diseases on Tomato Leaves</strong> được xây dựng với mục tiêu ứng dụng công nghệ Trí tuệ nhân tạo (AI), cụ thể là các mô hình học sâu (Deep Learning), để tạo ra một công cụ hỗ trợ chẩn đoán sớm các bệnh phổ biến trên lá cà chua. Hệ thống giúp người dùng nhanh chóng nhận diện bệnh thông qua hình ảnh, từ đó có những biện pháp xử lý kịp thời.
-          </p>
-        </div>
-        <div class="about-image" style="display: flex; justify-content: center; align-items: center;">
-          <img src="https://th.bing.com/th/id/OIP.Q5pVriNm5i94VcnLLmSBHQHaEK?w=280&h=180&c=7&r=0&o=7&cb=ucfimgc2&dpr=1.3&pid=1.7&rm=3" alt="Cây cà chua">
-        </div>
-      </div>
+  <section class="about-card">
+    <h2>Tuyên bố định hướng</h2>
+    <p>
+      Nền tảng được xây dựng nhằm giảm độ trễ trong phát hiện rủi ro bệnh cây, nâng cao năng lực ra quyết định của người dùng
+      và tạo không gian hợp tác giữa nông hộ, chuyên gia và cộng đồng quan tâm nông nghiệp công nghệ cao.
+    </p>
+    <p>
+      Toàn bộ chức năng được triển khai theo kiến trúc dịch vụ web thực tiễn: dễ mở rộng, có ghi log, có lớp kiểm tra dữ liệu đầu vào
+      và có cơ chế theo dõi hoạt động để phục vụ cải tiến liên tục.
+    </p>
+  </section>
 
-      <div class="about-section reverse">
-        <div class="about-text">
-          <h3>Công nghệ sử dụng</h3>
-          <ul>
-            <li><strong>Backend:</strong> Flask (Python) xử lý API và gọi mô hình AI.</li>
-            <li><strong>Frontend:</strong> HTML, CSS, JavaScript - giao diện đơn giản, thân thiện.</li>
-            <li><strong>Deep Learning:</strong> 8 kiến trúc CNN (<strong>VGG19, VGG16, ResNet50, MobileNetV2, InceptionV3, DenseNet, Xception, CNN</strong>) kết hợp 5 pipelines tiền xử lý → <strong>40 model configurations</strong>.</li>
-            <li><strong>Preprocessing:</strong> OpenCV & NumPy - 5 pipelines (Average HSV, Median CMYK/HSI, GaussianBlur + Noise CMYK/HSI).</li>
-            <li><strong>Similarity Check:</strong> MobileNetV2 làm feature extractor, phát hiện ảnh không phải lá cà chua trước khi dự đoán.</li>
-            <li><strong>Chatbot:</strong> RapidFuzz với 605 câu hỏi, hỗ trợ fuzzy matching tiếng Việt.</li>
-            <li><strong>Tối ưu hóa:</strong> LRU cache quản lý models trong RAM, giảm thời gian load.</li>
-          </ul>
-        </div>
-        <div class="about-image" style="display: flex; justify-content: center; align-items: center;">
-          <img src="https://th.bing.com/th/id/OIP.NvShl5D-YWvybMp6kmFYrAHaEK?w=281&h=180&c=7&r=0&o=7&cb=ucfimgc2&dpr=1.3&pid=1.7&rm=3" alt="Công nghệ AI">
-        </div>
-      </div>
+  <section class="about-grid">
+    <article class="about-card">
+      <h3>Năng lực AI và chẩn đoán</h3>
+      <ul>
+        <li>Hỗ trợ đa mô hình học sâu: VGG16, VGG19, ResNet50, MobileNetV2, InceptionV3, DenseNet, Xception và CNN.</li>
+        <li>Phân tích ảnh qua 5 pipeline tiền xử lý, tối ưu tính ổn định theo chất lượng ảnh thực tế.</li>
+        <li>Lớp Similarity Check dùng MobileNetV2 để sàng lọc ảnh không phù hợp trước khi dự đoán.</li>
+        <li>Kiến trúc cache LRU giảm tải bộ nhớ và rút ngắn thời gian phản hồi khi chạy đa mô hình.</li>
+      </ul>
+    </article>
 
-      <div class="about-footer">
-        <h3>Tác giả & Lời cảm ơn</h3>
-        <p>Nhóm phát triển: <strong>Nguyễn Thành Trung &amp; Võ Công Đoàn</strong>.</p>
-        <p>Dự án được thực hiện trong khuôn khổ Khóa luận tốt nghiệp, với sự hướng dẫn và hỗ trợ từ các giảng viên và sự đóng góp từ cộng đồng.</p>
-      </div>
+    <article class="about-card">
+      <h3>Social features nâng cao (đã cập nhật)</h3>
+      <ul>
+        <li>Feed cộng đồng đa chế độ: Dành cho bạn, Đang theo dõi, Nổi bật, Đã lưu, Mới nhất.</li>
+        <li>Chấm điểm bài viết theo mức độ tương tác và chủ đề để cá nhân hóa nội dung.</li>
+        <li>Hỗ trợ lưu bài viết, chia sẻ bài viết và theo dõi chỉ số social theo thời gian.</li>
+        <li>Gợi ý kết nối người dùng dựa trên hành vi, chủ đề quan tâm và mức độ hoạt động.</li>
+      </ul>
+    </article>
 
-      <div class="alert warn" style="margin-top: 20px;">
-        <h4 style="margin-top:0;">Giới hạn và Lưu ý quan trọng</h4>
-        <p style="margin-bottom: 5px;">
-          Đây chỉ là một hệ thống thử nghiệm. Kết quả mang tính tham khảo — luôn kiểm tra thực địa hoặc tham vấn chuyên gia nông nghiệp trước khi sử dụng thuốc hoặc can thiệp mạnh.
-        </p>
-        <p style="margin-bottom: 0;">
-          Độ chính xác của mô hình phụ thuộc rất nhiều vào chất lượng ảnh đầu vào (độ sáng, độ nét, góc chụp) và sự đa dạng của dữ liệu huấn luyện. Các trường hợp bệnh hiếm gặp hoặc triệu chứng không điển hình có thể không được nhận dạng chính xác.
-        </p>
-      </div>
-    </section>
+    <article class="about-card">
+      <h3>Vận hành và dịch vụ tích hợp</h3>
+      <ul>
+        <li>Hệ thống shop, giỏ hàng, wishlist, theo dõi đơn và thanh toán trực tuyến VNPay/MoMo/COD.</li>
+        <li>Messenger, chatbot hỗ trợ, thông báo và email service cho các luồng quan trọng.</li>
+        <li>Wiki kiến thức, video tutorials, bản đồ outbreak và dashboard phục vụ giám sát nông vụ.</li>
+        <li>Loyalty, điểm thưởng, nhiệm vụ, thành tích, referral và mini-game hỗ trợ giữ chân người dùng.</li>
+      </ul>
+    </article>
+
+    <article class="about-card">
+      <h3>Đảm bảo chất lượng</h3>
+      <ul>
+        <li>Hệ thống lưu dữ liệu theo chuẩn JSONL, dễ kiểm tra và truy vết thay đổi.</li>
+        <li>Có bộ test cho các thành phần quan trọng và quy trình kiểm tra định kỳ trước phát hành.</li>
+        <li>Logging nhiều lớp giúp nhận diện nhanh lỗi vận hành và rủi ro tích hợp.</li>
+        <li>Thiết kế ưu tiên tương thích ngược để mở rộng tính năng mà không phá dữ liệu cũ.</li>
+      </ul>
+    </article>
+  </section>
+
+  <section class="about-card notice-card">
+    <h3>Phạm vi sử dụng và lưu ý chuyên môn</h3>
+    <p>
+      Tomato AI là công cụ hỗ trợ quyết định. Kết quả dự đoán, tư vấn hoặc gợi ý xử lý cần được đối chiếu với quan sát thực địa,
+      điều kiện canh tác cụ thể và khuyến nghị từ chuyên gia trước khi thực hiện can thiệp kỹ thuật quy mô lớn.
+    </p>
+  </section>
+
+  <section class="about-card footer-card">
+    <h3>Thông tin dự án</h3>
+    <p>Nhóm phát triển: <strong>Nguyễn Thành Trung &amp; Võ Công Đoàn</strong>.</p>
+    <p>
+      Dự án được phát triển trong khuôn khổ khóa luận tốt nghiệp và đang tiếp tục được mở rộng theo định hướng
+      nền tảng nông nghiệp số tích hợp AI, dữ liệu vận hành và cộng đồng.
+    </p>
+  </section>
+</section>
+
+<style>
+  .about-shell {
+    margin-top: 20px;
+    display: grid;
+    gap: 18px;
+  }
+
+  .about-hero,
+  .about-card {
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 16px 36px rgba(29, 41, 57, 0.08);
+    border: 1px solid rgba(16, 24, 40, 0.04);
+  }
+
+  .about-hero {
+    padding: 28px;
+    display: grid;
+    gap: 24px;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    background:
+      radial-gradient(circle at top right, rgba(220, 53, 69, 0.12), transparent 38%),
+      linear-gradient(135deg, #fffaf5 0%, #ffffff 45%, #f4fcf7 100%);
+  }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(220, 53, 69, 0.1);
+    color: #b42318;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .hero-left h1 {
+    margin: 0 0 12px;
+    color: #1f2937;
+    font-size: clamp(1.8rem, 2.8vw, 2.6rem);
+  }
+
+  .hero-left p {
+    margin: 0;
+    line-height: 1.75;
+    color: #475467;
+  }
+
+  .hero-right {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .hero-stat {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #f9fafb;
+    border: 1px solid #eef2f6;
+  }
+
+  .hero-stat strong {
+    display: block;
+    color: #101828;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .hero-stat span {
+    color: #667085;
+    font-size: 0.9rem;
+  }
+
+  .hero-stat.highlight {
+    background: linear-gradient(135deg, #1f3d2f 0%, #2f5d44 100%);
+    border-color: transparent;
+  }
+
+  .hero-stat.highlight strong,
+  .hero-stat.highlight span {
+    color: #f9fffb;
+  }
+
+  .about-card {
+    padding: 24px;
+  }
+
+  .about-card h2,
+  .about-card h3 {
+    margin-top: 0;
+    color: #1d2939;
+  }
+
+  .about-card p {
+    color: #475467;
+    line-height: 1.7;
+    margin-bottom: 10px;
+  }
+
+  .about-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .about-card ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #344054;
+    line-height: 1.7;
+  }
+
+  .notice-card {
+    border-left: 5px solid #d92d20;
+    background: linear-gradient(135deg, #fff8f7 0%, #ffffff 100%);
+  }
+
+  .footer-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  }
+
+  [data-theme="dark"] .about-hero,
+  [data-theme="dark"] .about-card,
+  [data-theme="dark"] .hero-stat {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  [data-theme="dark"] .hero-left h1,
+  [data-theme="dark"] .about-card h2,
+  [data-theme="dark"] .about-card h3,
+  [data-theme="dark"] .hero-stat strong {
+    color: var(--text-primary);
+  }
+
+  [data-theme="dark"] .hero-left p,
+  [data-theme="dark"] .about-card p,
+  [data-theme="dark"] .about-card ul,
+  [data-theme="dark"] .hero-stat span {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  [data-theme="dark"] .notice-card {
+    border-left-color: #f04438;
+  }
+
+  @media (max-width: 940px) {
+    .about-hero {
+      grid-template-columns: 1fr;
+    }
+
+    .about-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 {% endblock %}
