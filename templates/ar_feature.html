@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+
+{% set is_en = current_lang == 'en' %}
+{% block title %}{{ 'AR Feature | Tomato AI' if is_en else 'Tính năng AR | Tomato AI' }}{% endblock %}
+
+{% block content %}
+<style>
+  .ar-page {
+    max-width: 1200px;
+    margin: 18px auto;
+    padding: 20px;
+  }
+
+  .ar-hero {
+    border-radius: 18px;
+    padding: 24px;
+    color: #112015;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(255,255,255,0.55), rgba(255,255,255,0) 50%),
+      linear-gradient(135deg, #7cd88d 0%, #e8f3af 45%, #f6d382 100%);
+    box-shadow: 0 12px 32px rgba(17, 32, 21, 0.16);
+    margin-bottom: 20px;
+  }
+
+  .ar-hero h1 {
+    margin: 0 0 6px;
+    font-size: 2rem;
+    letter-spacing: 0.2px;
+  }
+
+  .ar-hero p {
+    margin: 0;
+    max-width: 700px;
+    line-height: 1.5;
+  }
+
+  .ar-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+  }
+
+  .ar-stage-wrap {
+    background: #121c14;
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  }
+
+  .ar-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+  }
+
+  #ar-video,
+  #ar-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .ar-tag {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    background: rgba(8, 20, 10, 0.74);
+    color: #e8fbe9;
+    border: 1px solid rgba(124, 216, 141, 0.6);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 0.84rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .ar-controls,
+  .ar-panel {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(17, 32, 21, 0.1);
+    padding: 16px;
+  }
+
+  .ar-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .ar-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+
+  .ar-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(17, 32, 21, 0.2);
+  }
+
+  .ar-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .ar-btn.primary { background: #1b8847; color: #fff; }
+  .ar-btn.warn { background: #f09d2e; color: #1f1710; }
+  .ar-btn.danger { background: #cc3b3b; color: #fff; }
+  .ar-btn.ghost { background: #edf5ef; color: #12331e; }
+
+  .field {
+    margin-bottom: 12px;
+  }
+
+  .field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: #32463a;
+    font-weight: 600;
+  }
+
+  .field select,
+  .field input {
+    width: 100%;
+    border: 1px solid #d6e4d9;
+    border-radius: 9px;
+    padding: 8px;
+    font-size: 0.94rem;
+  }
+
+  .score-box {
+    border-radius: 12px;
+    padding: 14px;
+    background: linear-gradient(160deg, #f2f7ef, #e3f4ea);
+    border-left: 4px solid #1b8847;
+    margin-bottom: 12px;
+  }
+
+  .score-title {
+    margin: 0 0 5px;
+    color: #1e3a2a;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .score-value {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #0f2a1b;
+    font-weight: 800;
+  }
+
+  .hint {
+    margin: 0;
+    color: #4a5f52;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .quick-links {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .quick-links a {
+    color: #1b6fa5;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .quick-links a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 960px) {
+    .ar-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="ar-page">
+  <div class="ar-hero">
+    <h1>{{ 'Augmented Reality (AR) Leaf Assistant' if is_en else 'Trợ lý Lá Cà Chua AR (Thực tế tăng cường)' }}</h1>
+    <p>
+      {% if is_en %}
+      Point your camera to a tomato leaf. This AR screen overlays a target marker and disease status directly on live video.
+      Tap inside the camera area to move the AR marker, then press Analyze.
+      {% else %}
+      Hướng camera vào lá cà chua. Màn hình AR sẽ phủ marker mục tiêu và trạng thái bệnh trực tiếp trên video.
+      Chạm vào vùng camera để di chuyển marker AR, sau đó bấm Phân tích.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="ar-layout">
+    <div>
+      <div class="ar-stage-wrap">
+        <div class="ar-stage" id="ar-stage">
+          <video id="ar-video" autoplay playsinline muted></video>
+          <canvas id="ar-overlay"></canvas>
+          <div class="ar-tag" id="ar-status-tag">{{ 'Camera inactive' if is_en else 'Camera chưa bật' }}</div>
+        </div>
+      </div>
+
+      <div class="ar-controls">
+        <button id="start-ar" class="ar-btn primary">{{ 'Start AR Camera' if is_en else 'Bật camera AR' }}</button>
+        <button id="analyze-ar" class="ar-btn warn" disabled>{{ 'Analyze Frame' if is_en else 'Phân tích khung hình' }}</button>
+        <button id="toggle-hud" class="ar-btn ghost" disabled>{{ 'Hide HUD' if is_en else 'Ẩn HUD' }}</button>
+        <button id="stop-ar" class="ar-btn danger" disabled>{{ 'Stop' if is_en else 'Dừng' }}</button>
+      </div>
+    </div>
+
+    <aside class="ar-panel">
+      <div class="field">
+        <label for="model-select">{{ 'Model architecture' if is_en else 'Kiến trúc mô hình' }}</label>
+        <select id="model-select">
+          {% for model in models %}
+          <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="pipeline-select">{{ 'Preprocessing pipeline' if is_en else 'Pipeline tiền xử lý' }}</label>
+        <select id="pipeline-select">
+          {% for pipeline in pipelines %}
+          <option value="{{ pipeline }}" {% if pipeline == default_pipeline %}selected{% endif %}>{{ pipeline }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="auto-interval">{{ 'Auto analyze interval (ms)' if is_en else 'Chu kỳ tự phân tích (ms)' }}</label>
+        <input type="number" id="auto-interval" value="1800" min="500" max="5000" step="100">
+      </div>
+
+      <div class="field" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="auto-mode">
+        <label for="auto-mode" style="margin:0;">{{ 'Auto analyze continuously' if is_en else 'Tự động phân tích liên tục' }}</label>
+      </div>
+
+      <div class="score-box" id="result-box" style="display:none;">
+        <p class="score-title">{{ 'Detected class' if is_en else 'Lớp dự đoán' }}</p>
+        <p class="score-value" id="result-class">-</p>
+        <p class="score-title" style="margin-top:10px;">{{ 'Confidence' if is_en else 'Độ tin cậy' }}</p>
+        <p class="score-value" id="result-confidence">-</p>
+      </div>
+
+      <p class="hint" id="result-hint">
+        {{ 'Start camera to begin. Tip: hold leaf in center area and avoid strong backlight.' if is_en else 'Bật camera để bắt đầu. Mẹo: giữ lá ở giữa khung hình và tránh ngược sáng mạnh.' }}
+      </p>
+
+      <div class="quick-links">
+        <a href="{{ url_for('webcam') }}">{{ 'Go to standard webcam mode' if is_en else 'Chuyển sang chế độ webcam chuẩn' }}</a>
+        <a href="{{ url_for('game_menu') }}">{{ 'Go to game zone' if is_en else 'Đi tới khu giải trí' }}</a>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  const ui = {
+    statusActive: {{ '"AR camera active"' if is_en else '"Camera AR đang hoạt động"' }},
+    statusInactive: {{ '"Camera inactive"' if is_en else '"Camera chưa bật"' }},
+    hudLabel: {{ '"AR status"' if is_en else '"Trạng thái AR"' }},
+    confidenceLabel: {{ '"Confidence"' if is_en else '"Độ tin cậy"' }},
+    hintTapToAnalyze: {{ '"Tap on video to place AR marker and click Analyze Frame."' if is_en else '"Chạm vào video để đặt marker AR và bấm Phân tích khung hình."' }},
+    hintCameraError: {{ '"Cannot access camera. Please grant camera permission."' if is_en else '"Không thể truy cập camera. Vui lòng cấp quyền camera."' }},
+    analyzing: {{ '"Analyzing..."' if is_en else '"Đang phân tích..."' }},
+    analyzeButton: {{ '"Analyze Frame"' if is_en else '"Phân tích khung hình"' }},
+    healthyHint: {{ '"Leaf appears healthy. Keep consistent watering and airflow."' if is_en else '"Lá có vẻ khỏe mạnh. Hãy duy trì tưới nước và thông thoáng ổn định."' }},
+    diseaseHint: {{ '"Disease signal detected. Open standard webcam mode for detailed probabilities and severity."' if is_en else '"Phát hiện dấu hiệu bệnh. Mở chế độ webcam chuẩn để xem chi tiết xác suất và mức độ nghiêm trọng."' }},
+    analyzeFailed: {{ '"Analyze failed"' if is_en else '"Phân tích thất bại"' }},
+    hideHud: {{ '"Hide HUD"' if is_en else '"Ẩn HUD"' }},
+    showHud: {{ '"Show HUD"' if is_en else '"Hiện HUD"' }},
+    autoOn: {{ '"Auto analyze mode ON."' if is_en else '"Đã bật chế độ tự động phân tích."' }},
+    autoOff: {{ '"Auto analyze mode OFF."' if is_en else '"Đã tắt chế độ tự động phân tích."' }},
+  };
+
+  const video = document.getElementById('ar-video');
+  const overlay = document.getElementById('ar-overlay');
+  const overlayCtx = overlay.getContext('2d');
+  const stage = document.getElementById('ar-stage');
+  const statusTag = document.getElementById('ar-status-tag');
+
+  const startBtn = document.getElementById('start-ar');
+  const stopBtn = document.getElementById('stop-ar');
+  const analyzeBtn = document.getElementById('analyze-ar');
+  const hudBtn = document.getElementById('toggle-hud');
+  const autoMode = document.getElementById('auto-mode');
+  const autoIntervalInput = document.getElementById('auto-interval');
+
+  const modelSelect = document.getElementById('model-select');
+  const pipelineSelect = document.getElementById('pipeline-select');
+  const resultBox = document.getElementById('result-box');
+  const resultClass = document.getElementById('result-class');
+  const resultConfidence = document.getElementById('result-confidence');
+  const resultHint = document.getElementById('result-hint');
+
+  let stream = null;
+  let frameLoopId = null;
+  let isHudVisible = true;
+  let isAnalyzing = false;
+  let autoAnalyzeTimer = null;
+  let marker = { x: 0.5, y: 0.5 };
+  let latestPrediction = null;
+
+  function resizeOverlay() {
+    overlay.width = video.videoWidth || 960;
+    overlay.height = video.videoHeight || 720;
+  }
+
+  function drawHud() {
+    if (!overlay.width || !overlay.height) return;
+
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!isHudVisible) return;
+
+    const centerX = marker.x * overlay.width;
+    const centerY = marker.y * overlay.height;
+    const ringRadius = Math.max(32, Math.min(overlay.width, overlay.height) * 0.08);
+
+    overlayCtx.strokeStyle = 'rgba(98, 240, 151, 0.95)';
+    overlayCtx.lineWidth = 3;
+    overlayCtx.beginPath();
+    overlayCtx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+    overlayCtx.stroke();
+
+    overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+    overlayCtx.lineWidth = 1.5;
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(centerX - ringRadius - 18, centerY);
+    overlayCtx.lineTo(centerX - ringRadius + 8, centerY);
+    overlayCtx.moveTo(centerX + ringRadius - 8, centerY);
+    overlayCtx.lineTo(centerX + ringRadius + 18, centerY);
+    overlayCtx.moveTo(centerX, centerY - ringRadius - 18);
+    overlayCtx.lineTo(centerX, centerY - ringRadius + 8);
+    overlayCtx.moveTo(centerX, centerY + ringRadius - 8);
+    overlayCtx.lineTo(centerX, centerY + ringRadius + 18);
+    overlayCtx.stroke();
+
+    if (latestPrediction) {
+      const disease = !latestPrediction.class.toLowerCase().includes('healthy');
+      const panelColor = disease ? 'rgba(204, 59, 59, 0.86)' : 'rgba(27, 136, 71, 0.86)';
+      overlayCtx.fillStyle = panelColor;
+      overlayCtx.fillRect(16, overlay.height - 66, Math.min(380, overlay.width - 32), 50);
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.font = '600 15px "Segoe UI", sans-serif';
+      overlayCtx.fillText(ui.hudLabel + ': ' + latestPrediction.class, 28, overlay.height - 36);
+      overlayCtx.font = '500 13px "Segoe UI", sans-serif';
+      overlayCtx.fillText(ui.confidenceLabel + ': ' + (latestPrediction.confidence * 100).toFixed(1) + '%', 28, overlay.height - 16);
+    }
+  }
+
+  function tick() {
+    drawHud();
+    frameLoopId = window.requestAnimationFrame(tick);
+  }
+
+  function updateButtons(active) {
+    startBtn.disabled = active;
+    stopBtn.disabled = !active;
+    analyzeBtn.disabled = !active;
+    hudBtn.disabled = !active;
+    statusTag.textContent = active ? ui.statusActive : ui.statusInactive;
+  }
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      resizeOverlay();
+      updateButtons(true);
+      resultHint.textContent = ui.hintTapToAnalyze;
+      if (frameLoopId) window.cancelAnimationFrame(frameLoopId);
+      tick();
+    } catch (err) {
+      console.error(err);
+      resultHint.textContent = ui.hintCameraError;
+    }
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+    }
+    video.srcObject = null;
+    if (frameLoopId) window.cancelAnimationFrame(frameLoopId);
+    frameLoopId = null;
+    if (autoAnalyzeTimer) {
+      clearInterval(autoAnalyzeTimer);
+      autoAnalyzeTimer = null;
+    }
+    updateButtons(false);
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  async function analyzeFrame() {
+    if (!stream || isAnalyzing) return;
+    isAnalyzing = true;
+    analyzeBtn.textContent = ui.analyzing;
+
+    try {
+      const capture = document.createElement('canvas');
+      capture.width = overlay.width;
+      capture.height = overlay.height;
+      const captureCtx = capture.getContext('2d');
+      captureCtx.drawImage(video, 0, 0, capture.width, capture.height);
+
+      const payload = {
+        image: capture.toDataURL('image/jpeg', 0.9),
+        model: modelSelect.value,
+        pipeline: pipelineSelect.value,
+      };
+
+      const response = await fetch('{{ url_for('api_webcam_predict') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!data.ok) {
+        throw new Error(data.error || 'Prediction failed');
+      }
+
+      latestPrediction = data.prediction;
+      resultBox.style.display = 'block';
+      resultClass.textContent = data.prediction.class;
+      resultConfidence.textContent = (data.prediction.confidence * 100).toFixed(1) + '%';
+      resultHint.textContent = data.prediction.class.toLowerCase().includes('healthy')
+        ? ui.healthyHint
+        : ui.diseaseHint;
+    } catch (err) {
+      console.error(err);
+      resultHint.textContent = ui.analyzeFailed + ': ' + err.message;
+    } finally {
+      isAnalyzing = false;
+      analyzeBtn.textContent = ui.analyzeButton;
+    }
+  }
+
+  startBtn.addEventListener('click', startCamera);
+  stopBtn.addEventListener('click', stopCamera);
+  analyzeBtn.addEventListener('click', analyzeFrame);
+
+  hudBtn.addEventListener('click', () => {
+    isHudVisible = !isHudVisible;
+    hudBtn.textContent = isHudVisible ? ui.hideHud : ui.showHud;
+  });
+
+  autoMode.addEventListener('change', () => {
+    if (autoAnalyzeTimer) {
+      clearInterval(autoAnalyzeTimer);
+      autoAnalyzeTimer = null;
+    }
+    if (autoMode.checked) {
+      const interval = Math.max(500, parseInt(autoIntervalInput.value || '1800', 10));
+      autoAnalyzeTimer = setInterval(() => {
+        if (!isAnalyzing) analyzeFrame();
+      }, interval);
+      resultHint.textContent = ui.autoOn;
+    } else {
+      resultHint.textContent = ui.autoOff;
+    }
+  });
+
+  stage.addEventListener('click', (evt) => {
+    const rect = stage.getBoundingClientRect();
+    marker.x = Math.min(1, Math.max(0, (evt.clientX - rect.left) / rect.width));
+    marker.y = Math.min(1, Math.max(0, (evt.clientY - rect.top) / rect.height));
+  });
+
+  window.addEventListener('resize', resizeOverlay);
+  window.addEventListener('beforeunload', stopCamera);
+</script>
+{% endblock %}

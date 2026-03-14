@@ -76,6 +76,12 @@
     cursor: not-allowed;
   }
 
+  .btn-link {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+
   .prediction-display {
     background: white;
     border-radius: 12px;
@@ -210,6 +216,7 @@
     <button id="start-btn" class="btn btn-primary">▶️ Start Camera</button>
     <button id="stop-btn" class="btn btn-danger" disabled>⏹️ Stop</button>
     <button id="capture-btn" class="btn btn-success" disabled>📸 Capture & Analyze</button>
+    <a href="{{ url_for('ar_feature') }}" class="btn btn-primary btn-link">🕶️ Open AR Feature</a>
     <label style="margin-left: auto; display: flex; align-items: center;">
       <input type="checkbox" id="auto-detect" style="margin-right: 5px;">
       Auto-detect (continuous)

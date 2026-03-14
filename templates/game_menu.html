@@ -115,7 +115,9 @@
     font-weight: bold;
     font-size: 1.2em;
   }
-  block;
+
+  .play-btn {
+    display: block;
     width: 100%;
     padding: 14px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -128,9 +130,7 @@
     transition: transform 0.2s, box-shadow 0.2s;
     border: none;
     cursor: pointer;
-    margin-top: autonsform 0.2s, box-shadow 0.2s;
-    border: none;
-    cursor: pointer;
+    margin-top: auto;
   }
   
   .play-btn:hover {
@@ -290,6 +290,23 @@
       
       <a href="{{ url_for('farm_game') }}" class="play-btn">
         🚀 Bắt đầu chơi
+      </a>
+    </div>
+
+    <div class="game-card">
+      <div class="game-icon">🕶️</div>
+      <h2>AR Feature</h2>
+      <p>Trải nghiệm camera AR: đặt marker ảo và phân tích lá cà chua ngay trên khung hình trực tiếp.</p>
+
+      <ul class="game-features">
+        <li>Camera live với AR HUD</li>
+        <li>Chấm điểm tình trạng lá theo thời gian thực</li>
+        <li>Hỗ trợ auto-analyze theo chu kỳ</li>
+        <li>Phù hợp mobile và desktop</li>
+      </ul>
+
+      <a href="{{ url_for('ar_feature') }}" class="play-btn">
+        🚀 Mở AR
       </a>
     </div>
     

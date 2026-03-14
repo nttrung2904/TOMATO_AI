@@ -11660,6 +11660,18 @@ def webcam():
                          default_pipeline=DEFAULT_PIPELINE)
 
 
+@app.route('/ar-feature')
+def ar_feature():
+    """Augmented Reality camera experience page."""
+    return render_template(
+        'ar_feature.html',
+        models=MODELS,
+        pipelines=PIPELINES.keys(),
+        default_model=DEFAULT_MODEL,
+        default_pipeline=DEFAULT_PIPELINE,
+    )
+
+
 @app.route('/api/webcam_predict', methods=['POST'])
 def api_webcam_predict():
     """Real-time prediction endpoint for webcam frames."""
