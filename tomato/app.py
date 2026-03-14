@@ -2918,6 +2918,293 @@ def redeem_voucher():
 
 # ==================== Shop ====================
 
+SUBSCRIPTION_BOX_PLANS = [
+    {
+        'id': 'starter',
+        'name': 'Gói Khởi Đầu',
+        'price_per_delivery': 99000,
+        'description': 'Phù hợp người mới trồng, bộ sản phẩm cơ bản cho 1-2 luống cà chua.',
+        'items': [
+            'Phân bón hữu cơ mini',
+            'Dung dịch phòng nấm lá',
+            'Combo bẫy côn trùng',
+            'Hướng dẫn chăm sóc theo tuần'
+        ]
+    },
+    {
+        'id': 'pro',
+        'name': 'Gói Chuyên Sâu',
+        'price_per_delivery': 179000,
+        'description': 'Bổ sung dinh dưỡng + phòng trị chuyên sâu cho vườn cà chua quy mô vừa.',
+        'items': [
+            'Phân bón NPK cân bằng',
+            'Chế phẩm vi sinh đất',
+            'Thuốc trừ nấm phổ rộng',
+            'Bộ test pH đất',
+            'Checklist theo dõi sâu bệnh'
+        ]
+    },
+    {
+        'id': 'premium',
+        'name': 'Gói Premium Farm',
+        'price_per_delivery': 299000,
+        'description': 'Giải pháp đầy đủ cho nhà vườn cần chăm sóc bài bản và tối ưu năng suất.',
+        'items': [
+            'Phân bón cao cấp đa vi lượng',
+            'Bộ phòng bệnh tổng hợp 4 tuần',
+            'Thiết bị đo độ ẩm mini',
+            'Combo xử lý nhện đỏ',
+            'Lịch chăm sóc cá nhân hóa'
+        ]
+    }
+]
+
+SUBSCRIPTION_FREQUENCIES = {
+    'weekly': {'label': 'Hàng tuần', 'monthly_deliveries': 4},
+    'biweekly': {'label': '2 tuần/lần', 'monthly_deliveries': 2},
+    'monthly': {'label': 'Hàng tháng', 'monthly_deliveries': 1},
+}
+
+
+def get_subscription_box_plans():
+    return SUBSCRIPTION_BOX_PLANS
+
+
+def get_subscription_box_file():
+    return BASE_DIR / 'data' / 'subscription_boxes.jsonl'
+
+
+def load_subscription_boxes():
+    """Load all subscription boxes from JSONL."""
+    try:
+        file_path = get_subscription_box_file()
+        if not file_path.exists():
+            return []
+
+        rows = []
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return rows
+    except Exception as e:
+        app.logger.error(f'Error loading subscription boxes: {e}')
+        return []
+
+
+def append_subscription_box(subscription):
+    """Append a new subscription record."""
+    try:
+        file_path = get_subscription_box_file()
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(subscription, ensure_ascii=False) + '\n')
+        return True
+    except Exception as e:
+        app.logger.error(f'Error appending subscription box: {e}')
+        return False
+
+
+def get_user_active_subscription(user_id):
+    """Return the newest active subscription for user."""
+    subscriptions = load_subscription_boxes()
+    active = [
+        s for s in subscriptions
+        if s.get('user_id') == user_id and s.get('status') == 'active'
+    ]
+    active.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return active[0] if active else None
+
+
+def cancel_subscription_box(subscription_id, user_id):
+    """Cancel a subscription if it belongs to user and is active."""
+    try:
+        file_path = get_subscription_box_file()
+        if not file_path.exists():
+            return False, 'Không tìm thấy dữ liệu gói đăng ký'
+
+        updated_rows = []
+        cancelled_item = None
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                if row.get('id') == subscription_id and row.get('user_id') == user_id:
+                    if row.get('status') != 'active':
+                        return False, 'Gói này đã được hủy trước đó'
+                    row['status'] = 'cancelled'
+                    row['cancelled_at'] = datetime.utcnow().isoformat()
+                    row['updated_at'] = datetime.utcnow().isoformat()
+                    cancelled_item = row
+
+                updated_rows.append(row)
+
+        if not cancelled_item:
+            return False, 'Không tìm thấy gói cần hủy'
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            for row in updated_rows:
+                f.write(json.dumps(row, ensure_ascii=False) + '\n')
+
+        return True, cancelled_item
+    except Exception as e:
+        app.logger.error(f'Error canceling subscription box: {e}')
+        return False, 'Lỗi hệ thống khi hủy gói'
+
+
+@app.route('/subscription-box')
+def subscription_box_page():
+    """Subscription Box landing page."""
+    plans = get_subscription_box_plans()
+    active_subscription = None
+
+    user_id = session.get('user_id')
+    if user_id:
+        active_subscription = get_user_active_subscription(user_id)
+
+    return render_template(
+        'subscription_box.html',
+        plans=plans,
+        frequencies=SUBSCRIPTION_FREQUENCIES,
+        active_subscription=active_subscription
+    )
+
+
+@app.route('/api/subscription-box/my', methods=['GET'])
+def api_my_subscription_box():
+    """Return current user's active subscription box."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+
+    subscription = get_user_active_subscription(user_id)
+    return {'ok': True, 'subscription': subscription}
+
+
+@app.route('/api/subscription-box/subscribe', methods=['POST'])
+def api_subscribe_box():
+    """Create a new subscription box for current user."""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập để đăng ký gói'}, 401
+
+        current_active = get_user_active_subscription(user_id)
+        if current_active:
+            return {
+                'ok': False,
+                'error': 'Bạn đã có gói đang hoạt động. Vui lòng hủy gói hiện tại trước.'
+            }, 400
+
+        data = request.get_json() or {}
+        plan_id = (data.get('plan_id') or '').strip()
+        frequency = (data.get('frequency') or 'biweekly').strip()
+        address = (data.get('address') or '').strip()[:500]
+        note = (data.get('note') or '').strip()[:500]
+        start_date_raw = (data.get('start_date') or '').strip()
+
+        if not plan_id:
+            return {'ok': False, 'error': 'Vui lòng chọn gói đăng ký'}, 400
+        if frequency not in SUBSCRIPTION_FREQUENCIES:
+            return {'ok': False, 'error': 'Tần suất giao hàng không hợp lệ'}, 400
+        if not address:
+            return {'ok': False, 'error': 'Vui lòng nhập địa chỉ nhận hàng'}, 400
+
+        plan = next((p for p in SUBSCRIPTION_BOX_PLANS if p['id'] == plan_id), None)
+        if not plan:
+            return {'ok': False, 'error': 'Gói đăng ký không tồn tại'}, 404
+
+        today = datetime.utcnow().date()
+        try:
+            start_date = datetime.fromisoformat(start_date_raw).date() if start_date_raw else today
+        except ValueError:
+            start_date = today
+        if start_date < today:
+            start_date = today
+
+        freq_cfg = SUBSCRIPTION_FREQUENCIES[frequency]
+        price_per_delivery = int(plan['price_per_delivery'])
+        monthly_estimate = price_per_delivery * int(freq_cfg['monthly_deliveries'])
+
+        subscription = {
+            'id': str(uuid4())[:8],
+            'user_id': user_id,
+            'user_email': session.get('user_email', ''),
+            'plan_id': plan['id'],
+            'plan_name': plan['name'],
+            'plan_items': plan['items'],
+            'delivery_frequency': frequency,
+            'delivery_label': freq_cfg['label'],
+            'price_per_delivery': price_per_delivery,
+            'monthly_estimate': monthly_estimate,
+            'next_delivery_date': start_date.isoformat(),
+            'address': address,
+            'note': note,
+            'status': 'active',
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat(),
+        }
+
+        if not append_subscription_box(subscription):
+            return {'ok': False, 'error': 'Không thể lưu đăng ký. Vui lòng thử lại.'}, 500
+
+        try:
+            create_notification(
+                user_id=user_id,
+                title='📦 Đăng ký Subscription Box thành công',
+                message=(
+                    f'Bạn đã đăng ký {subscription["plan_name"]} - {subscription["delivery_label"]}. '
+                    f'Kỳ giao đầu tiên: {subscription["next_delivery_date"]}'
+                ),
+                notification_type='success',
+                link='/subscription-box'
+            )
+        except Exception as notify_error:
+            app.logger.warning(f'Cannot create subscription notification: {notify_error}')
+
+        app.logger.info(f'Subscription created: {subscription["id"]} for user {user_id}')
+        return {'ok': True, 'message': 'Đăng ký gói thành công', 'subscription': subscription}
+
+    except Exception as e:
+        app.logger.exception('Error subscribing subscription box')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/subscription-box/cancel/<subscription_id>', methods=['POST'])
+def api_cancel_subscription_box(subscription_id):
+    """Cancel current user's subscription box."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+
+    ok, result = cancel_subscription_box(subscription_id, user_id)
+    if not ok:
+        return {'ok': False, 'error': result}, 400
+
+    try:
+        create_notification(
+            user_id=user_id,
+            title='🛑 Đã hủy Subscription Box',
+            message=f'Bạn đã hủy gói {result.get("plan_name", "Subscription Box")}',
+            notification_type='info',
+            link='/subscription-box'
+        )
+    except Exception as notify_error:
+        app.logger.warning(f'Cannot create cancel-subscription notification: {notify_error}')
+
+    return {'ok': True, 'message': 'Đã hủy gói đăng ký', 'subscription': result}
+
+
 @app.route('/shop')
 def shop():
     """Shop page for pesticides and fertilizers"""

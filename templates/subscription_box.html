@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription Box | Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .sub-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .sub-hero {
+    background: linear-gradient(130deg, #1f9d55 0%, #52b788 45%, #95d5b2 100%);
+    color: #fff;
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 28px rgba(31, 157, 85, 0.25);
+  }
+
+  .sub-hero h1 {
+    margin: 0 0 8px;
+    font-size: 2rem;
+  }
+
+  .sub-hero p {
+    margin: 0;
+    max-width: 760px;
+    opacity: 0.96;
+    line-height: 1.6;
+  }
+
+  .sub-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 14px;
+  }
+
+  .plan-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .plan-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .plan-card.active {
+    border-color: #2f9e44;
+    background: linear-gradient(180deg, #ffffff 0%, #f4fff8 100%);
+  }
+
+  .plan-card h3 {
+    margin: 0 0 8px;
+    color: #174d2a;
+    font-size: 1.2rem;
+  }
+
+  .plan-price {
+    font-size: 1.35rem;
+    color: #0f5132;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .plan-desc {
+    color: #4f5f56;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    margin: 0 0 10px;
+  }
+
+  .plan-items {
+    margin: 0;
+    padding-left: 18px;
+    color: #33413a;
+    font-size: 0.9rem;
+  }
+
+  .panel {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  }
+
+  .panel h2 {
+    margin: 0 0 14px;
+    color: #174d2a;
+    font-size: 1.15rem;
+  }
+
+  .field {
+    margin-bottom: 12px;
+  }
+
+  .field label {
+    display: block;
+    margin-bottom: 5px;
+    color: #2f3d35;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    border: 1px solid #d8e1dc;
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 0.95rem;
+  }
+
+  .field textarea {
+    resize: vertical;
+    min-height: 88px;
+  }
+
+  .sub-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .sub-btn.primary {
+    width: 100%;
+    background: linear-gradient(130deg, #2f9e44 0%, #1b7e39 100%);
+    color: white;
+  }
+
+  .sub-btn.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(27, 126, 57, 0.3);
+  }
+
+  .sub-btn.cancel {
+    background: #c92a2a;
+    color: #fff;
+    width: 100%;
+  }
+
+  .sub-btn.cancel:hover {
+    background: #a51111;
+  }
+
+  .status-box {
+    margin-bottom: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    background: #eefaf1;
+    border-left: 4px solid #2f9e44;
+    color: #1f4630;
+    font-size: 0.92rem;
+  }
+
+  .active-box {
+    background: #f8fff9;
+    border: 1px solid #d8f3dc;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .active-line {
+    margin: 6px 0;
+    font-size: 0.93rem;
+    color: #365143;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: #d8f3dc;
+    color: #1b7e39;
+  }
+
+  .require-login {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: #fff4e6;
+    color: #7c4a03;
+    border-left: 4px solid #f08c00;
+    font-size: 0.92rem;
+  }
+
+  @media (max-width: 920px) {
+    .sub-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="sub-wrapper">
+  <div class="sub-hero">
+    <h1>📦 Subscription Box</h1>
+    <p>
+      Nhận bộ vật tư chăm sóc cà chua định kỳ theo gói. Mỗi lần giao gồm phân bón, chế phẩm và hướng dẫn thực hành,
+      giúp bạn chăm cây đều tay mà không cần nhớ mua lẻ từng món.
+    </p>
+  </div>
+
+  <div class="sub-grid">
+    <section>
+      <div class="plans-grid" id="plans-grid">
+        {% for plan in plans %}
+        <article class="plan-card" data-plan-id="{{ plan['id'] }}" data-price="{{ plan['price_per_delivery'] }}">
+          <h3>{{ plan['name'] }}</h3>
+          <div class="plan-price">{{ '{:,.0f}'.format(plan['price_per_delivery']) }} đ / lần giao</div>
+          <p class="plan-desc">{{ plan['description'] }}</p>
+          <ul class="plan-items">
+            {% for item in plan['items'] %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>Đăng ký gói</h2>
+
+      <div id="status-box" class="status-box" style="display:none;"></div>
+
+      {% if active_subscription %}
+      <div class="active-box" id="active-box" data-subscription-id="{{ active_subscription.id }}">
+        <span class="badge">Đang hoạt động</span>
+        <p class="active-line"><strong>Gói:</strong> {{ active_subscription.plan_name }}</p>
+        <p class="active-line"><strong>Tần suất:</strong> {{ active_subscription.delivery_label }}</p>
+        <p class="active-line"><strong>Kỳ giao kế tiếp:</strong> {{ active_subscription.next_delivery_date }}</p>
+        <p class="active-line"><strong>Ước tính/tháng:</strong> {{ '{:,.0f}'.format(active_subscription.monthly_estimate) }} đ</p>
+        <button class="sub-btn cancel" id="cancel-btn">Hủy gói hiện tại</button>
+      </div>
+      {% else %}
+      <div id="active-box" style="display:none;"></div>
+      {% endif %}
+
+      <form id="subscribe-form">
+        <input type="hidden" id="plan-id" name="plan_id">
+
+        <div class="field">
+          <label for="frequency">Tần suất giao hàng</label>
+          <select id="frequency" name="frequency">
+            {% for key, value in frequencies.items() %}
+            <option value="{{ key }}">{{ value.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="start-date">Ngày bắt đầu</label>
+          <input type="date" id="start-date" name="start_date" required>
+        </div>
+
+        <div class="field">
+          <label for="address">Địa chỉ nhận hàng</label>
+          <textarea id="address" name="address" placeholder="Nhập địa chỉ chi tiết để giao Subscription Box" required></textarea>
+        </div>
+
+        <div class="field">
+          <label for="note">Ghi chú</label>
+          <textarea id="note" name="note" placeholder="Khung giờ nhận hàng, hướng dẫn giao, v.v."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="estimate">Chi phí ước tính / tháng</label>
+          <input id="estimate" value="-" readonly>
+        </div>
+
+        {% if session.get('user_id') %}
+        <button type="submit" class="sub-btn primary">Đăng ký Subscription Box</button>
+        {% else %}
+        <div class="require-login">Bạn cần đăng nhập để đăng ký Subscription Box.</div>
+        {% endif %}
+      </form>
+    </aside>
+  </div>
+</div>
+
+<script>
+  const plans = Array.from(document.querySelectorAll('.plan-card'));
+  const planIdInput = document.getElementById('plan-id');
+  const estimateInput = document.getElementById('estimate');
+  const frequencySelect = document.getElementById('frequency');
+  const form = document.getElementById('subscribe-form');
+  const statusBox = document.getElementById('status-box');
+  const cancelBtn = document.getElementById('cancel-btn');
+
+  const frequencyMap = {
+    weekly: 4,
+    biweekly: 2,
+    monthly: 1,
+  };
+
+  function money(value) {
+    return new Intl.NumberFormat('vi-VN').format(value) + ' đ';
+  }
+
+  function showStatus(message, isError = false) {
+    statusBox.style.display = 'block';
+    statusBox.textContent = message;
+    statusBox.style.background = isError ? '#fff5f5' : '#eefaf1';
+    statusBox.style.borderLeftColor = isError ? '#c92a2a' : '#2f9e44';
+    statusBox.style.color = isError ? '#7f1d1d' : '#1f4630';
+  }
+
+  function getSelectedPlanCard() {
+    return plans.find((card) => card.classList.contains('active'));
+  }
+
+  function refreshEstimate() {
+    const active = getSelectedPlanCard();
+    if (!active) {
+      estimateInput.value = '-';
+      return;
+    }
+    const basePrice = Number(active.dataset.price || 0);
+    const cycle = frequencyMap[frequencySelect.value] || 1;
+    estimateInput.value = money(basePrice * cycle);
+  }
+
+  plans.forEach((card) => {
+    card.addEventListener('click', () => {
+      plans.forEach((x) => x.classList.remove('active'));
+      card.classList.add('active');
+      planIdInput.value = card.dataset.planId;
+      refreshEstimate();
+    });
+  });
+
+  frequencySelect.addEventListener('change', refreshEstimate);
+
+  if (plans.length > 0) {
+    plans[0].click();
+  }
+
+  const startDateInput = document.getElementById('start-date');
+  if (startDateInput) {
+    const today = new Date().toISOString().split('T')[0];
+    startDateInput.min = today;
+    startDateInput.value = today;
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const payload = {
+        plan_id: planIdInput.value,
+        frequency: document.getElementById('frequency').value,
+        start_date: document.getElementById('start-date').value,
+        address: document.getElementById('address').value.trim(),
+        note: document.getElementById('note').value.trim(),
+      };
+
+      if (!payload.plan_id) {
+        showStatus('Vui lòng chọn một gói trước khi đăng ký.', true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/subscription-box/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        if (!data.ok) {
+          showStatus(data.error || 'Đăng ký thất bại.', true);
+          return;
+        }
+
+        showStatus('Đăng ký thành công! Trang sẽ tải lại để cập nhật trạng thái gói.');
+        setTimeout(() => window.location.reload(), 900);
+      } catch (error) {
+        showStatus('Không thể kết nối máy chủ. Vui lòng thử lại.', true);
+      }
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', async () => {
+      const activeBox = document.getElementById('active-box');
+      const subscriptionId = activeBox?.dataset?.subscriptionId;
+      if (!subscriptionId) {
+        showStatus('Không tìm thấy mã gói cần hủy.', true);
+        return;
+      }
+
+      const ok = confirm('Bạn chắc chắn muốn hủy gói Subscription Box hiện tại?');
+      if (!ok) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/subscription-box/cancel/' + subscriptionId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await response.json();
+        if (!data.ok) {
+          showStatus(data.error || 'Hủy gói thất bại.', true);
+          return;
+        }
+
+        showStatus('Đã hủy gói thành công. Trang sẽ tải lại để bạn chọn gói mới.');
+        setTimeout(() => window.location.reload(), 900);
+      } catch (error) {
+        showStatus('Không thể kết nối máy chủ. Vui lòng thử lại.', true);
+      }
+    });
+  }
+</script>
+{% endblock %}

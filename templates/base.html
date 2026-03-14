@@ -1176,6 +1176,12 @@
             </svg>
             <span>Giải trí</span>
           </a>
+          <a href="{{ url_for('subscription_box_page') }}" class="nav-dropdown-item">
+            <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
+              <path d="M21,8V6A2,2 0 0,0 19,4H5A2,2 0 0,0 3,6V8A2,2 0 0,1 5,10V14A2,2 0 0,1 3,16V18A2,2 0 0,0 5,20H19A2,2 0 0,0 21,18V16A2,2 0 0,1 19,14V10A2,2 0 0,1 21,8M14,14H10V12H14V14Z" />
+            </svg>
+            <span>Subscription Box</span>
+          </a>
           {% if session.get('username') %}
           <a href="{{ url_for('wishlist_page') }}" class="nav-dropdown-item">
             <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
