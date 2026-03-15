@@ -1852,6 +1852,10 @@ def _generate_voucher(player_name):
 @app.route('/game')
 def game_menu():
     """Game menu page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     high_scores = _get_high_scores()
     memory_high_scores = _get_memory_high_scores()
     return render_template('game_menu.html', high_scores=high_scores, memory_high_scores=memory_high_scores)
@@ -1859,6 +1863,10 @@ def game_menu():
 @app.route('/game/quiz')
 def quiz_game():
     """Tomato quiz game"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     return render_template('quiz.html', questions=QUIZ_QUESTIONS)
 
 @app.route('/api/quiz/submit', methods=['POST'])
@@ -2017,6 +2025,10 @@ def _save_memory_score(player_name, score, moves, time_taken, difficulty, pairs)
 @app.route('/game/memory')
 def memory_game():
     """Memory matching game"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     # Get random tomato images
     images_dir = Path(app.static_folder) / 'images' / 'tomato_samples'
     tomato_images = []
@@ -2218,6 +2230,10 @@ def _save_farm_progress(user_id, progress_data):
 @app.route('/game/farm')
 def farm_game():
     """Tomato RPG game - control character to farm"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     if 'user_id' not in session:
         flash('Vui lòng đăng nhập để chơi game')
         return redirect(url_for('login'))
@@ -3065,6 +3081,10 @@ def cancel_subscription_box(subscription_id, user_id):
 @app.route('/subscription-box')
 def subscription_box_page():
     """Subscription Box landing page."""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     plans = get_subscription_box_plans()
     active_subscription = None
 
@@ -3086,6 +3106,8 @@ def api_my_subscription_box():
     user_id = session.get('user_id')
     if not user_id:
         return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+    if session.get('is_admin'):
+        return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
 
     subscription = get_user_active_subscription(user_id)
     return {'ok': True, 'subscription': subscription}
@@ -3098,6 +3120,8 @@ def api_subscribe_box():
         user_id = session.get('user_id')
         if not user_id:
             return {'ok': False, 'error': 'Vui lòng đăng nhập để đăng ký gói'}, 401
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
 
         current_active = get_user_active_subscription(user_id)
         if current_active:
@@ -3186,6 +3210,8 @@ def api_cancel_subscription_box(subscription_id):
     user_id = session.get('user_id')
     if not user_id:
         return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+    if session.get('is_admin'):
+        return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
 
     ok, result = cancel_subscription_box(subscription_id, user_id)
     if not ok:
@@ -3208,6 +3234,10 @@ def api_cancel_subscription_box(subscription_id):
 @app.route('/shop')
 def shop():
     """Shop page for pesticides and fertilizers"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     try:
         products = load_products()
         # Only show active products
@@ -3216,6 +3246,168 @@ def shop():
     except Exception as e:
         app.logger.error(f'Error loading shop: {e}')
         return render_template('shop.html', products=[])
+
+
+BLIND_BOX_PRICE = 99000
+BLIND_BOX_REWARD_POOL = [
+    # Harder pool: mostly low vouchers, lower cash odds, includes no-reward chance.
+    {'type': 'voucher', 'value': 5000, 'probability': 35.0, 'label': 'Voucher 5,000đ'},
+    {'type': 'voucher', 'value': 10000, 'probability': 25.0, 'label': 'Voucher 10,000đ'},
+    {'type': 'voucher', 'value': 20000, 'probability': 15.0, 'label': 'Voucher 20,000đ'},
+    {'type': 'voucher', 'value': 30000, 'probability': 7.0, 'label': 'Voucher 30,000đ'},
+    {'type': 'voucher', 'value': 50000, 'probability': 3.0, 'label': 'Voucher 50,000đ'},
+    {'type': 'cash', 'value': 100000, 'probability': 7.0, 'label': '100,000đ tiền mặt ví'},
+    {'type': 'cash', 'value': 200000, 'probability': 3.0, 'label': '200,000đ tiền mặt ví'},
+    {'type': 'cash', 'value': 500000, 'probability': 1.5, 'label': '500,000đ tiền mặt ví'},
+    {'type': 'cash', 'value': 1000000, 'probability': 0.3, 'label': '1,000,000đ tiền mặt ví'},
+    {'type': 'cash', 'value': 2000000, 'probability': 0.1, 'label': '2,000,000đ tiền mặt ví'},
+    {'type': 'cash', 'value': 5000000, 'probability': 0.05, 'label': '5,000,000đ tiền mặt ví'},
+    {'type': 'none', 'value': 0, 'probability': 3.0, 'label': 'Chúc bạn may mắn lần sau'},
+    # Special jackpot kept at 0.05%
+    {'type': 'cash', 'value': 10000000, 'probability': 0.05, 'label': '🎉 JACKPOT 10,000,000đ'},
+]
+
+
+def _pick_blind_box_reward():
+    """Pick a blind box reward based on configured weighted probabilities."""
+    roll = random.random() * 100
+    cumulative = 0.0
+    for reward in BLIND_BOX_REWARD_POOL:
+        cumulative += reward['probability']
+        if roll <= cumulative:
+            return reward
+    return BLIND_BOX_REWARD_POOL[-1]
+
+
+def _has_successful_topup(user_id):
+    """Require at least one successful top-up before allowing blind box opening."""
+    transactions = load_wallet_transactions(user_id)
+    for tx in transactions:
+        if tx.get('transaction_type') == 'topup' and float(tx.get('amount', 0)) > 0:
+            return True
+    return False
+
+
+def _append_blind_box_opening(record):
+    """Store blind box opening history for auditing and analytics."""
+    try:
+        file_path = BASE_DIR / 'data' / 'blind_box_openings.jsonl'
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+    except Exception:
+        app.logger.exception('Error saving blind box opening record')
+
+
+@app.route('/api/blind-box/open', methods=['POST'])
+def api_open_blind_box():
+    """Open blind box: deduct 99k from wallet and grant weighted reward."""
+    try:
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+
+        user_id = session.get('user_id')
+        if not user_id or user_id == 'admin':
+            return {'ok': False, 'error': 'Tài khoản không hợp lệ để mở hộp mù'}, 403
+
+        if not _has_successful_topup(user_id):
+            return {
+                'ok': False,
+                'error': 'Bạn cần nạp tiền vào ví ít nhất 1 lần trước khi mở hộp mù'
+            }, 400
+
+        wallet_before = get_user_wallet(user_id)
+        balance_before = float(wallet_before.get('balance', 0))
+
+        if balance_before < BLIND_BOX_PRICE:
+            return {
+                'ok': False,
+                'error': f'Số dư ví không đủ. Cần tối thiểu {BLIND_BOX_PRICE:,}đ',
+                'wallet_balance': balance_before,
+                'required': BLIND_BOX_PRICE
+            }, 400
+
+        debit_tx = add_wallet_transaction(
+            user_id=user_id,
+            amount=-BLIND_BOX_PRICE,
+            transaction_type='blind_box_open',
+            description=f'Mở hộp mù ({BLIND_BOX_PRICE:,}đ)'
+        )
+
+        reward = _pick_blind_box_reward()
+        reward_payload = {
+            'type': reward['type'],
+            'value': reward['value'],
+            'label': reward['label'],
+            'probability': reward['probability']
+        }
+
+        credit_tx_id = None
+        voucher_code = None
+
+        if reward['type'] == 'voucher':
+            voucher_code = f"BBX{str(uuid4())[:8].upper()}"
+            added = add_voucher_to_user(user_id, voucher_code, int(reward['value']), 'blind_box')
+            if not added:
+                add_wallet_transaction(
+                    user_id=user_id,
+                    amount=BLIND_BOX_PRICE,
+                    transaction_type='blind_box_refund',
+                    description='Hoàn tiền do lỗi tạo voucher hộp mù'
+                )
+                return {'ok': False, 'error': 'Không thể tạo voucher, hệ thống đã hoàn tiền'}, 500
+            reward_payload['voucher_code'] = voucher_code
+        elif reward['type'] == 'cash' and float(reward.get('value', 0)) > 0:
+            credit_tx = add_wallet_transaction(
+                user_id=user_id,
+                amount=float(reward['value']),
+                transaction_type='blind_box_reward_cash',
+                description=f"Thưởng hộp mù: {reward['label']}",
+                reference_id=debit_tx.get('id')
+            )
+            credit_tx_id = credit_tx.get('id')
+
+        wallet_after = get_user_wallet(user_id)
+        balance_after = float(wallet_after.get('balance', 0))
+
+        _append_blind_box_opening({
+            'id': str(uuid4()),
+            'user_id': user_id,
+            'price': BLIND_BOX_PRICE,
+            'reward': reward_payload,
+            'debit_transaction_id': debit_tx.get('id'),
+            'credit_transaction_id': credit_tx_id,
+            'balance_before': balance_before,
+            'balance_after': balance_after,
+            'opened_at': datetime.utcnow().isoformat()
+        })
+
+        try:
+            message = f'Bạn nhận được {reward_payload["label"]}!'
+            if voucher_code:
+                message += f' Mã voucher: {voucher_code}'
+            create_notification(
+                user_id=user_id,
+                title='🎁 Mở hộp mù thành công',
+                message=message,
+                notification_type='success',
+                link='/shop'
+            )
+        except Exception as notify_error:
+            app.logger.warning(f'Cannot create blind box notification: {notify_error}')
+
+        return {
+            'ok': True,
+            'message': 'Mở hộp mù thành công!',
+            'price': BLIND_BOX_PRICE,
+            'reward': reward_payload,
+            'wallet_balance': balance_after,
+            'net_change': balance_after - balance_before
+        }
+
+    except Exception:
+        app.logger.exception('Error opening blind box')
+        return {'ok': False, 'error': 'Có lỗi xảy ra khi mở hộp mù'}, 500
 
 @app.route('/api/products')
 def api_products():
@@ -3253,6 +3445,10 @@ def product_detail(product_id):
 @app.route('/cart')
 def cart():
     """Shopping cart page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     user = None
     addresses = []
     
@@ -4721,6 +4917,9 @@ def remove_from_wishlist(user_id, product_id):
 def api_get_wishlist():
     """Get user's wishlist with product details"""
     try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
+
         user_id = session.get('user_id')
         wishlist = get_user_wishlist(user_id)
         
@@ -4741,6 +4940,9 @@ def api_get_wishlist():
 def api_add_to_wishlist(product_id):
     """Add product to wishlist"""
     try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
+
         user_id = session.get('user_id')
         
         # Check if product exists
@@ -4763,6 +4965,9 @@ def api_add_to_wishlist(product_id):
 def api_remove_from_wishlist(product_id):
     """Remove product from wishlist"""
     try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
+
         user_id = session.get('user_id')
         success = remove_from_wishlist(user_id, product_id)
         
@@ -4779,6 +4984,9 @@ def api_remove_from_wishlist(product_id):
 def api_check_wishlist(product_id):
     """Check if product is in user's wishlist"""
     try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
+
         user_id = session.get('user_id')
         wishlist = get_user_wishlist(user_id)
         
@@ -4792,6 +5000,10 @@ def api_check_wishlist(product_id):
 @login_required
 def wishlist_page():
     """Wishlist page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     return render_template('wishlist.html', 
                          user=session,
                          active_page='wishlist')
@@ -5565,64 +5777,79 @@ def api_get_wallet():
         return {'ok': False, 'error': str(e)}, 500
 
 
-@app.route('/api/wallet/topup', methods=['POST'])
+@app.route('/api/wallet/topup', methods=['GET', 'POST'])
 @login_required
 def api_wallet_topup():
-    """Create top-up payment request"""
+    """Demo top-up: credit wallet immediately (supports GET from profile + POST API)."""
     try:
         user_id = session.get('user_id')
-        data = request.get_json()
-        
-        amount = int(data.get('amount', 0))
-        payment_method = data.get('payment_method', 'vnpay')  # vnpay or momo
+        if request.method == 'GET':
+            amount_raw = request.args.get('amount', '0')
+            payment_method = request.args.get('method', 'vnpay').lower()  # vnpay or momo
+        else:
+            data = request.get_json(silent=True) or {}
+            amount_raw = data.get('amount', 0)
+            payment_method = data.get('payment_method', 'vnpay').lower()  # vnpay or momo
+
+        try:
+            amount = int(float(amount_raw))
+        except (TypeError, ValueError):
+            amount = 0
         
         if amount < 10000:
+            if request.method == 'GET':
+                flash('Số tiền nạp tối thiểu 10,000đ', 'error')
+                return redirect(url_for('profile'))
             return {'ok': False, 'error': 'Số tiền nạp tối thiểu 10,000đ'}, 400
         
         if amount > 50000000:
+            if request.method == 'GET':
+                flash('Số tiền nạp tối đa 50,000,000đ', 'error')
+                return redirect(url_for('profile'))
             return {'ok': False, 'error': 'Số tiền nạp tối đa 50,000,000đ'}, 400
-        
-        # Create pending transaction
-        transaction_id = str(uuid4())
-        transaction = {
-            'id': transaction_id,
-            'user_id': user_id,
-            'amount': amount,
-            'transaction_type': 'topup_pending',
-            'description': f'Nạp tiền vào ví qua {payment_method.upper()}',
-            'payment_method': payment_method,
-            'status': 'pending',
-            'timestamp': datetime.utcnow().isoformat()
+
+        if payment_method not in {'vnpay', 'momo'}:
+            payment_method = 'vnpay'
+
+        # Demo mode: credit wallet immediately, no external gateway redirect
+        tx = add_wallet_transaction(
+            user_id=user_id,
+            amount=amount,
+            transaction_type='topup',
+            description=f'Nạp tiền demo qua {payment_method.upper()}'
+        )
+
+        wallet = get_user_wallet(user_id)
+
+        try:
+            create_notification(
+                user_id=user_id,
+                title='💰 Nạp tiền thành công (Demo)',
+                message=f'Đã nạp {amount:,}đ vào ví. Số dư: {wallet.get("balance", 0):,.0f}đ',
+                notification_type='success',
+                link='/profile'
+            )
+        except Exception as notify_error:
+            app.logger.warning(f'Cannot create topup notification: {notify_error}')
+
+        app.logger.info(f'Demo topup success: user={user_id}, amount={amount}, method={payment_method}')
+
+        if request.method == 'GET':
+            flash(f'Nạp tiền demo thành công! +{amount:,}đ vào ví', 'success')
+            return redirect(url_for('profile'))
+
+        return {
+            'ok': True,
+            'message': 'Nạp tiền demo thành công',
+            'transaction_id': tx.get('id'),
+            'wallet_balance': wallet.get('balance', 0)
         }
-        
-        # Save pending transaction
-        transaction_file = BASE_DIR / 'data' / 'wallet_transactions.jsonl'
-        with open(transaction_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(transaction, ensure_ascii=False) + '\n')
-        
-        # Generate payment URL
-        if payment_method == 'vnpay' and vnpay_payment:
-            payment_url = vnpay_payment.create_payment_url(
-                order_id=transaction_id,
-                amount=amount,
-                order_desc=f'Nap tien vi - {user_id}',
-                order_type='topup',
-                return_url=url_for('wallet_topup_callback', _external=True)
-            )
-        elif payment_method == 'momo' and momo_payment:
-            payment_url = momo_payment.create_payment_url(
-                order_id=transaction_id,
-                amount=amount,
-                order_info=f'Nap tien vi - {user_id}',
-                return_url=url_for('wallet_topup_callback', _external=True)
-            )
-        else:
-            return {'ok': False, 'error': 'Phương thức thanh toán không khả dụng'}, 400
-        
-        return {'ok': True, 'payment_url': payment_url, 'transaction_id': transaction_id}
     
     except Exception as e:
         app.logger.error(f'Error creating topup: {e}')
+        if request.method == 'GET':
+            flash('Có lỗi khi nạp tiền demo', 'error')
+            return redirect(url_for('profile'))
         return {'ok': False, 'error': str(e)}, 500
 
 
@@ -7700,6 +7927,9 @@ def points_dashboard():
     if 'user_id' not in session:
         flash('Vui lòng đăng nhập để xem điểm thưởng', 'warning')
         return redirect(url_for('login'))
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
     
     user_id = session['user_id']
     user = get_user_by_id(user_id)
@@ -7743,6 +7973,8 @@ def redeem_points():
     """Redeem points for rewards"""
     if 'user_id' not in session:
         return {'ok': False, 'error': 'Chưa đăng nhập'}, 401
+    if session.get('is_admin'):
+        return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
     
     try:
         data = request.get_json()
@@ -8638,6 +8870,10 @@ def get_user_stats(user_id):
 @app.route('/community')
 def community():
     """Community feed page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     posts = load_posts()
     likes = load_post_likes()
     current_user_id = session.get('user_id')
@@ -8974,6 +9210,10 @@ def api_toggle_follow(user_id):
 @app.route('/outbreak-map')
 def outbreak_map():
     """Disease outbreak map page"""
+    if session.get('is_admin'):
+        flash('Admin không có quyền truy cập chức năng này', 'error')
+        return redirect(url_for('index'))
+
     return render_template('outbreak_map.html')
 
 @app.route('/api/outbreaks', methods=['GET'])

@@ -1103,12 +1103,14 @@
         </svg>
         <span>Hỏi đáp</span>
       </a>
+      {% if not session.get('is_admin') %}
       <a href="{{ url_for('shop') }}" class="nav-link">
         <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
           <path d="M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z" />
         </svg>
         <span>Cửa hàng</span>
       </a>
+      {% endif %}
       <a href="{{ url_for('wiki_index') }}" class="nav-link">
         <svg style="width:20px;height:20px;" viewBox="0 0 24 24">
           <path d="M21,5C19.89,4.65 18.67,4.5 17.5,4.5C15.55,4.5 13.45,4.9 12,6C10.55,4.9 8.45,4.5 6.5,4.5C4.55,4.5 2.45,4.9 1,6V20.65C1,20.9 1.25,21.15 1.5,21.15C1.6,21.15 1.65,21.1 1.75,21.1C3.1,20.45 5.05,20 6.5,20C8.45,20 10.55,20.4 12,21.5C13.35,20.65 15.8,20 17.5,20C19.15,20 20.85,20.3 22.25,21.05C22.35,21.1 22.4,21.1 22.5,21.1C22.75,21.1 23,20.85 23,20.6V6C22.4,5.55 21.75,5.25 21,5M21,18.5C19.9,18.15 18.7,18 17.5,18C15.8,18 13.35,18.65 12,19.5V8C13.35,7.15 15.8,6.5 17.5,6.5C18.7,6.5 19.9,6.65 21,7V18.5Z" />
@@ -1170,6 +1172,7 @@
             </svg>
             <span>Lịch sử</span>
           </a>
+          {% if not session.get('is_admin') %}
           <a href="{{ url_for('game_menu') }}" class="nav-dropdown-item">
             <svg style="width:18px;height:18px;fill:currentColor;" viewBox="0 0 24 24">
               <path d="M16.97,5.17C16.45,5.06 15.92,5 15.38,5C13.5,5 11.69,5.67 10.26,6.87L9.67,7.37L9.13,6.83L8.13,5.83L8.66,5.28C10.39,3.58 12.75,2.58 15.25,2.58C16,2.58 16.73,2.67 17.43,2.85L17,3.28L16.97,5.17M11.91,7.79C13.07,6.82 14.5,6.3 16,6.3C16.33,6.3 16.66,6.34 17,6.39V7.91L19.23,5.68C19.9,6.5 20.38,7.5 20.63,8.58L18.83,10.38C18.5,9.5 17.91,8.69 17.13,8.12L15.97,9.28L13.97,7.28L11.91,7.79M6.79,7.79L5,9.58C5,11.5 5.74,13.37 7.05,14.79L11.26,10.58L10.26,9.58L6.79,7.79M10.59,11.38L6.38,15.58L7.79,17C9.21,18.26 11.08,19 13,19C13.69,19 14.37,18.9 15.03,18.71L14.5,18.18L12.5,16.18L10.59,11.38M16.36,15.55C16.92,15.21 17.44,14.8 17.9,14.32L18.92,15.34L17.97,16.29C17.45,16.81 16.89,17.25 16.28,17.63L15.97,17.79V16.18L16.36,15.55Z" />
@@ -1208,6 +1211,7 @@
             </svg>
             <span>Quản lý mùa vụ</span>
           </a>
+          {% endif %}
         </div>
       </div>
       
@@ -1225,7 +1229,7 @@
       <!-- Language Switcher -->
       <div class="language-switcher">
         <button onclick="toggleLanguageMenu(event)">
-          <span style="font-size: 1.2em;">{{ '🇬🇧' if current_lang == 'en' else '🇻🇳' }}</span>
+          <span style="font-size: 1.2em;">{{ 'EN' if current_lang == 'en' else 'VN' }}</span>
           <span>{{ current_lang|upper if current_lang else 'VI' }}</span>
           <svg style="width:12px;height:12px;" viewBox="0 0 24 24">
             <path d="M7,10L12,15L17,10H7Z" />
@@ -1296,7 +1300,7 @@
           <div class="user-menu-header">
             <div class="user-menu-name">{{ session.get('user_name', 'Người dùng') }}</div>
             <div class="user-menu-email">{{ session.get('user_email', '') }}</div>
-            {% if session.get('user_id') %}
+            {% if session.get('user_id') and not session.get('is_admin') %}
             <div class="user-menu-points" style="margin-top: 10px; padding: 8px 12px; background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); border-radius: 20px; color: white; font-weight: 600; text-align: center;">
               <span style="font-size: 0.85em;">💎 Điểm thưởng:</span>
               <span style="font-size: 1.2em; margin-left: 5px;" id="userPointsDisplay">{{ session.get('user_points', 0) }}</span>
@@ -1312,6 +1316,7 @@
               <span>Thông tin cá nhân</span>
             </a>
             
+            {% if not session.get('is_admin') %}
             <a href="{{ url_for('cart') }}" class="user-menu-item">
               <svg viewBox="0 0 24 24">
                 <path d="M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2H4.27L5.21,4H20A1,1 0 0,1 21,5C21,5.17 20.95,5.34 20.88,5.5L17.3,11.97C16.96,12.58 16.3,13 15.55,13H8.1L7.2,14.63L7.17,14.75A0.25,0.25 0 0,0 7.42,15H19V17H7C5.89,17 5,16.1 5,15C5,14.65 5.09,14.32 5.24,14.04L6.6,11.59L3,4H1V2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18M16,11L18.78,6H6.14L8.5,11H16Z" />
@@ -1325,6 +1330,7 @@
               </svg>
               <span>💎 Điểm thưởng</span>
             </a>
+            {% endif %}
             
             {% if session.get('is_admin') %}
             <div class="user-menu-divider"></div>

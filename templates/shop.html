@@ -88,6 +88,213 @@
     font-weight: 600;
     color: #555;
   }
+
+  .blind-box-section {
+    background: linear-gradient(145deg, #1c2d2a 0%, #283f37 100%);
+    color: #f6fff9;
+    border-radius: 18px;
+    padding: 22px;
+    margin-bottom: 30px;
+    box-shadow: 0 14px 34px rgba(14, 24, 21, 0.28);
+  }
+
+  .blind-box-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .blind-box-title {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .blind-box-subtitle {
+    margin: 6px 0 0;
+    color: #d3e8da;
+    font-size: 0.95rem;
+  }
+
+  .blind-box-price {
+    font-size: 1rem;
+    color: #f7d87e;
+    font-weight: 700;
+  }
+
+  .blind-box-wallet {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .blind-box-choose {
+    margin-top: 16px;
+  }
+
+  .blind-box-choose-label {
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    color: #dff1e7;
+  }
+
+  .gift-box-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(90px, 1fr));
+    gap: 10px;
+    max-width: 520px;
+  }
+
+  .gift-box {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #3b5a4f 0%, #2d473f 100%);
+    color: #f4fff7;
+    height: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    overflow: hidden;
+  }
+
+  .gift-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 100%;
+    background: rgba(248, 219, 128, 0.85);
+  }
+
+  .gift-box::after {
+    content: '';
+    position: absolute;
+    top: 42%;
+    left: 0;
+    width: 100%;
+    height: 12px;
+    background: rgba(248, 219, 128, 0.8);
+  }
+
+  .gift-box span {
+    position: relative;
+    z-index: 2;
+    font-size: 1.5rem;
+  }
+
+  .gift-box small {
+    position: relative;
+    z-index: 2;
+    margin-top: 3px;
+    font-size: 0.75rem;
+    opacity: 0.9;
+  }
+
+  .gift-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  .gift-box.selected {
+    border-color: #f7d87e;
+    box-shadow: 0 0 0 2px rgba(247, 216, 126, 0.2), 0 10px 24px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .gift-box.opening {
+    animation: giftShake 0.9s ease;
+  }
+
+  .gift-box.revealed {
+    background: linear-gradient(180deg, #465f57 0%, #3f554e 100%);
+    border-color: #9be0b8;
+    box-shadow: 0 0 0 2px rgba(155, 224, 184, 0.2), 0 12px 26px rgba(0, 0, 0, 0.32);
+  }
+
+  .gift-box.revealed::after {
+    top: 6px;
+    height: 8px;
+    background: rgba(248, 219, 128, 0.9);
+  }
+
+  .gift-box-hint {
+    margin-top: 10px;
+    font-size: 0.88rem;
+    color: #d5e6dd;
+    min-height: 20px;
+  }
+
+  @keyframes giftShake {
+    0% { transform: translateX(0) scale(1); }
+    15% { transform: translateX(-3px) rotate(-1deg); }
+    30% { transform: translateX(3px) rotate(1deg); }
+    45% { transform: translateX(-3px) rotate(-1deg); }
+    60% { transform: translateX(3px) rotate(1deg); }
+    100% { transform: translateX(0) scale(1.04); }
+  }
+
+  .blind-box-actions {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .blind-box-open-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 11px 18px;
+    background: linear-gradient(135deg, #f7c35f 0%, #e98b2a 100%);
+    color: #1f1a10;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 24px rgba(233, 139, 42, 0.35);
+  }
+
+  .blind-box-open-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(233, 139, 42, 0.45);
+  }
+
+  .blind-box-open-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .blind-box-odds {
+    margin-top: 14px;
+    font-size: 0.9rem;
+    color: #dbe9e0;
+    line-height: 1.5;
+  }
+
+  .blind-box-result {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: none;
+  }
+
+  .blind-box-result.show {
+    display: block;
+  }
   
   .filter-btn:hover, .filter-btn.active {
     background: var(--tomato-500);
@@ -278,6 +485,14 @@
       bottom: 20px;
       right: 20px;
     }
+
+    .blind-box-section {
+      padding: 18px;
+    }
+
+    .gift-box-grid {
+      grid-template-columns: repeat(3, minmax(80px, 1fr));
+    }
   }
 </style>
 
@@ -285,6 +500,58 @@
   <div class="shop-header">
     <h1>🛒 Cửa hàng Thuốc & Phân bón</h1>
     <p>Sản phẩm chất lượng cho cây cà chua khỏe mạnh</p>
+  </div>
+
+  <div class="blind-box-section">
+    <div class="blind-box-head">
+      <div>
+        <h2 class="blind-box-title">🎁 Hộp Mù May Mắn</h2>
+        <p class="blind-box-subtitle">Mở hộp để nhận voucher hoặc tiền thưởng vào ví của bạn</p>
+      </div>
+      <div class="blind-box-price">Giá mở: 99,000đ / lượt</div>
+    </div>
+
+    <div class="blind-box-wallet" id="blind-box-wallet">💰 Số dư ví: Đang tải...</div>
+
+    <div class="blind-box-choose">
+      <div class="blind-box-choose-label">Chọn 1 hộp quà bạn muốn mở:</div>
+      <div class="gift-box-grid" id="gift-box-grid">
+        <button type="button" class="gift-box" onclick="selectGiftBox(1)">
+          <span>🎁</span>
+          <small>Hộp 1</small>
+        </button>
+        <button type="button" class="gift-box" onclick="selectGiftBox(2)">
+          <span>🎁</span>
+          <small>Hộp 2</small>
+        </button>
+        <button type="button" class="gift-box" onclick="selectGiftBox(3)">
+          <span>🎁</span>
+          <small>Hộp 3</small>
+        </button>
+      </div>
+      <div class="gift-box-hint" id="gift-box-hint">Bạn chưa chọn hộp nào.</div>
+    </div>
+
+    <div class="blind-box-actions">
+      {% if session.get('user_id') and session.get('user_id') != 'admin' %}
+      <button class="blind-box-open-btn" id="blind-box-open-btn" onclick="openBlindBox()" disabled>Chọn hộp trước khi mở</button>
+      {% else %}
+      <button class="blind-box-open-btn" disabled>Đăng nhập để mở hộp mù</button>
+      {% endif %}
+      <a href="{{ url_for('profile') }}" style="color:#dff4e6; text-decoration: underline;">Nạp tiền tại trang hồ sơ</a>
+    </div>
+
+    <div class="blind-box-odds">
+      85% nhận voucher 5,000đ - 50,000đ.
+      <br>
+      11.95% nhận tiền thưởng ví từ 100,000đ đến 5,000,000đ (giá trị càng cao thì xác suất càng thấp).
+      <br>
+      3% không nhận thưởng.
+      <br>
+      Phần thưởng đặc biệt: 10,000,000đ với xác suất 0.05%.
+    </div>
+
+    <div class="blind-box-result" id="blind-box-result"></div>
   </div>
   
   <div class="filter-section">
@@ -309,6 +576,53 @@
 let products = [];
 let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
 let userWishlists = [];
+const BLIND_BOX_PRICE = 99000;
+let isOpeningBlindBox = false;
+let selectedGiftBox = null;
+
+function selectGiftBox(index) {
+  if (isOpeningBlindBox) return;
+
+  const boxes = document.querySelectorAll('.gift-box');
+  boxes.forEach((box, i) => {
+    box.classList.remove('selected', 'revealed', 'opening');
+    if (i === index - 1) {
+      box.classList.add('selected');
+    }
+  });
+
+  selectedGiftBox = index;
+  const hintEl = document.getElementById('gift-box-hint');
+  if (hintEl) {
+    hintEl.textContent = `Đã chọn Hộp ${index}. Nhấn "Mở hộp mù 99k" để mở từ từ.`;
+  }
+
+  const btn = document.getElementById('blind-box-open-btn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Mở hộp mù 99k';
+  }
+}
+
+function playGiftOpeningAnimation(index) {
+  return new Promise((resolve) => {
+    const boxes = document.querySelectorAll('.gift-box');
+    const chosen = boxes[index - 1];
+    if (!chosen) {
+      resolve();
+      return;
+    }
+
+    boxes.forEach((box) => box.classList.remove('opening', 'revealed'));
+    chosen.classList.add('selected', 'opening');
+
+    setTimeout(() => {
+      chosen.classList.remove('opening');
+      chosen.classList.add('revealed');
+      resolve();
+    }, 1200);
+  });
+}
 
 // Load user's wishlist
 async function loadUserWishlist() {
@@ -384,10 +698,122 @@ async function loadProducts() {
   }
 }
 
-// Load products on page load
-document.addEventListener('DOMContentLoaded', function() {
-  loadProducts();
-});
+async function loadBlindBoxWallet() {
+  const walletEl = document.getElementById('blind-box-wallet');
+  if (!walletEl) return;
+
+  {% if not session.get('user_id') or session.get('user_id') == 'admin' %}
+  walletEl.textContent = '💰 Vui lòng đăng nhập bằng tài khoản người dùng để mở hộp mù';
+  return;
+  {% endif %}
+
+  try {
+    const response = await fetch('/api/wallet');
+    const data = await response.json();
+    if (data.ok) {
+      const balance = Number(data.wallet?.balance || 0);
+      walletEl.textContent = `💰 Số dư ví: ${formatPrice(balance)}`;
+    } else {
+      walletEl.textContent = '💰 Không thể tải số dư ví';
+    }
+  } catch (error) {
+    console.error('Error loading wallet for blind box:', error);
+    walletEl.textContent = '💰 Không thể tải số dư ví';
+  }
+}
+
+async function openBlindBox() {
+  if (isOpeningBlindBox) return;
+
+  const btn = document.getElementById('blind-box-open-btn');
+  const resultEl = document.getElementById('blind-box-result');
+
+  if (!btn) return;
+
+  if (!selectedGiftBox) {
+    showToast('Hãy chọn một hộp quà trước khi mở!', 'warning');
+    return;
+  }
+
+  const confirmed = confirm('Bạn sẽ dùng 99,000đ trong ví để mở hộp mù. Tiếp tục?');
+  if (!confirmed) return;
+
+  isOpeningBlindBox = true;
+  btn.disabled = true;
+  btn.textContent = `Đang mở Hộp ${selectedGiftBox}...`;
+
+  const hintEl = document.getElementById('gift-box-hint');
+  if (hintEl) {
+    hintEl.textContent = `Đang mở Hộp ${selectedGiftBox}...`; 
+  }
+
+  await playGiftOpeningAnimation(selectedGiftBox);
+
+  try {
+    const response = await fetch('/api/blind-box/open', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    const data = await response.json();
+
+    if (!data.ok) {
+      showToast(data.error || 'Không thể mở hộp mù', 'error');
+      if (resultEl) {
+        resultEl.classList.add('show');
+        resultEl.innerHTML = `<strong>Không thể mở hộp:</strong> ${data.error || 'Lỗi không xác định'}`;
+      }
+      return;
+    }
+
+    const reward = data.reward || {};
+    const rewardValue = Number(reward.value || 0);
+    let detailLine = `Phần thưởng: <strong>${reward.label || 'Không xác định'}</strong>`;
+
+    if (reward.type === 'voucher' && reward.voucher_code) {
+      detailLine += `<br>Mã voucher: <strong>${reward.voucher_code}</strong>`;
+    }
+
+    if (resultEl) {
+      resultEl.classList.add('show');
+      resultEl.innerHTML = `
+        <div><strong>🎉 Mở hộp thành công!</strong></div>
+        <div style="margin-top: 6px; color: #d9ecdf;">Bạn đã mở Hộp ${selectedGiftBox}</div>
+        <div style="margin-top: 6px;">${detailLine}</div>
+        <div style="margin-top: 6px; font-size: 0.92rem; color: #d7eadf;">
+          Tỉ lệ trúng mục này: ${Number(reward.probability || 0)}%
+        </div>
+      `;
+    }
+
+    if (reward.type === 'cash') {
+      showToast(`Chúc mừng! Bạn nhận ${formatPrice(rewardValue)} vào ví`, 'success');
+    } else if (reward.type === 'none') {
+      showToast('Lần này chưa trúng thưởng, chúc bạn may mắn lần sau!', 'warning');
+    } else {
+      showToast('Bạn nhận được voucher mới!', 'success');
+    }
+
+    await loadBlindBoxWallet();
+
+    if (hintEl) {
+      hintEl.textContent = 'Bạn có thể chọn lại hộp khác để mở lượt tiếp theo.';
+    }
+  } catch (error) {
+    console.error('Error opening blind box:', error);
+    showToast('Lỗi kết nối khi mở hộp mù', 'error');
+    if (hintEl) {
+      hintEl.textContent = 'Mở hộp chưa thành công. Bạn có thể thử lại.';
+    }
+  } finally {
+    isOpeningBlindBox = false;
+    btn.disabled = !selectedGiftBox;
+    btn.textContent = selectedGiftBox ? 'Mở hộp mù 99k' : 'Chọn hộp trước khi mở';
+  }
+}
 
 function getImageUrl(imagePath) {
   // If image path starts with /static or http, use as is
@@ -598,7 +1024,8 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-  renderProducts();
+  loadProducts();
+  loadBlindBoxWallet();
   updateCartCount();
 });
 </script>
