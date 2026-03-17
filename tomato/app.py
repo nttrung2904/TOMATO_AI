@@ -2932,6 +2932,88 @@ def redeem_voucher():
         app.logger.exception('Error redeeming voucher')
         return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại sau'}, 500
 
+# ==================== Daily Checkin ====================
+
+@app.route('/api/checkin/do', methods=['POST'])
+def do_daily_checkin():
+    """Manual daily checkin - user must click button to checkin"""
+    try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập để điểm danh'}, 401
+        
+        user_id = session.get('user_id')
+        
+        if user_id == 'admin':
+            return {'ok': False, 'error': 'Admin không thể điểm danh'}, 403
+        
+        checkin_result = process_daily_checkin(user_id)
+        
+        if not checkin_result.get('ok'):
+            return {
+                'ok': False,
+                'error': checkin_result.get('error', 'Không thể điểm danh')
+            }, 400
+        
+        # Update session points
+        session['user_points'] = checkin_result.get('total_points', session.get('user_points', 0))
+        
+        return {
+            'ok': True,
+            'message': checkin_result.get('message', 'Điểm danh thành công!'),
+            'points_earned': checkin_result.get('points_earned', DAILY_CHECKIN_POINTS),
+            'streak_days': checkin_result.get('streak_days', 0),
+            'total_checkin_days': checkin_result.get('total_checkin_days', 0),
+            'voucher': checkin_result.get('voucher')
+        }
+    except Exception as e:
+        app.logger.exception('Error in daily checkin')
+        return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại sau'}, 500
+
+@app.route('/api/checkin/status', methods=['GET'])
+def checkin_status():
+    """Check if user can checkin today"""
+    try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+        
+        user_id = session.get('user_id')
+        
+        if user_id == 'admin':
+            return {
+                'ok': True,
+                'can_checkin': False,
+                'reason': 'Admin cannot checkin'
+            }
+        
+        user = get_user_by_id(user_id)
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
+        
+        now = datetime.now()
+        today = now.date()
+        last_checkin_date = None
+        
+        if user.get('last_checkin'):
+            try:
+                last_checkin_date = datetime.fromisoformat(user.get('last_checkin')).date()
+            except ValueError:
+                pass
+        
+        can_checkin = last_checkin_date != today
+        
+        return {
+            'ok': True,
+            'can_checkin': can_checkin,
+            'streak_days': user.get('streak_days', 0),
+            'total_checkin_days': user.get('total_checkin_days', 0),
+            'last_checkin_date': str(last_checkin_date) if last_checkin_date else None
+        }
+    except Exception as e:
+        app.logger.exception('Error checking checkin status')
+        return {'ok': False, 'error': 'Lỗi hệ thống'}, 500
+
 # ==================== Shop ====================
 
 SUBSCRIPTION_BOX_PLANS = [
@@ -3907,6 +3989,91 @@ def hash_password(password):
     """Hash password with SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
+
+DAILY_CHECKIN_POINTS = 20
+DAILY_CHECKIN_VOUCHER_INTERVAL = 30
+DAILY_CHECKIN_VOUCHER_VALUE = 20000
+
+
+def process_daily_checkin(user_id):
+    """Process a once-per-day check-in reward for a user."""
+    try:
+        user = get_user_by_id(user_id)
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}
+
+        now = datetime.now()
+        today = now.date()
+        last_checkin_date = None
+        last_checkin = user.get('last_checkin')
+        if last_checkin:
+            try:
+                last_checkin_date = datetime.fromisoformat(last_checkin).date()
+            except ValueError:
+                last_checkin_date = None
+
+        # Only allow one reward per day.
+        if last_checkin_date == today:
+            return {'ok': False, 'already_checked_in': True, 'error': 'Bạn đã điểm danh hôm nay rồi'}
+
+        if not add_points(user_id, DAILY_CHECKIN_POINTS, 'daily_checkin', 'Điểm danh hằng ngày (+20 xu)'):
+            return {'ok': False, 'error': 'Lỗi khi thêm xu điểm danh'}
+
+        previous_streak = int(user.get('streak_days', 0) or 0)
+        if last_checkin_date and (today - last_checkin_date).days == 1:
+            streak_days = previous_streak + 1
+        else:
+            streak_days = 1
+
+        total_checkin_days = int(user.get('total_checkin_days', 0) or 0) + 1
+
+        update_ok = update_user(user_id, {
+            'last_checkin': now.isoformat(),
+            'streak_days': streak_days,
+            'total_checkin_days': total_checkin_days
+        })
+        if not update_ok:
+            return {'ok': False, 'error': 'Không thể cập nhật trạng thái điểm danh'}
+
+        voucher = None
+        if total_checkin_days % DAILY_CHECKIN_VOUCHER_INTERVAL == 0:
+            voucher_code = f"CHK{str(uuid4())[:8].upper()}"
+            added = add_voucher_to_user(
+                user_id,
+                voucher_code,
+                DAILY_CHECKIN_VOUCHER_VALUE,
+                'daily_checkin_30_days'
+            )
+            if added:
+                voucher = {
+                    'code': voucher_code,
+                    'value': DAILY_CHECKIN_VOUCHER_VALUE
+                }
+
+        latest_user = get_user_by_id(user_id) or {}
+        total_points = latest_user.get('points', user.get('points', 0) + DAILY_CHECKIN_POINTS)
+
+        message = f"Điểm danh thành công! +{DAILY_CHECKIN_POINTS} xu"
+        if voucher:
+            message += (
+                f". Chúc mừng bạn đạt mốc {total_checkin_days} ngày và nhận voucher "
+                f"{voucher['value']:,}đ"
+            )
+
+        return {
+            'ok': True,
+            'already_checked_in': False,
+            'message': message,
+            'points_earned': DAILY_CHECKIN_POINTS,
+            'total_points': total_points,
+            'streak_days': streak_days,
+            'total_checkin_days': total_checkin_days,
+            'voucher': voucher
+        }
+    except Exception as e:
+        app.logger.error(f'Error processing daily check-in: {e}')
+        return {'ok': False, 'error': 'Lỗi khi điểm danh'}
+
 def get_user_by_email(email):
     """Get user by email"""
     try:
@@ -3948,6 +4115,7 @@ def create_user(email, password, full_name):
             # Gamification
             'streak_days': 0,  # Số ngày liên tục
             'last_checkin': None,  # Lần check-in cuối
+            'total_checkin_days': 0,  # Tổng số ngày đã điểm danh
             'vouchers': [],  # Danh sách mã giảm giá từ games
             # Statistics
             'total_orders': 0,
@@ -4145,6 +4313,18 @@ def get_user_statistics(user_id):
         # Get referral info
         referral_info = get_user_referral_info(user_id)
         
+        # Get checkin info
+        last_checkin = user.get('last_checkin')
+        last_checkin_date = None
+        if last_checkin:
+            try:
+                last_checkin_date = datetime.fromisoformat(last_checkin).date()
+            except ValueError:
+                pass
+        
+        today = datetime.now().date()
+        can_checkin_today = last_checkin_date != today
+        
         # Calculate membership info
         tier, tier_name, tier_color = calculate_membership_tier(user['total_spent'])
         benefits = get_membership_benefits(tier)
@@ -4190,6 +4370,12 @@ def get_user_statistics(user_id):
                 'code': referral_info.get('code', ''),
                 'referral_count': referral_info.get('referral_count', 0),
                 'total_earned': referral_info.get('total_earned', 0)
+            },
+            'checkin': {
+                'last_checkin_date': str(last_checkin_date) if last_checkin_date else None,
+                'can_checkin_today': can_checkin_today,
+                'streak_days': user.get('streak_days', 0),
+                'total_checkin_days': user.get('total_checkin_days', 0)
             }
         }
         
@@ -4365,6 +4551,7 @@ def login():
             session['user_name'] = user['full_name']
             session['user_points'] = user.get('points', 0)
             session['is_admin'] = False
+
             flash('Đăng nhập thành công!', 'success')
             
             # Redirect to next page or profile
@@ -4400,7 +4587,14 @@ def profile():
         addresses = []
         orders = []
         stats = None
-        return render_template('profile.html', user=user, addresses=addresses, orders=orders, stats=stats)
+        return render_template(
+            'profile.html',
+            user=user,
+            addresses=addresses,
+            orders=orders,
+            stats=stats,
+            daily_checkin_popup=None
+        )
     
     user_id = session.get('user_id')
     user = get_user_by_email(session.get('user_email'))
@@ -4429,7 +4623,15 @@ def profile():
     except Exception:
         app.logger.exception('Error loading orders')
     
-    return render_template('profile.html', user=user, addresses=addresses, orders=orders, stats=stats)
+    daily_checkin_popup = session.pop('daily_checkin_popup', None)
+    return render_template(
+        'profile.html',
+        user=user,
+        addresses=addresses,
+        orders=orders,
+        stats=stats,
+        daily_checkin_popup=daily_checkin_popup
+    )
 
 @app.route('/api/address/add', methods=['POST'])
 @login_required
@@ -8056,52 +8258,24 @@ def daily_checkin():
     """Daily check-in to earn points"""
     if 'user_id' not in session:
         return {'ok': False, 'error': 'Chưa đăng nhập'}, 401
+    if session.get('is_admin'):
+        return {'ok': False, 'error': 'Admin không có quyền truy cập chức năng này'}, 403
     
     try:
         user_id = session['user_id']
-        user = get_user_by_id(user_id)
-        
-        if not user:
-            return {'ok': False, 'error': 'Không tìm thấy người dùng'}, 404
-        
-        # Check if already checked in today
-        last_checkin = user.get('last_checkin')
-        today = datetime.now().date()
-        
-        if last_checkin:
-            last_checkin_date = datetime.fromisoformat(last_checkin).date()
-            if last_checkin_date == today:
-                return {'ok': False, 'error': 'Bạn đã check-in hôm nay rồi'}, 400
-        
-        # Add check-in points
-        checkin_points = 5
-        success = add_points(user_id, checkin_points, 'daily_checkin', 
-                           'Check-in hàng ngày')
-        
-        if not success:
-            return {'ok': False, 'error': 'Lỗi khi thêm điểm'}, 500
-        
-        # Update last_checkin
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        users = []
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    u = json.loads(line)
-                    if u['id'] == user_id:
-                        u['last_checkin'] = datetime.now().isoformat()
-                    users.append(u)
-        
-        with open(users_file, 'w', encoding='utf-8') as f:
-            for u in users:
-                f.write(json.dumps(u, ensure_ascii=False) + '\n')
-        
-        return {
-            'ok': True,
-            'message': f'Check-in thành công! +{checkin_points} điểm',
-            'points_earned': checkin_points,
-            'total_points': user.get('points', 0) + checkin_points
-        }
+        result = process_daily_checkin(user_id)
+
+        if result.get('ok'):
+            session['user_points'] = result.get('total_points', session.get('user_points', 0))
+            return result
+
+        if result.get('already_checked_in'):
+            return {'ok': False, 'error': result.get('error', 'Bạn đã điểm danh hôm nay rồi')}, 400
+
+        if result.get('error') == 'Không tìm thấy người dùng':
+            return {'ok': False, 'error': result.get('error')}, 404
+
+        return {'ok': False, 'error': result.get('error', 'Lỗi khi điểm danh')}, 500
     except Exception as e:
         app.logger.error(f'Error during check-in: {e}')
         return {'ok': False, 'error': 'Lỗi khi check-in'}, 500
