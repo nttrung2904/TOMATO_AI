@@ -69,7 +69,7 @@
     font-size: 0.75em;
     font-weight: bold;
   }
-  
+
   .filter-section {
     display: flex;
     justify-content: center;
@@ -494,6 +494,204 @@
       grid-template-columns: repeat(3, minmax(80px, 1fr));
     }
   }
+
+  /* ===== Lucky Spin Section ===== */
+  .lucky-spin-section {
+    background: linear-gradient(145deg, #2c1654 0%, #1a0f30 100%);
+    color: #f0e6ff;
+    border-radius: 18px;
+    padding: 22px;
+    margin-bottom: 30px;
+    box-shadow: 0 14px 34px rgba(40, 10, 70, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  .lucky-spin-section::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(200,100,255,0.15), transparent 70%);
+    pointer-events: none;
+  }
+  .spin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .spin-title { margin: 0; font-size: 1.35rem; color: #f0e6ff; }
+  .spin-subtitle { margin: 5px 0 0; font-size: 0.9rem; color: #c9b3e8; }
+  .spin-price-badge {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .spin-wallet-row {
+    background: rgba(255,255,255,0.08);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    display: inline-block;
+    margin-bottom: 18px;
+  }
+  .spin-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .spin-wheel-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .spin-pointer {
+    font-size: 1.6rem;
+    color: #f7d87e;
+    margin-bottom: -8px;
+    text-shadow: 0 2px 8px rgba(247,216,126,0.6);
+    z-index: 2;
+    position: relative;
+  }
+  .spin-canvas-wrap {
+    position: relative;
+    width: 308px;
+    height: 308px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(247,216,126,0.25), 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .spin-canvas-wrap canvas { display: block; border-radius: 50%; }
+  .spin-control-col {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .spin-status-card {
+    background: rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 0.9rem;
+    color: #d4bff0;
+    border: 1px solid rgba(200,150,255,0.15);
+  }
+  .spin-btn-group { display: flex; flex-direction: column; gap: 10px; }
+  .spin-free-btn, .spin-paid-btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: all 0.25s;
+  }
+  .spin-free-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(16,185,129,0.3);
+  }
+  .spin-free-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(16,185,129,0.5);
+  }
+  .spin-free-btn.available {
+    animation: spinGlow 2s ease-in-out infinite alternate;
+  }
+  @keyframes spinGlow {
+    from { box-shadow: 0 6px 20px rgba(16,185,129,0.35); }
+    to   { box-shadow: 0 8px 28px rgba(16,185,129,0.75); }
+  }
+  .spin-paid-btn {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(124,58,237,0.3);
+  }
+  .spin-paid-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(124,58,237,0.5);
+  }
+  .spin-free-btn:disabled, .spin-paid-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    animation: none;
+  }
+  .spin-odds-list {
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 10px 12px;
+    max-height: 230px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,150,255,0.3) transparent;
+  }
+  .odds-title { font-weight: 700; font-size: 0.85rem; color: #c9b3e8; margin-bottom: 8px; }
+  .odds-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: #d4bff0;
+  }
+  .odds-pct { color: #a78bfa; font-weight: 600; font-size: 0.78rem; }
+  .spin-result-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(20,10,40,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 18px;
+    backdrop-filter: blur(4px);
+  }
+  .spin-result-card {
+    background: linear-gradient(145deg, #3a1e78, #251154);
+    border: 2px solid rgba(200,150,255,0.3);
+    border-radius: 18px;
+    padding: 28px 32px;
+    text-align: center;
+    max-width: 300px;
+    width: 90%;
+    animation: spinResultPop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  }
+  @keyframes spinResultPop {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .spin-result-emoji { font-size: 3rem; margin-bottom: 8px; }
+  .spin-result-title { font-size: 1.1rem; font-weight: 600; color: #c9b3e8; margin-bottom: 8px; }
+  .spin-result-prize { font-size: 1.4rem; font-weight: 800; color: #f7d87e; margin-bottom: 10px; }
+  .spin-result-detail { font-size: 0.88rem; color: #c9b3e8; line-height: 1.5; margin-bottom: 16px; }
+  .spin-result-close {
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .spin-result-close:hover { transform: scale(1.05); }
+  @media (max-width: 768px) {
+    .spin-layout { flex-direction: column; align-items: center; }
+    .spin-canvas-wrap { width: 260px; height: 260px; }
+    .spin-canvas-wrap canvas { width: 260px; height: 260px; }
+  }
 </style>
 
 <div class="shop-container">
@@ -553,7 +751,63 @@
 
     <div class="blind-box-result" id="blind-box-result"></div>
   </div>
-  
+
+  <!-- Lucky Spin Wheel -->
+  <div class="lucky-spin-section">
+    <div class="spin-header">
+      <div>
+        <h2 class="spin-title">🎡 Vòng Quay May Mắn</h2>
+        <p class="spin-subtitle">Hoàn thành đủ nhiệm vụ hằng ngày để nhận 1 lượt quay miễn phí!</p>
+      </div>
+      <div class="spin-price-badge">30,000đ / lượt quay</div>
+    </div>
+    <div class="spin-wallet-row" id="spin-wallet-row">💰 Đang tải số dư...</div>
+    <div class="spin-layout">
+      <!-- Wheel -->
+      <div class="spin-wheel-col">
+        <div class="spin-pointer">▼</div>
+        <div class="spin-canvas-wrap">
+          <canvas id="spin-canvas" width="300" height="300"></canvas>
+        </div>
+      </div>
+      <!-- Controls -->
+      <div class="spin-control-col">
+        <div class="spin-status-card">
+          <span id="spin-status-icon" style="font-size:1.3rem;flex-shrink:0">⏳</span>
+          <span id="spin-status-msg">Đang kiểm tra trạng thái...</span>
+        </div>
+        <div class="spin-btn-group">
+          {% if session.get('user_id') and session.get('user_id') != 'admin' %}
+          <button class="spin-free-btn" id="spin-free-btn" onclick="triggerSpin('free')" disabled>
+            🎁 Quay miễn phí
+          </button>
+          <button class="spin-paid-btn" id="spin-paid-btn" onclick="triggerSpin('paid')" disabled>
+            💰 Quay 30,000đ
+          </button>
+          {% else %}
+          <a href="{{ url_for('login') }}" style="display:block;text-align:center;padding:12px 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border-radius:12px;font-weight:700;text-decoration:none;">
+            🔑 Đăng nhập để quay
+          </a>
+          {% endif %}
+        </div>
+        <div class="spin-odds-list" id="spin-odds-list">
+          <div class="odds-title">📊 Bảng phần thưởng</div>
+          <div style="color:#c9b3e8;font-size:0.8rem">Đang tải...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Result modal overlay (inside section for correct stacking) -->
+    <div class="spin-result-overlay" id="spin-result-overlay" style="display:none">
+      <div class="spin-result-card">
+        <div class="spin-result-emoji" id="spin-result-emoji">🎉</div>
+        <div class="spin-result-title">🎊 Chúc mừng!</div>
+        <div class="spin-result-prize" id="spin-result-prize"></div>
+        <div class="spin-result-detail" id="spin-result-detail"></div>
+        <button class="spin-result-close" onclick="closeSpinResult()">🎯 Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <div class="filter-section">
     <button class="filter-btn active" data-category="all">Tất cả</button>
     <button class="filter-btn" data-category="pesticide">Thuốc trừ sâu</button>
@@ -1022,10 +1276,239 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
+// ===== Lucky Spin Wheel =====
+let SPIN_PRIZES_DATA = [];
+let spinDeg = 0;
+let isSpinning = false;
+
+function drawSpinWheel(prizes, rotDeg) {
+  const canvas = document.getElementById('spin-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  const outerR = Math.min(cx, cy) - 4;
+  const innerR = 28;
+  ctx.clearRect(0, 0, W, H);
+
+  // Outer golden ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR + 4, 0, 2 * Math.PI);
+  ctx.fillStyle = '#f7d87e';
+  ctx.fill();
+
+  if (!prizes || !prizes.length) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
+    ctx.fillStyle = '#3a1e78';
+    ctx.fill();
+    ctx.fillStyle = '#c9b3e8';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Vòng quay', cx, cy - 10);
+    ctx.fillText('Đang tải...', cx, cy + 10);
+    return;
+  }
+
+  const n = prizes.length;
+  const segRad = (2 * Math.PI) / n;
+  const rotRad = (rotDeg * Math.PI) / 180;
+
+  prizes.forEach((p, i) => {
+    const startRad = rotRad + i * segRad - Math.PI / 2;
+    const endRad = startRad + segRad;
+    const midRad = startRad + segRad / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, outerR, startRad, endRad);
+    ctx.closePath();
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(midRad);
+    // Emoji
+    ctx.font = '12px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 3;
+    ctx.fillText(p.emoji || '🎁', outerR - 18, 0);
+    // Label
+    ctx.font = 'bold 8px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 2;
+    const label = p.label.length > 14 ? p.label.slice(0, 13) + '\u2026' : p.label;
+    ctx.fillText(label, outerR - 30, 0);
+    ctx.restore();
+  });
+
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
+  ctx.fillStyle = '#1a0f30';
+  ctx.fill();
+  ctx.strokeStyle = '#f7d87e';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.font = '18px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 0;
+  ctx.fillText('🍅', cx, cy);
+}
+
+function animateWheelSpin(fromDeg, toDeg, duration, onTick, onDone) {
+  const startTime = performance.now();
+  const diff = toDeg - fromDeg;
+  function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+  function frame(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    onTick(fromDeg + diff * easeOut(t));
+    if (t < 1) requestAnimationFrame(frame);
+    else onDone(toDeg);
+  }
+  requestAnimationFrame(frame);
+}
+
+function spinWheelToPrize(prizeIndex, onComplete) {
+  const n = SPIN_PRIZES_DATA.length;
+  if (!n) return;
+  const segDeg = 360 / n;
+  // Calculate rotation so prizeIndex segment center lands at top (arrow)
+  const targetMod = ((-(prizeIndex + 0.5) * segDeg) % 360 + 360) % 360;
+  const currentMod = ((spinDeg % 360) + 360) % 360;
+  let delta = targetMod - currentMod;
+  if (delta <= 0) delta += 360;
+  delta += 6 * 360; // at least 6 full rotations for drama
+  isSpinning = true;
+  animateWheelSpin(
+    spinDeg, spinDeg + delta, 4000,
+    (d) => { spinDeg = d; drawSpinWheel(SPIN_PRIZES_DATA, d); },
+    (d) => { spinDeg = d; isSpinning = false; if (onComplete) onComplete(); }
+  );
+}
+
+async function loadSpinStatus() {
+  {% if not session.get('user_id') or session.get('user_id') == 'admin' %}
+  const smsg = document.getElementById('spin-status-msg');
+  const sicon = document.getElementById('spin-status-icon');
+  if (smsg) smsg.textContent = 'Vui lòng đăng nhập để sử dụng vòng quay';
+  if (sicon) sicon.textContent = '🔒';
+  drawSpinWheel([], 0);
+  return;
+  {% endif %}
+  try {
+    const res = await fetch('/api/spin/status');
+    const data = await res.json();
+    if (!data.ok) { console.error('spin status error', data); return; }
+    SPIN_PRIZES_DATA = data.prizes || [];
+    if (!isSpinning) drawSpinWheel(SPIN_PRIZES_DATA, spinDeg);
+    renderSpinOdds(SPIN_PRIZES_DATA);
+
+    const walletEl = document.getElementById('spin-wallet-row');
+    if (walletEl) {
+      walletEl.textContent = '💰 Số dư ví: ' + (data.wallet_balance || 0).toLocaleString('vi-VN') + 'đ';
+    }
+    const statusMsg = document.getElementById('spin-status-msg');
+    const statusIcon = document.getElementById('spin-status-icon');
+    const freeBtn = document.getElementById('spin-free-btn');
+    const paidBtn = document.getElementById('spin-paid-btn');
+    if (data.can_free_spin) {
+      if (statusMsg) statusMsg.textContent = '🎉 Bạn có 1 lượt quay miễn phí hôm nay!';
+      if (statusIcon) statusIcon.textContent = '🎁';
+      if (freeBtn) { freeBtn.disabled = false; freeBtn.classList.add('available'); }
+    } else {
+      if (statusMsg) statusMsg.textContent = data.free_spin_reason || 'Chưa đủ điều kiện quay miễn phí';
+      if (statusIcon) statusIcon.textContent = '📋';
+      if (freeBtn) { freeBtn.disabled = true; freeBtn.classList.remove('available'); }
+    }
+    if (paidBtn) paidBtn.disabled = false;
+  } catch (e) {
+    console.error('Error loading spin status:', e);
+  }
+}
+
+function renderSpinOdds(prizes) {
+  const el = document.getElementById('spin-odds-list');
+  if (!el) return;
+  el.innerHTML = '<div class="odds-title">📊 Bảng phần thưởng</div>' +
+    prizes.map(p =>
+      '<div class="odds-row"><span>' + (p.emoji || '🎁') + ' ' + p.label + '</span><span class="odds-pct">' + p.probability + '%</span></div>'
+    ).join('');
+}
+
+async function triggerSpin(type) {
+  if (isSpinning) return;
+  if (type === 'paid') {
+    if (!confirm('Bạn sẽ dùng 30,000đ trong ví để quay. Tiếp tục?')) return;
+  }
+  const freeBtn = document.getElementById('spin-free-btn');
+  const paidBtn = document.getElementById('spin-paid-btn');
+  if (freeBtn) freeBtn.disabled = true;
+  if (paidBtn) paidBtn.disabled = true;
+  try {
+    const res = await fetch('/api/spin/do', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || 'Không thể quay', 'error');
+      loadSpinStatus();
+      return;
+    }
+    const prize = data.prize;
+    const prizeIndex = SPIN_PRIZES_DATA.findIndex(p => p.id === prize.id);
+    spinWheelToPrize(prizeIndex >= 0 ? prizeIndex : 0, () => {
+      showSpinResultModal(prize);
+      loadSpinStatus();
+    });
+  } catch (e) {
+    console.error('Spin error:', e);
+    showToast('Lỗi kết nối', 'error');
+    loadSpinStatus();
+  }
+}
+
+function showSpinResultModal(prize) {
+  const overlay = document.getElementById('spin-result-overlay');
+  const emojiEl = document.getElementById('spin-result-emoji');
+  const prizeEl = document.getElementById('spin-result-prize');
+  const detailEl = document.getElementById('spin-result-detail');
+  if (!overlay) return;
+  if (emojiEl) emojiEl.textContent = prize.emoji || '🎉';
+  if (prizeEl) prizeEl.textContent = prize.label;
+  let detail = '';
+  if (prize.type === 'voucher' && prize.voucher_code) {
+    detail = '🎫 Mã: <strong>' + prize.voucher_code + '</strong><br><small>Dùng khi thanh toán để được giảm giá!</small>';
+  } else if (prize.type === 'cash') {
+    detail = '💰 Tiền thưởng đã được cộng vào ví của bạn!';
+  } else if (prize.type === 'points') {
+    detail = '⭐ Xu đã được cộng vào tài khoản!';
+  }
+  if (detailEl) detailEl.innerHTML = detail;
+  overlay.style.display = 'flex';
+}
+
+function closeSpinResult() {
+  const overlay = document.getElementById('spin-result-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
   loadProducts();
   loadBlindBoxWallet();
+  loadSpinStatus();
   updateCartCount();
 });
 </script>

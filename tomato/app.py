@@ -3313,6 +3313,165 @@ def api_cancel_subscription_box(subscription_id):
     return {'ok': True, 'message': 'Đã hủy gói đăng ký', 'subscription': result}
 
 
+# ==================== Lucky Spin ====================
+
+LUCKY_SPIN_PRICE = 30000  # 30,000đ per paid spin
+
+LUCKY_SPIN_PRIZES = [
+    # Common (60%)
+    {'id': 'voucher_3k',  'label': 'Voucher 3,000đ',   'type': 'voucher', 'value': 3000,   'probability': 22.0, 'color': '#95a5a6', 'emoji': '🎫'},
+    {'id': 'voucher_5k',  'label': 'Voucher 5,000đ',   'type': 'voucher', 'value': 5000,   'probability': 22.0, 'color': '#7f8c8d', 'emoji': '🎫'},
+    {'id': 'points_20',   'label': '+20 xu',            'type': 'points',  'value': 20,     'probability': 16.0, 'color': '#27ae60', 'emoji': '⭐'},
+    # Uncommon (25%)
+    {'id': 'voucher_10k', 'label': 'Voucher 10,000đ',  'type': 'voucher', 'value': 10000,  'probability': 13.0, 'color': '#2980b9', 'emoji': '🎟️'},
+    {'id': 'voucher_20k', 'label': 'Voucher 20,000đ',  'type': 'voucher', 'value': 20000,  'probability': 8.0,  'color': '#8e44ad', 'emoji': '🎟️'},
+    {'id': 'points_50',   'label': '+50 xu',            'type': 'points',  'value': 50,     'probability': 4.0,  'color': '#16a085', 'emoji': '💫'},
+    # Rare (12%)
+    {'id': 'voucher_50k', 'label': 'Voucher 50,000đ',  'type': 'voucher', 'value': 50000,  'probability': 5.0,  'color': '#e67e22', 'emoji': '🏆'},
+    {'id': 'cash_30k',    'label': 'Tiền ví 30,000đ',  'type': 'cash',    'value': 30000,  'probability': 4.5,  'color': '#f39c12', 'emoji': '💰'},
+    {'id': 'points_100',  'label': '+100 xu',           'type': 'points',  'value': 100,    'probability': 2.5,  'color': '#d35400', 'emoji': '✨'},
+    # Epic (2.8%)
+    {'id': 'voucher_100k','label': 'Voucher 100,000đ', 'type': 'voucher', 'value': 100000, 'probability': 1.5,  'color': '#e74c3c', 'emoji': '💎'},
+    {'id': 'cash_50k',    'label': 'Tiền ví 50,000đ',  'type': 'cash',    'value': 50000,  'probability': 0.9,  'color': '#c0392b', 'emoji': '💰'},
+    {'id': 'points_200',  'label': '+200 xu',           'type': 'points',  'value': 200,    'probability': 0.4,  'color': '#922b21', 'emoji': '🌟'},
+    # Legendary (0.2%)
+    {'id': 'jackpot',     'label': '🎉 200,000đ JACKPOT','type': 'cash',   'value': 200000, 'probability': 0.2,  'color': '#f1c40f', 'emoji': '🎉'},
+]
+
+
+def _pick_spin_prize():
+    """Pick a lucky spin prize based on probability"""
+    roll = random.random() * 100
+    cumulative = 0.0
+    for prize in LUCKY_SPIN_PRIZES:
+        cumulative += prize['probability']
+        if roll <= cumulative:
+            return prize
+    return LUCKY_SPIN_PRIZES[0]  # fallback to first
+
+
+def _check_free_spin_available(user_id):
+    """Check if user has a free spin available today (all daily quests completed)"""
+    try:
+        today_str = datetime.now().date().isoformat()
+        # Check last free spin date
+        user = get_user_by_id(user_id)
+        if not user:
+            return False, 'Không tìm thấy người dùng'
+        last_free_spin = user.get('last_free_spin')
+        if last_free_spin:
+            try:
+                if datetime.fromisoformat(last_free_spin).date().isoformat() == today_str:
+                    return False, 'Bạn đã dùng lượt quay miễn phí hôm nay'
+            except ValueError:
+                pass
+        # Check all daily quests completed
+        quests = get_user_daily_quests(user_id)
+        all_done = all(q.get('completed', False) for q in quests)
+        if not all_done:
+            completed = sum(1 for q in quests if q.get('completed', False))
+            return False, f'Hoàn thành đủ nhiệm vụ để nhận lượt quay miễn phí ({completed}/{len(quests)} nhiệm vụ)'
+        return True, 'Bạn có 1 lượt quay miễn phí!'
+    except Exception:
+        return False, 'Lỗi kiểm tra lượt quay'
+
+
+@app.route('/api/spin/status', methods=['GET'])
+def spin_status():
+    """Check spin status for current user"""
+    try:
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+        user_id = session.get('user_id')
+        if user_id == 'admin':
+            return {'ok': True, 'can_free_spin': False, 'free_spin_reason': 'Admin không thể quay', 'wallet_balance': 0, 'spin_price': LUCKY_SPIN_PRICE, 'prizes': LUCKY_SPIN_PRIZES}
+        can_free, free_msg = _check_free_spin_available(user_id)
+        wallet = get_user_wallet(user_id)
+        return {
+            'ok': True,
+            'can_free_spin': can_free,
+            'free_spin_reason': free_msg,
+            'wallet_balance': float(wallet.get('balance', 0)),
+            'spin_price': LUCKY_SPIN_PRICE,
+            'prizes': LUCKY_SPIN_PRIZES
+        }
+    except Exception:
+        app.logger.exception('Error in spin_status')
+        return {'ok': False, 'error': 'Lỗi hệ thống'}, 500
+
+
+@app.route('/api/spin/do', methods=['POST'])
+def do_spin():
+    """Execute a lucky spin (free or paid)"""
+    try:
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập'}, 401
+        user_id = session.get('user_id')
+        if user_id == 'admin':
+            return {'ok': False, 'error': 'Admin không thể quay vòng quay'}, 403
+
+        data = request.get_json() or {}
+        spin_type = data.get('type', 'paid')  # 'free' or 'paid'
+
+        if spin_type == 'free':
+            can_free, msg = _check_free_spin_available(user_id)
+            if not can_free:
+                return {'ok': False, 'error': msg}, 400
+            # Mark free spin used
+            update_user(user_id, {'last_free_spin': datetime.now().isoformat()})
+        else:
+            # Paid spin
+            wallet = get_user_wallet(user_id)
+            balance = float(wallet.get('balance', 0))
+            if balance < LUCKY_SPIN_PRICE:
+                return {
+                    'ok': False,
+                    'error': f'Số dư ví không đủ. Cần {LUCKY_SPIN_PRICE:,}đ, bạn có {int(balance):,}đ',
+                    'wallet_balance': balance
+                }, 400
+            add_wallet_transaction(
+                user_id=user_id,
+                amount=-LUCKY_SPIN_PRICE,
+                transaction_type='lucky_spin',
+                description=f'Quay vòng quay may mắn ({LUCKY_SPIN_PRICE:,}đ)'
+            )
+
+        # Pick prize
+        prize = _pick_spin_prize()
+        prize_result = {
+            'id': prize['id'],
+            'label': prize['label'],
+            'type': prize['type'],
+            'value': prize['value'],
+            'emoji': prize['emoji'],
+            'color': prize['color']
+        }
+
+        # Give reward
+        if prize['type'] == 'voucher':
+            code = f"SPIN{str(uuid4())[:8].upper()}"
+            add_voucher_to_user(user_id, code, int(prize['value']), 'lucky_spin')
+            prize_result['voucher_code'] = code
+        elif prize['type'] == 'cash':
+            add_wallet_transaction(
+                user_id=user_id,
+                amount=float(prize['value']),
+                transaction_type='lucky_spin_reward',
+                description=f"Thưởng vòng quay: {prize['label']}"
+            )
+        elif prize['type'] == 'points':
+            add_points(user_id, prize['value'], 'lucky_spin', f"Vòng quay may mắn (+{prize['value']} xu)")
+
+        wallet_after = get_user_wallet(user_id)
+        prize_result['wallet_balance'] = float(wallet_after.get('balance', 0))
+        prize_result['spin_type'] = spin_type
+
+        return {'ok': True, 'prize': prize_result}
+    except Exception:
+        app.logger.exception('Error in do_spin')
+        return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại'}, 500
+
+
 @app.route('/shop')
 def shop():
     """Shop page for pesticides and fertilizers"""
@@ -5956,6 +6115,33 @@ def api_weather_forecast():
     except Exception as e:
         app.logger.error(f'Forecast API error: {e}')
         return {'success': False, 'error': str(e)}, 500
+
+
+# ==================== User API Routes ====================
+
+@app.route('/api/user/statistics', methods=['GET'])
+@login_required
+def api_user_statistics():
+    """Get user statistics for quick access bar"""
+    try:
+        user_id = session.get('user_id')
+        if user_id == 'admin':
+            return {'ok': False, 'error': 'Admin không thể xem'}, 403
+        
+        # Get full statistics
+        statistics = get_user_statistics(user_id)
+        
+        # Get daily quests
+        daily_quests = get_user_daily_quests(user_id)
+        
+        return {
+            'ok': True,
+            'statistics': statistics,
+            'daily_quests': daily_quests
+        }
+    except Exception as e:
+        app.logger.error(f'Error getting user statistics: {e}')
+        return {'ok': False, 'error': 'Lỗi tải dữ liệu'}, 500
 
 
 # ==================== Wallet API Routes ====================

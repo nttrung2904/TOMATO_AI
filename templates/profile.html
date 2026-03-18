@@ -1725,6 +1725,53 @@
     text-align: center;
     color: #ff6347;
     font-weight: 600;
+    flex: 1;
+  }
+
+  .quest-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .quest-go-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 100px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #ff6347;
+    color: white;
+    text-decoration: none;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .quest-go-btn:hover {
+    background: #e5533d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(229, 83, 61, 0.3);
+  }
+
+  .quest-go-btn.completed {
+    background: #4caf50;
+  }
+
+  .quest-go-btn.completed:hover {
+    background: #429846;
+    box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+  }
+
+  @media (max-width: 768px) {
+    .quest-footer {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .quest-go-btn {
+      width: 100%;
+    }
   }
   
   .quest-info {
@@ -2634,6 +2681,28 @@ function showSection(section, element) {
   console.log('========== End showSection ==========');
 }
 
+function activateSectionFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    let section = params.get('section');
+
+    if (!section && window.location.hash) {
+      const hashSection = window.location.hash.replace('#', '').replace('-section', '');
+      if (hashSection) section = hashSection;
+    }
+
+    if (!section) return;
+
+    const sectionElement = document.getElementById(section + '-section');
+    if (!sectionElement) return;
+
+    const menuElement = document.querySelector(`.menu-item[data-section="${section}"]`);
+    showSection(section, menuElement || null);
+  } catch (error) {
+    console.error('Error activating section from URL:', error);
+  }
+}
+
 function copyVoucherCode(code) {
   navigator.clipboard.writeText(code).then(() => {
     if (window.showToast) {
@@ -2966,6 +3035,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Hidden section:', s.id);
     }
   });
+
+  activateSectionFromUrl();
 
   // Check if user can checkin today
   {% if not session.get('is_admin') %}
@@ -3301,6 +3372,31 @@ const QUEST_ICONS = {
   'game': '🎮'
 };
 
+const QUEST_ACTIONS = {
+  'scan': { label: 'Đi quét', url: "{{ url_for('webcam') }}" },
+  'post': { label: 'Đi đăng bài', url: "{{ url_for('community') }}" },
+  'comment': { label: 'Đi bình luận', url: "{{ url_for('community') }}" },
+  'like': { label: 'Đi thả like', url: "{{ url_for('community') }}" },
+  'game': { label: 'Đi chơi game', url: "{{ url_for('game_menu') }}" }
+};
+
+function getQuestAction(quest) {
+  const byType = QUEST_ACTIONS[quest.type];
+  if (byType) return byType;
+
+  const title = (quest.title || '').toLowerCase();
+  const desc = (quest.desc || '').toLowerCase();
+  const text = `${title} ${desc}`;
+
+  if (text.includes('quét')) return QUEST_ACTIONS.scan;
+  if (text.includes('đăng') || text.includes('bài')) return QUEST_ACTIONS.post;
+  if (text.includes('bình luận')) return QUEST_ACTIONS.comment;
+  if (text.includes('like')) return QUEST_ACTIONS.like;
+  if (text.includes('game') || text.includes('chơi')) return QUEST_ACTIONS.game;
+
+  return { label: 'Đi đến', url: "{{ url_for('index') }}" };
+}
+
 async function loadQuests() {
   try {
     const response = await fetch('/api/quests/daily');
@@ -3313,6 +3409,7 @@ async function loadQuests() {
         const completed = quest.completed;
         const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
         const icon = QUEST_ICONS[quest.type] || '📋';
+        const action = getQuestAction(quest);
         
         return `
           <div class="quest-card ${completed ? 'completed' : ''}">
@@ -3332,8 +3429,13 @@ async function loadQuests() {
               <div class="progress-text">${quest.progress}/${quest.target}</div>
             </div>
             
-            <div class="quest-reward">
-              🎁 Phần thưởng: <strong>+${quest.reward || 0} điểm</strong>
+            <div class="quest-footer">
+              <div class="quest-reward">
+                🎁 Phần thưởng: <strong>+${quest.reward || 0} điểm</strong>
+              </div>
+              <a class="quest-go-btn ${completed ? 'completed' : ''}" href="${action.url}" aria-label="${action.label}: ${quest.title || 'Nhiệm vụ'}">
+                ${completed ? 'Xem lại' : 'Đi đến'}
+              </a>
             </div>
           </div>
         `;

@@ -1065,6 +1065,55 @@
         display: none;
       }
     }
+
+    /* ===== Quick Access Bar (Check-in & Quests) ===== */
+    .quick-access-bar {
+      background: linear-gradient(90deg, rgba(244,122,78,0.05), rgba(76,175,80,0.05));
+      border-bottom: 1px solid var(--tomato-100);
+      padding: 12px 20px;
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      flex-wrap: wrap;
+    }
+    [data-theme="dark"] .quick-access-bar {
+      background: linear-gradient(90deg, rgba(244,122,78,0.08), rgba(76,175,80,0.08));
+      border-bottom-color: var(--tomato-800);
+    }
+    .qab-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      background: white;
+      border-radius: 10px;
+      border-left: 3px solid var(--tomato-500);
+      min-width: 280px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+    }
+    .qab-card.qab-card-clickable { cursor: pointer; }
+    .qab-card.qab-card-clickable:focus-visible {
+      outline: 2px solid var(--tomato-500);
+      outline-offset: 2px;
+    }
+    [data-theme="dark"] .qab-card {
+      background: var(--bg-secondary);
+      border-left-color: var(--tomato-400);
+    }
+    .qab-card:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .qab-info { flex: 1; }
+    .qab-title { font-size: 0.9rem; font-weight: 600; color: #333; margin: 0; }
+    [data-theme="dark"] .qab-title { color: #ddd; }
+    .qab-desc { font-size: 0.8rem; color: #666; margin: 0; }
+    [data-theme="dark"] .qab-desc { color: #999; }
+    .qab-btn { padding: 6px 12px; background: var(--tomato-500); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+    .qab-btn:hover:not(:disabled) { background: var(--tomato-600); }
+    .qab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (max-width: 768px) {
+      .quick-access-bar { flex-direction: column; padding: 10px 12px; gap: 10px; }
+      .qab-card { min-width: 100%; }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -1401,6 +1450,27 @@
       {% endif %}
     </nav>
   </div>
+
+  <!-- Quick Access Bar: Check-in & Quests -->
+  {% if session.get('user_id') and session.get('user_id') != 'admin' %}
+  <div class="quick-access-bar" id="quick-access-bar">
+    <!-- Check-in Card -->
+    <div class="qab-card qab-card-clickable" id="qab-checkin" role="link" tabindex="0" onclick="window.location.href='{{ url_for('profile') }}?section=checkin'" onkeydown="if(event.key==='Enter' || event.key===' '){ event.preventDefault(); window.location.href='{{ url_for('profile') }}?section=checkin'; }">
+      <div class="qab-info">
+        <p class="qab-title" id="qab-checkin-title">📅 Điểm Danh</p>
+        <p class="qab-desc" id="qab-checkin-desc">Đang tải...</p>
+      </div>
+      <button class="qab-btn" id="qab-checkin-btn" onclick="handleQuickCheckin(event)" style="display:none">Điểm Danh</button>
+    </div>
+    <!-- Quests Card -->
+    <div class="qab-card qab-card-clickable" id="qab-quests" role="link" tabindex="0" onclick="window.location.href='{{ url_for('profile') }}?section=quests'" onkeydown="if(event.key==='Enter' || event.key===' '){ event.preventDefault(); window.location.href='{{ url_for('profile') }}?section=quests'; }">
+      <div class="qab-info">
+        <p class="qab-title">🏆 Nhiệm Vụ: <span id="qab-quests-count">0/0</span></p>
+        <p class="qab-desc" id="qab-quests-desc">Đang tải...</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   
   <div class="container">
 
@@ -1888,6 +1958,78 @@
       });
     }
     {% endif %}
+
+    // ===== Quick Access Bar (Check-in & Quests) =====
+    async function loadQuickAccessBar() {
+      try {
+        // Check if user is logged in by trying to fetch statistics
+        const res = await fetch('/api/user/statistics');
+        if (!res.ok) {
+          // Not logged in or error
+          const qbar = document.getElementById('quick-access-bar');
+          if (qbar) qbar.style.display = 'none';
+          return;
+        }
+        
+        const data = await res.json();
+        if (!data.ok) {
+          console.warn('Statistics fetch returned ok: false');
+          return;
+        }
+        
+        const stats = data.statistics || {};
+        const checkin = stats.checkin || {};
+        const daily_quests = data.daily_quests || [];
+        
+        // Update Check-in
+        const cbtn = document.getElementById('qab-checkin-btn');
+        const cdesc = document.getElementById('qab-checkin-desc');
+        if (checkin.can_checkin_today) {
+          if (cdesc) cdesc.textContent = `🔥 Streak: ${checkin.streak_days || 0}d | 📅 Tổng: ${checkin.total_checkin_days || 0}d`;
+          if (cbtn) cbtn.style.display = 'block';
+        } else {
+          if (cdesc) cdesc.textContent = `✅ Đã điểm danh hôm nay`;
+          if (cbtn) cbtn.style.display = 'none';
+        }
+        
+        // Update Quests
+        const comp = daily_quests.filter(q => q.completed).length;
+        const tot = daily_quests.length;
+        const cntEl = document.getElementById('qab-quests-count');
+        const descEl = document.getElementById('qab-quests-desc');
+        if (cntEl) cntEl.textContent = `${comp}/${tot}`;
+        if (descEl) descEl.textContent = `+${tot * 10} xu | ${tot - comp} còn lại`;
+      } catch (e) {
+        console.error('Lỗi tải quick access:', e);
+      }
+    }
+
+    async function handleQuickCheckin(evt) {
+      if (evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+      }
+      try {
+        const res = await fetch('/api/checkin/do', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+        if (data.ok) {
+          if (window.toast) window.toast.success('🎉 Điểm danh thành công!');
+          loadQuickAccessBar();
+        } else {
+          if (window.toast) window.toast.error(data.error || 'Không thể điểm danh');
+        }
+      } catch (e) {
+        console.error('Lỗi:', e);
+        if (window.toast) window.toast.error('Lỗi kết nối');
+      }
+    }
+
+    // Load on page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadQuickAccessBar);
+    } else {
+      loadQuickAccessBar();
+    }
   </script>
   
   {% block scripts %}{% endblock %}
