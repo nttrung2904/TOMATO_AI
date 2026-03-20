@@ -5,56 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Không tìm thấy trang - Tomato Disease Detection</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
     :root {
-      --tomato-700: #c62828;
+      --official-green-900: #17382d;
+      --official-green-700: #2f8f5b;
+      --official-gold-500: #d89b31;
     }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Be Vietnam Pro', sans-serif;
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(216, 155, 49, 0.35), transparent 38%),
+        radial-gradient(circle at 88% 88%, rgba(47, 143, 91, 0.32), transparent 40%),
+        linear-gradient(135deg, #17382d 0%, #2f8f5b 58%, #3f7b5d 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
     .error-container {
       background: white;
-      max-width: 600px;
+      max-width: 640px;
       margin: 20px;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(216, 155, 49, 0.24);
+      box-shadow: 0 24px 60px rgba(14, 36, 28, 0.34);
       text-align: center;
     }
+
     .error-icon {
-      font-size: 4em;
-      margin-bottom: 20px;
+      font-size: 4.4em;
+      margin-bottom: 16px;
     }
+
     h1 {
-      color: var(--tomato-700);
-      margin-bottom: 20px;
-      font-size: 2em;
+      font-family: 'Manrope', sans-serif;
+      color: var(--official-green-900);
+      margin: 0 0 14px;
+      font-size: clamp(1.7rem, 4vw, 2.4rem);
+      letter-spacing: -0.03em;
     }
+
     p {
-      color: #666;
-      font-size: 1.1em;
+      color: #4f665c;
+      font-size: 1.03rem;
       margin-bottom: 30px;
       line-height: 1.6;
     }
+
     .btn {
       display: inline-block;
       padding: 12px 24px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, var(--official-green-700), #3f7b5d);
       color: white;
       text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
+      border-radius: 12px;
+      font-weight: 700;
       transition: transform 0.2s, box-shadow 0.2s;
     }
+
     .btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 8px 20px rgba(23, 56, 45, 0.34);
+    }
+
+    @media (max-width: 640px) {
+      .error-container {
+        padding: 32px 24px;
+        border-radius: 16px;
+      }
+
+      .error-icon {
+        font-size: 3.8em;
+      }
     }
   </style>
 </head>

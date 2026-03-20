@@ -221,6 +221,101 @@
       padding: 30px 20px;
     }
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .auth-container {
+    max-width: 500px;
+    padding: 16px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .auth-card {
+    border-radius: 22px;
+    border: 1px solid #e2ebe7;
+    box-shadow: 0 18px 34px rgba(20, 45, 36, 0.1);
+    padding: 34px;
+    background:
+      radial-gradient(circle at 85% 12%, rgba(248, 189, 104, 0.18), transparent 36%),
+      linear-gradient(145deg, #ffffff 0%, #f8fcfa 100%);
+  }
+
+  .auth-header h1 {
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+    letter-spacing: -0.02em;
+    color: #1c353c;
+  }
+
+  .auth-header p,
+  .auth-footer {
+    color: #5f747d;
+  }
+
+  .form-group label {
+    color: #3f5b63;
+    font-weight: 700;
+  }
+
+  .form-group input {
+    border-color: #d5e2de;
+    border-radius: 12px;
+  }
+
+  .submit-btn {
+    border-radius: 12px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 10px 20px rgba(221, 96, 58, 0.24);
+  }
+
+  .submit-btn:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+    box-shadow: 0 12px 22px rgba(187, 72, 39, 0.3);
+  }
+
+  .guest-checkout {
+    border-radius: 12px;
+    border-color: #dd603a;
+    color: #c55534;
+    font-weight: 700;
+  }
+
+  .guest-checkout:hover {
+    background: #fff4ef;
+  }
+
+  [data-theme="dark"] .auth-card {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.28);
+  }
+
+  [data-theme="dark"] .auth-header h1 {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .auth-header p,
+  [data-theme="dark"] .auth-footer,
+  [data-theme="dark"] .form-group label {
+    color: #a7beb6;
+  }
+
+  [data-theme="dark"] .form-group input {
+    border-color: #3a4f46;
+    background: #23332c;
+  }
+
+  [data-theme="dark"] .guest-checkout {
+    background: #1e3028;
+    color: #f1b19a;
+    border-color: #c37558;
+  }
+
+  [data-theme="dark"] .guest-checkout:hover {
+    background: #273b33;
+  }
 </style>
 
 <div class="auth-container">

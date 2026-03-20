@@ -3,16 +3,18 @@
 {% block title %}Điểm thưởng - {{ t('site_name') }}{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1200px; margin: 40px auto;">
-  <div class="points-header" style="text-align: center; margin-bottom: 40px;">
-    <h1 style="color: var(--tomato-700); margin-bottom: 10px;">
-      <span style="font-size: 2.5em;">🏆</span>
-      {{ t('points.title') if current_lang else 'Điểm thưởng của bạn' }}
-    </h1>
-    <div class="current-points-display" style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); color: white; padding: 30px; border-radius: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 10px 30px rgba(255,107,107,0.3);">
-      <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">{{ t('points.current_points') if current_lang else 'Điểm hiện tại' }}</div>
-      <div style="font-size: 3em; font-weight: 700;">{{ user.points|default(0) }}</div>
-      <div style="font-size: 0.85em; opacity: 0.85; margin-top: 10px;">
+<section class="points-shell">
+  <header class="points-hero reveal">
+    <div class="hero-main">
+      <p class="hero-kicker">Loyalty Program</p>
+      <h1>{{ t('points.title') if current_lang else 'Điểm thưởng của bạn' }}</h1>
+      <p class="hero-subtitle">Tích điểm mỗi ngày, đổi ưu đãi linh hoạt và theo dõi thứ hạng của bạn theo thời gian thực.</p>
+    </div>
+
+    <div class="hero-balance">
+      <div class="balance-label">{{ t('points.current_points') if current_lang else 'Điểm hiện tại' }}</div>
+      <div class="balance-value">{{ user.points|default(0) }}</div>
+      <div class="balance-rank">
         {% if user_rank %}
           🏅 Hạng {{ user_rank }} trong bảng xếp hạng
         {% else %}
@@ -20,57 +22,53 @@
         {% endif %}
       </div>
     </div>
-  </div>
+  </header>
 
-  <!-- Quick Actions -->
-  <div class="quick-actions" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px;">
-    <button onclick="dailyCheckin()" class="action-btn" style="background: #4caf50; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(76,175,80,0.3); transition: all 0.3s;">
-      <div style="font-size: 2em; margin-bottom: 10px;">✓</div>
-      <div>Check-in hàng ngày</div>
-      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+20 xu</div>
+  <section class="actions-grid reveal">
+    <button onclick="dailyCheckin()" class="action-tile action-checkin">
+      <div class="tile-icon">✓</div>
+      <div class="tile-title">Check-in hàng ngày</div>
+      <div class="tile-meta">+20 xu</div>
     </button>
-    
-    <a href="{{ url_for('quiz_game') }}" class="action-btn" style="background: #2196f3; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(33,150,243,0.3); text-decoration: none; display: block; text-align: center;">
-      <div style="font-size: 2em; margin-bottom: 10px;">📝</div>
-      <div>Làm Quiz</div>
-      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+50 điểm</div>
-    </a>
-    
-    <a href="{{ url_for('game_menu') }}" class="action-btn" style="background: #ff9800; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(255,152,0,0.3); text-decoration: none; display: block; text-align: center;">
-      <div style="font-size: 2em; margin-bottom: 10px;">🎮</div>
-      <div>Chơi Game</div>
-      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">+20-30 điểm</div>
-    </a>
-    
-    <a href="{{ url_for('leaderboard') }}" class="action-btn" style="background: #9c27b0; color: white; padding: 20px; border: none; border-radius: 15px; cursor: pointer; font-size: 1.1em; font-weight: 600; box-shadow: 0 4px 15px rgba(156,39,176,0.3); text-decoration: none; display: block; text-align: center;">
-      <div style="font-size: 2em; margin-bottom: 10px;">🏆</div>
-      <div>Bảng xếp hạng</div>
-      <div style="font-size: 0.8em; opacity: 0.9; margin-top: 5px;">Top người chơi</div>
-    </a>
-  </div>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px;">
-    <!-- Points History -->
-    <div class="points-section" style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-      <h2 style="color: var(--tomato-700); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.5em;">📊</span>
-        {{ t('points.points_history') if current_lang else 'Lịch sử điểm' }}
-      </h2>
-      
-      <div class="points-history" style="max-height: 500px; overflow-y: auto;">
+    <a href="{{ url_for('quiz_game') }}" class="action-tile action-quiz">
+      <div class="tile-icon">📝</div>
+      <div class="tile-title">Làm Quiz</div>
+      <div class="tile-meta">+50 điểm</div>
+    </a>
+
+    <a href="{{ url_for('game_menu') }}" class="action-tile action-game">
+      <div class="tile-icon">🎮</div>
+      <div class="tile-title">Chơi Game</div>
+      <div class="tile-meta">+20-30 điểm</div>
+    </a>
+
+    <a href="{{ url_for('leaderboard') }}" class="action-tile action-rank">
+      <div class="tile-icon">🏆</div>
+      <div class="tile-title">Bảng xếp hạng</div>
+      <div class="tile-meta">Top người chơi</div>
+    </a>
+  </section>
+
+  <section class="content-grid">
+    <article class="panel panel-history reveal">
+      <div class="panel-head">
+        <h2>📊 {{ t('points.points_history') if current_lang else 'Lịch sử điểm' }}</h2>
+        <span class="head-chip">20 giao dịch gần nhất</span>
+      </div>
+
+      <div class="history-list">
         {% if history %}
           {% for entry in history[:20] %}
-          <div class="history-entry" style="border-left: 3px solid {% if entry.points > 0 %}#4caf50{% else %}#f44336{% endif %}; padding: 15px; margin-bottom: 15px; background: #f8f9fa; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
-              <span style="font-weight: 600; color: {% if entry.points > 0 %}#4caf50{% else %}#f44336{% endif %}; font-size: 1.2em;">
+          <div class="history-item {{ 'gain' if entry.points > 0 else 'loss' }}">
+            <div class="history-top">
+              <span class="history-points">
                 {% if entry.points > 0 %}+{% endif %}{{ entry.points }}
               </span>
-              <span style="font-size: 0.85em; color: #666;">
-                {{ entry.created_at[:10] }} {{ entry.created_at[11:16] }}
-              </span>
+              <span class="history-time">{{ entry.created_at[:10] }} {{ entry.created_at[11:16] }}</span>
             </div>
-            <div style="color: #333; font-weight: 500; margin-bottom: 3px;">{{ entry.description }}</div>
-            <div style="font-size: 0.85em; color: #888;">
+            <div class="history-desc">{{ entry.description }}</div>
+            <div class="history-type">
               {% if entry.action == 'order' %}💰 Mua hàng
               {% elif entry.action == 'quiz_completed' %}📝 Quiz
               {% elif entry.action == 'memory_game' %}🧠 Trí nhớ
@@ -85,36 +83,32 @@
           </div>
           {% endfor %}
         {% else %}
-          <div style="text-align: center; padding: 40px; color: #999;">
-            <div style="font-size: 3em; margin-bottom: 10px;">📭</div>
-            <div>Chưa có lịch sử tích điểm</div>
-            <div style="font-size: 0.9em; margin-top: 10px;">Hãy bắt đầu tích điểm ngay!</div>
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <h3>Chưa có lịch sử tích điểm</h3>
+            <p>Hãy bắt đầu check-in và hoàn thành nhiệm vụ để tăng điểm.</p>
           </div>
         {% endif %}
       </div>
-    </div>
+    </article>
 
-    <!-- Redeem Points -->
-    <div class="points-section" style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-      <h2 style="color: var(--tomato-700); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.5em;">🎁</span>
-        {{ t('points.redeem') if current_lang else 'Đổi điểm' }}
-      </h2>
-      
-      <div class="redeem-options">
+    <article class="panel panel-redeem reveal">
+      <div class="panel-head">
+        <h2>🎁 {{ t('points.redeem') if current_lang else 'Đổi điểm' }}</h2>
+        <span class="head-chip">Ưu đãi đổi quà</span>
+      </div>
+
+      <div class="redeem-list">
         {% for option in redemption_options %}
-        <div class="redeem-option" style="border: 2px solid {% if user.points >= option.points %}var(--tomato-600){% else %}#ddd{% endif %}; padding: 20px; margin-bottom: 15px; border-radius: 15px; position: relative; {% if user.points < option.points %}opacity: 0.6;{% endif %}">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div style="font-weight: 600; font-size: 1.1em; color: #333;">{{ option.name }}</div>
-            <div style="background: var(--tomato-600); color: white; padding: 5px 15px; border-radius: 20px; font-weight: 600; font-size: 0.9em;">
-              {{ option.points }} điểm
-            </div>
+        <div class="redeem-item {% if user.points < option.points %}disabled{% endif %}">
+          <div class="redeem-top">
+            <div class="redeem-name">{{ option.name }}</div>
+            <div class="redeem-cost">{{ option.points }} điểm</div>
           </div>
-          <div style="color: #666; margin-bottom: 15px;">Giá trị: {{ "{:,}".format(option.value).replace(',', '.') }}đ</div>
-          <button onclick="redeemPoints('{{ option.id }}')" 
-                  class="redeem-btn"
-                  {% if user.points < option.points %}disabled{% endif %}
-                  style="width: 100%; padding: 12px; background: {% if user.points >= option.points %}var(--tomato-600){% else %}#ccc{% endif %}; color: white; border: none; border-radius: 10px; cursor: {% if user.points >= option.points %}pointer{% else %}not-allowed{% endif %}; font-weight: 600; transition: all 0.3s;">
+
+          <div class="redeem-value">Giá trị: {{ "{:,}".format(option.value).replace(',', '.') }}đ</div>
+
+          <button onclick="redeemPoints('{{ option.id }}')" class="redeem-btn" {% if user.points < option.points %}disabled{% endif %}>
             {% if user.points >= option.points %}
               Đổi ngay
             {% else %}
@@ -125,53 +119,507 @@
         {% endfor %}
       </div>
 
-      <!-- Earn Points Guide -->
-      <div style="margin-top: 30px; padding: 20px; background: #e3f2fd; border-radius: 15px; border-left: 4px solid #2196f3;">
-        <h3 style="color: #1976d2; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-          <span>💡</span> Cách tích điểm
-        </h3>
-        <ul style="list-style: none; padding: 0; margin: 0;">
-          <li style="margin-bottom: 8px; color: #333;">✓ Check-in hàng ngày: <strong>+20 xu</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">🎫 Mỗi 30 ngày điểm danh: <strong>+1 voucher 20.000đ</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">📝 Hoàn thành Quiz: <strong>+50 điểm</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">🧠 Game trí nhớ: <strong>+30 điểm</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">🌱 Game nông trại: <strong>+20 điểm</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">🔍 Dự đoán bệnh: <strong>+10 điểm</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">⭐ Đánh giá sản phẩm: <strong>+15 điểm</strong></li>
-          <li style="margin-bottom: 8px; color: #333;">💰 Mua hàng: <strong>+10 điểm/10.000đ</strong></li>
+      <div class="earn-guide">
+        <h3>💡 Cách tích điểm nhanh</h3>
+        <ul>
+          <li>✓ Check-in hàng ngày: +20 xu</li>
+          <li>🎫 Mỗi 30 ngày điểm danh: +1 voucher 20.000đ</li>
+          <li>📝 Hoàn thành Quiz: +50 điểm</li>
+          <li>🧠 Game trí nhớ: +30 điểm</li>
+          <li>🌱 Game nông trại: +20 điểm</li>
+          <li>🔍 Dự đoán bệnh: +10 điểm</li>
+          <li>⭐ Đánh giá sản phẩm: +15 điểm</li>
+          <li>💰 Mua hàng: +10 điểm trên mỗi 10.000đ</li>
         </ul>
       </div>
-    </div>
-  </div>
-</div>
+    </article>
+  </section>
+</section>
 
 <style>
-  .action-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .points-shell {
+    --pts-bg-soft: #f7faf8;
+    --pts-ink: #172534;
+    --pts-muted: #5f6f81;
+    --pts-border: #dde6e2;
+    --pts-accent: #e35f3e;
+    --pts-accent-deep: #bf482b;
+    --pts-green: #2f8f5b;
+    --pts-blue: #2b6fd1;
+    --pts-orange: #d77919;
+    --pts-gold: #a67516;
+    max-width: 1240px;
+    margin: 28px auto 44px;
+    padding: 0 14px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    color: var(--pts-ink);
   }
-  
+
+  .points-hero {
+    position: relative;
+    border-radius: 26px;
+    padding: 32px;
+    display: grid;
+    gap: 24px;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    border: 1px solid #f1d9d2;
+    background:
+      radial-gradient(circle at 85% 15%, rgba(255, 187, 90, 0.25) 0%, rgba(255, 187, 90, 0) 48%),
+      radial-gradient(circle at 14% 80%, rgba(66, 153, 105, 0.16) 0%, rgba(66, 153, 105, 0) 52%),
+      linear-gradient(145deg, #fff9f6 0%, #fffefe 56%, #f5fbf8 100%);
+    box-shadow: 0 18px 36px rgba(23, 37, 52, 0.08);
+    overflow: hidden;
+  }
+
+  .hero-main h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    letter-spacing: -0.02em;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .hero-kicker {
+    margin: 0 0 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.76rem;
+    color: var(--pts-accent-deep);
+  }
+
+  .hero-subtitle {
+    margin: 0;
+    max-width: 640px;
+    line-height: 1.7;
+    color: var(--pts-muted);
+  }
+
+  .hero-balance {
+    border-radius: 20px;
+    padding: 22px;
+    background: linear-gradient(145deg, #de5837, #f17c52);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    align-self: start;
+  }
+
+  .balance-label {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .balance-value {
+    margin-top: 10px;
+    line-height: 1;
+    font-size: clamp(2.3rem, 4vw, 3.1rem);
+    font-weight: 800;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .balance-rank {
+    margin-top: 12px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    opacity: 0.95;
+  }
+
+  .actions-grid {
+    margin-top: 22px;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .action-tile {
+    border: none;
+    border-radius: 16px;
+    padding: 20px 18px;
+    text-align: left;
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    box-shadow: 0 8px 24px rgba(23, 37, 52, 0.2);
+  }
+
+  .action-tile:hover {
+    transform: translateY(-4px);
+  }
+
+  .tile-icon {
+    font-size: 1.8rem;
+    margin-bottom: 12px;
+  }
+
+  .tile-title {
+    font-size: 1.04rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .tile-meta {
+    font-size: 0.88rem;
+    opacity: 0.92;
+  }
+
+  .action-checkin { background: linear-gradient(145deg, #2f8f5b, #48a875); }
+  .action-checkin:hover { box-shadow: 0 12px 28px rgba(47, 143, 91, 0.36); }
+
+  .action-quiz { background: linear-gradient(145deg, #2b6fd1, #4d8ce5); }
+  .action-quiz:hover { box-shadow: 0 12px 28px rgba(43, 111, 209, 0.34); }
+
+  .action-game { background: linear-gradient(145deg, #d77919, #ee973f); }
+  .action-game:hover { box-shadow: 0 12px 28px rgba(215, 121, 25, 0.34); }
+
+  .action-rank { background: linear-gradient(145deg, #8d6b20, #c5952d); }
+  .action-rank:hover { box-shadow: 0 12px 28px rgba(141, 107, 32, 0.34); }
+
+  .content-grid {
+    margin-top: 24px;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1.1fr 1fr;
+  }
+
+  .panel {
+    border-radius: 20px;
+    border: 1px solid var(--pts-border);
+    background: #fff;
+    box-shadow: 0 14px 28px rgba(23, 37, 52, 0.06);
+    padding: 24px;
+  }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .panel-head h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .head-chip {
+    font-size: 0.78rem;
+    color: #35556f;
+    background: #e9f0f6;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .history-list {
+    max-height: 620px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .history-item {
+    border-left: 4px solid;
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    margin-bottom: 12px;
+    background: #f9fbfd;
+  }
+
+  .history-item.gain { border-left-color: var(--pts-green); }
+  .history-item.loss { border-left-color: #cb4f4f; }
+
+  .history-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .history-points {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.14rem;
+    font-weight: 800;
+  }
+
+  .history-item.gain .history-points { color: var(--pts-green); }
+  .history-item.loss .history-points { color: #cb4f4f; }
+
+  .history-time {
+    color: #65758a;
+    font-size: 0.8rem;
+  }
+
+  .history-desc {
+    font-weight: 600;
+    margin: 4px 0;
+    color: #2c3e52;
+  }
+
+  .history-type {
+    color: #6b7b8d;
+    font-size: 0.86rem;
+  }
+
+  .redeem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .redeem-item {
+    border: 1px solid #e4ece8;
+    border-radius: 14px;
+    padding: 14px;
+    background: linear-gradient(160deg, #ffffff 0%, #f7fbf9 100%);
+  }
+
+  .redeem-item.disabled {
+    opacity: 0.62;
+    filter: grayscale(0.1);
+  }
+
+  .redeem-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .redeem-name {
+    color: #26394e;
+    font-weight: 700;
+  }
+
+  .redeem-cost {
+    border-radius: 999px;
+    padding: 5px 10px;
+    background: #e05835;
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .redeem-value {
+    margin: 10px 0 12px;
+    color: #617386;
+    font-size: 0.92rem;
+  }
+
+  .redeem-btn {
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    background: var(--pts-accent);
+    color: #fff;
+    padding: 11px 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .redeem-btn:disabled {
+    cursor: not-allowed;
+    background: #b9c4bf;
+  }
+
   .redeem-btn:not(:disabled):hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+    transform: translateY(-1px);
+    background: var(--pts-accent-deep);
+    box-shadow: 0 8px 20px rgba(191, 72, 43, 0.28);
   }
-  
-  [data-theme="dark"] .points-section {
+
+  .earn-guide {
+    margin-top: 16px;
+    border-radius: 14px;
+    padding: 16px;
+    background: #eef7ff;
+    border-left: 4px solid #2b6fd1;
+  }
+
+  .earn-guide h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    color: #1f4f92;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .earn-guide ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 7px;
+    color: #2c4f70;
+    font-size: 0.92rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 34px 12px;
+    color: #6f8092;
+  }
+
+  .empty-icon {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 6px;
+    font-size: 1.02rem;
+    color: #2f4258;
+  }
+
+  .empty-state p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .reveal {
+    animation: reveal-up 0.55s ease both;
+  }
+
+  .actions-grid.reveal .action-tile:nth-child(1) { animation: reveal-up 0.45s ease both 0.02s; }
+  .actions-grid.reveal .action-tile:nth-child(2) { animation: reveal-up 0.45s ease both 0.08s; }
+  .actions-grid.reveal .action-tile:nth-child(3) { animation: reveal-up 0.45s ease both 0.14s; }
+  .actions-grid.reveal .action-tile:nth-child(4) { animation: reveal-up 0.45s ease both 0.2s; }
+
+  @keyframes reveal-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  [data-theme="dark"] .points-shell {
+    --pts-bg-soft: #151d1b;
+    --pts-ink: #e7f0f2;
+    --pts-muted: #9cb4bf;
+    --pts-border: #2c3b3b;
+  }
+
+  [data-theme="dark"] .points-hero,
+  [data-theme="dark"] .panel {
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
   }
-  
-  [data-theme="dark"] .history-entry {
-    background: var(--bg-primary);
+
+  [data-theme="dark"] .hero-kicker,
+  [data-theme="dark"] .head-chip {
+    color: #f0c6b8;
+    background: rgba(227, 95, 62, 0.2);
   }
-  
-  [data-theme="dark"] .redeem-option {
-    background: var(--bg-primary);
-    color: var(--text-primary);
+
+  [data-theme="dark"] .hero-subtitle,
+  [data-theme="dark"] .history-time,
+  [data-theme="dark"] .history-type,
+  [data-theme="dark"] .redeem-value,
+  [data-theme="dark"] .empty-state {
+    color: #9eb3be;
+  }
+
+  [data-theme="dark"] .history-item {
+    background: #1d262d;
+  }
+
+  [data-theme="dark"] .history-desc,
+  [data-theme="dark"] .redeem-name,
+  [data-theme="dark"] .empty-state h3,
+  [data-theme="dark"] .panel-head h2,
+  [data-theme="dark"] .hero-main h1 {
+    color: #f4fafc;
+  }
+
+  [data-theme="dark"] .redeem-item {
+    background: #1e2825;
+    border-color: #344541;
+  }
+
+  [data-theme="dark"] .earn-guide {
+    background: #17232f;
+    border-left-color: #4c8be8;
+  }
+
+  [data-theme="dark"] .earn-guide h3 {
+    color: #7cb1ff;
+  }
+
+  [data-theme="dark"] .earn-guide ul {
+    color: #bdd6f3;
+  }
+
+  @media (max-width: 1060px) {
+    .points-hero {
+      grid-template-columns: 1fr;
+      padding: 24px;
+    }
+
+    .actions-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .points-shell {
+      margin-top: 18px;
+      padding: 0 10px;
+    }
+
+    .actions-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .panel,
+    .points-hero {
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .panel-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .history-top,
+    .redeem-top {
+      flex-direction: column;
+      align-items: flex-start;
+    }
   }
 </style>
 
 <script>
+function notifyUser(type, message) {
+  if (window.toast) {
+    if (type === 'success') {
+      window.toast.success(message);
+    } else {
+      window.toast.error(message);
+    }
+    return;
+  }
+
+  alert(message);
+}
+
 function dailyCheckin() {
   fetch('/api/points/checkin', {
     method: 'POST',
@@ -182,21 +630,21 @@ function dailyCheckin() {
   .then(res => res.json())
   .then(data => {
     if (data.ok) {
-      alert('✓ ' + data.message);
+      notifyUser('success', '✓ ' + data.message);
       location.reload();
     } else {
-      alert('⚠️ ' + data.error);
+      notifyUser('error', '⚠️ ' + data.error);
     }
   })
   .catch(err => {
     console.error('Check-in error:', err);
-    alert('Lỗi khi check-in');
+    notifyUser('error', 'Lỗi khi check-in');
   });
 }
 
 function redeemPoints(optionId) {
   if (!confirm('Bạn có chắc muốn đổi điểm?')) return;
-  
+
   fetch('/api/points/redeem', {
     method: 'POST',
     headers: {
@@ -207,15 +655,15 @@ function redeemPoints(optionId) {
   .then(res => res.json())
   .then(data => {
     if (data.ok) {
-      alert('🎉 ' + data.message + '\n\nMã giảm giá: ' + data.coupon_code + '\n\nĐiểm còn lại: ' + data.remaining_points);
+      notifyUser('success', '🎉 ' + data.message + '\n\nMã giảm giá: ' + data.coupon_code + '\n\nĐiểm còn lại: ' + data.remaining_points);
       location.reload();
     } else {
-      alert('⚠️ ' + data.error);
+      notifyUser('error', '⚠️ ' + data.error);
     }
   })
   .catch(err => {
     console.error('Redeem error:', err);
-    alert('Lỗi khi đổi điểm');
+    notifyUser('error', 'Lỗi khi đổi điểm');
   });
 }
 </script>

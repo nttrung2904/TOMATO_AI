@@ -421,6 +421,179 @@
       gap: 10px;
     }
   }
+
+  /* Official polish overrides */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+  .kb-hero,
+  .kb-container {
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .kb-hero {
+    background:
+      radial-gradient(circle at 16% 18%, rgba(249, 195, 118, 0.32), transparent 40%),
+      linear-gradient(135deg, #1f4437 0%, #2c6f58 54%, #3b8266 100%);
+    border-radius: 30px;
+    max-width: 1240px;
+    margin: 14px auto 36px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: 0 18px 42px rgba(21, 54, 41, 0.24);
+  }
+
+  [data-theme="dark"] .kb-hero {
+    background:
+      radial-gradient(circle at 16% 18%, rgba(249, 195, 118, 0.18), transparent 40%),
+      linear-gradient(135deg, #10231c 0%, #16372b 52%, #1d4a3a 100%);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .kb-hero h1 {
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  .kb-search input {
+    border: 2px solid rgba(255, 255, 255, 0.34);
+  }
+
+  .kb-search button {
+    background: linear-gradient(135deg, #d57d2f 0%, #e2a53c 100%);
+    box-shadow: 0 8px 18px rgba(105, 70, 20, 0.34);
+  }
+
+  .kb-search button:hover {
+    background: linear-gradient(135deg, #c26f26 0%, #d1902a 100%);
+  }
+
+  .sidebar-section {
+    border-radius: 18px;
+    border: 1px solid #dce9e1;
+    box-shadow: 0 12px 26px rgba(20, 53, 41, 0.1);
+  }
+
+  [data-theme="dark"] .sidebar-section {
+    background: #1a2822;
+    border-color: #2f453a;
+  }
+
+  .sidebar-title {
+    color: #1f5f45;
+    letter-spacing: 0.08em;
+  }
+
+  [data-theme="dark"] .sidebar-title {
+    color: #92d4b3;
+  }
+
+  .category-list a:hover,
+  .category-list a.active {
+    border-left-color: #2f8f5b;
+    color: #1f5f45;
+    background: linear-gradient(90deg, rgba(47, 143, 91, 0.14), rgba(47, 143, 91, 0.04));
+  }
+
+  .tag-cloud a {
+    background: #edf5f0;
+    color: #2f5e4a;
+    border-color: #d0e1d8;
+  }
+
+  .tag-cloud a:hover {
+    background: linear-gradient(135deg, #2f8f5b, #3b6f58);
+    border-color: #2f8f5b;
+  }
+
+  .section-header h2 {
+    font-family: 'Manrope', sans-serif;
+    color: #1e4738;
+    letter-spacing: -0.02em;
+  }
+
+  [data-theme="dark"] .section-header h2 {
+    color: #9fd8bd;
+  }
+
+  .section-count {
+    background: #edf5f0;
+    color: #315846;
+    border: 1px solid #d2e3d9;
+  }
+
+  [data-theme="dark"] .section-count {
+    background: #24362e;
+    color: #99d3b4;
+    border-color: #355044;
+  }
+
+  .article-item {
+    border-radius: 18px;
+    border: 1px solid #dbe9e1;
+    box-shadow: 0 14px 30px rgba(17, 47, 35, 0.09);
+  }
+
+  .article-item:hover {
+    border-left-color: #2f8f5b;
+    box-shadow: 0 18px 36px rgba(21, 58, 43, 0.17);
+    background: linear-gradient(135deg, #ffffff 0%, #f4faf6 100%);
+  }
+
+  [data-theme="dark"] .article-item,
+  [data-theme="dark"] .article-item:hover {
+    background: #1a2822;
+    border-color: #31483d;
+  }
+
+  .article-badge {
+    background: linear-gradient(135deg, #2f8f5b, #3f7b5d);
+    box-shadow: 0 8px 16px rgba(33, 90, 63, 0.26);
+  }
+
+  .article-title {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.22rem;
+  }
+
+  .featured-badge {
+    background: linear-gradient(135deg, #ffd687, #f2b13f);
+    color: #5b3a00;
+    box-shadow: 0 4px 10px rgba(209, 142, 41, 0.34);
+  }
+
+  .empty-state {
+    border: 1px dashed #c8ddd0;
+    border-radius: 18px;
+    background: #f8fcf9;
+  }
+
+  [data-theme="dark"] .empty-state {
+    background: #1a2521;
+    border-color: #375244;
+  }
+
+  @media (max-width: 768px) {
+    .kb-hero {
+      border-radius: 20px;
+      padding: 56px 16px;
+      margin-top: 8px;
+    }
+
+    .kb-search input {
+      padding-right: 20px;
+    }
+
+    .kb-search button {
+      position: static;
+      transform: none;
+      margin-top: 10px;
+      width: 100%;
+      padding: 12px 18px;
+    }
+
+    .article-title {
+      font-size: 1.08rem;
+    }
+  }
 </style>
 
 <div class="kb-hero">

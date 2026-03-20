@@ -464,6 +464,133 @@
     font-size: 4rem;
     margin-bottom: 1rem;
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .product-detail-container {
+    --pd-ink: #1b3239;
+    --pd-muted: #5f747d;
+    --pd-border: #deebe6;
+    --pd-accent: #dd603a;
+    --pd-accent-strong: #bb4827;
+    max-width: 1260px;
+    margin: 1.5rem auto 2.8rem;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .breadcrumb {
+    color: #667d86;
+    font-size: 0.95rem;
+  }
+
+  .product-detail {
+    gap: 20px;
+  }
+
+  .product-image-section,
+  .product-info-section,
+  .reviews-section {
+    border-radius: 18px;
+    border: 1px solid var(--pd-border);
+    box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+  }
+
+  .product-image-section {
+    background:
+      radial-gradient(circle at 84% 14%, rgba(245, 185, 98, 0.14), transparent 34%),
+      linear-gradient(145deg, #ffffff 0%, #f8fcfa 100%);
+  }
+
+  .product-name {
+    color: var(--pd-ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(1.7rem, 2.8vw, 2.3rem);
+    letter-spacing: -0.02em;
+  }
+
+  .product-price {
+    color: var(--pd-accent-strong);
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .product-description,
+  .rating-text {
+    color: var(--pd-muted);
+  }
+
+  .btn-add-cart,
+  .btn-buy-now,
+  .btn-write-review,
+  .btn-wishlist {
+    border-radius: 11px;
+    font-weight: 700;
+  }
+
+  .btn-add-cart,
+  .btn-write-review {
+    background: linear-gradient(135deg, var(--pd-accent) 0%, #ef8a52 100%);
+  }
+
+  .btn-add-cart:hover:not(:disabled),
+  .btn-write-review:hover {
+    background: linear-gradient(135deg, var(--pd-accent-strong) 0%, #db6f38 100%);
+  }
+
+  .btn-buy-now {
+    background: linear-gradient(135deg, #1f8d5b 0%, #39a976 100%);
+  }
+
+  .btn-buy-now:hover:not(:disabled) {
+    background: linear-gradient(135deg, #197546 0%, #2f8f62 100%);
+    box-shadow: 0 8px 20px rgba(31, 141, 91, 0.3);
+  }
+
+  .review-item {
+    border-radius: 12px;
+    border-color: #e5ece9;
+  }
+
+  .review-item:hover {
+    box-shadow: 0 8px 18px rgba(17, 46, 37, 0.09);
+  }
+
+  .review-author,
+  .reviews-header h2 {
+    font-family: 'Manrope', sans-serif;
+    color: var(--pd-ink);
+  }
+
+  [data-theme="dark"] .product-image-section,
+  [data-theme="dark"] .product-info-section,
+  [data-theme="dark"] .reviews-section {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .product-name,
+  [data-theme="dark"] .review-author,
+  [data-theme="dark"] .reviews-header h2 {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .product-description,
+  [data-theme="dark"] .rating-text,
+  [data-theme="dark"] .review-comment {
+    color: #a8c0b8;
+  }
+
+  [data-theme="dark"] .btn-wishlist {
+    background: #1c2f28;
+    border-color: #c67a5f;
+    color: #f1a78b;
+  }
+
+  [data-theme="dark"] .btn-wishlist.in-wishlist {
+    background: #c45a38;
+    color: #fff;
+  }
   
   @media (max-width: 768px) {
     .product-detail {

@@ -635,6 +635,180 @@
       height: 150px;
     }
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .cart-container {
+    --ct-ink: #1d3138;
+    --ct-muted: #5f747c;
+    --ct-border: #deebe6;
+    --ct-accent: #dd603a;
+    --ct-accent-strong: #bb4827;
+    padding: 24px 14px 36px;
+    max-width: 1160px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .cart-header {
+    background:
+      radial-gradient(circle at 82% 12%, rgba(248, 186, 101, 0.24), transparent 40%),
+      radial-gradient(circle at 15% 84%, rgba(96, 192, 145, 0.19), transparent 45%),
+      linear-gradient(140deg, #1c4a3a 0%, #2a6b54 56%, #34755d 100%);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 20px 38px rgba(24, 58, 45, 0.24);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+
+  .cart-header h1 {
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(1.55rem, 3.1vw, 2.2rem);
+    letter-spacing: -0.02em;
+  }
+
+  .cart-content {
+    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  }
+
+  .cart-items,
+  .cart-summary {
+    border-radius: 18px;
+    border: 1px solid var(--ct-border);
+    box-shadow: 0 12px 24px rgba(19, 48, 38, 0.08);
+  }
+
+  .section-title,
+  .summary-title {
+    color: var(--ct-ink);
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .cart-item {
+    padding: 16px 0;
+  }
+
+  .item-image {
+    border: 1px solid #e9efec;
+  }
+
+  .item-name {
+    color: var(--ct-ink);
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .item-price {
+    color: var(--ct-accent-strong);
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.18em;
+  }
+
+  .qty-btn {
+    border: 1px solid #e4ece9;
+    border-radius: 8px;
+  }
+
+  .qty-btn:hover {
+    background: #eef4f1;
+  }
+
+  .remove-btn {
+    border-radius: 9px;
+    background: #cb4b3a;
+    font-weight: 700;
+  }
+
+  .remove-btn:hover {
+    background: #b03f31;
+  }
+
+  .summary-row:last-of-type {
+    color: var(--ct-accent-strong);
+    border-bottom-color: #d7e5e0;
+  }
+
+  .coupon-input {
+    border-color: #d4e2de;
+    border-radius: 10px;
+  }
+
+  .coupon-btn {
+    background: linear-gradient(135deg, var(--ct-accent) 0%, #ef8a52 100%);
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .coupon-btn:hover {
+    background: linear-gradient(135deg, var(--ct-accent-strong) 0%, #db6f38 100%);
+  }
+
+  .checkout-btn {
+    background: linear-gradient(135deg, #1f8d5b 0%, #39a976 100%) !important;
+    border-radius: 12px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 20px rgba(31, 141, 91, 0.25);
+  }
+
+  .checkout-btn:hover {
+    background: linear-gradient(135deg, #197546 0%, #2f8f62 100%) !important;
+  }
+
+  [data-theme="dark"] .cart-header {
+    background:
+      radial-gradient(circle at 82% 12%, rgba(248, 186, 101, 0.11), transparent 40%),
+      radial-gradient(circle at 15% 84%, rgba(96, 192, 145, 0.1), transparent 45%),
+      linear-gradient(140deg, #173124 0%, #234338 56%, #2d5344 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  [data-theme="dark"] .cart-items,
+  [data-theme="dark"] .cart-summary {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .section-title,
+  [data-theme="dark"] .summary-title,
+  [data-theme="dark"] .item-name,
+  [data-theme="dark"] .qty-number {
+    color: #e9f6f1;
+  }
+
+  [data-theme="dark"] .item-price,
+  [data-theme="dark"] .summary-row:last-of-type {
+    color: #ffb69d;
+  }
+
+  [data-theme="dark"] .qty-btn {
+    border-color: #395047;
+  }
+
+  [data-theme="dark"] .qty-btn:hover {
+    background: #243730;
+  }
+
+  [data-theme="dark"] .coupon-input {
+    border-color: #3a4f46;
+  }
+
+  @media (max-width: 768px) {
+    .cart-container {
+      padding: 16px 10px 24px;
+    }
+
+    .cart-header {
+      border-radius: 18px;
+      padding: 20px;
+    }
+
+    .cart-content {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 
 <div class="cart-container">

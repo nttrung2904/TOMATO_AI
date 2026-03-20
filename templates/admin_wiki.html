@@ -197,6 +197,124 @@
   .article-title-link:hover {
     text-decoration: underline;
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .admin-container {
+    --aw-ink: #1b3239;
+    --aw-border: #deebe6;
+    --aw-muted: #60757d;
+    max-width: 1460px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .admin-header h1,
+  .stat-value,
+  .article-title-link {
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .admin-header h1 {
+    color: var(--aw-ink);
+    letter-spacing: -0.02em;
+  }
+
+  .btn-add,
+  .btn,
+  .badge {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .btn-add {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.24);
+  }
+
+  .btn-add:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+  }
+
+  .stat-card,
+  .articles-table {
+    border-radius: 16px;
+    border: 1px solid var(--aw-border);
+    box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+  }
+
+  .stat-label {
+    color: var(--aw-muted);
+    font-weight: 600;
+  }
+
+  .stat-value {
+    color: #bb4827;
+  }
+
+  .articles-table th {
+    background: #f2f7f5;
+    color: #3b5b64;
+  }
+
+  .articles-table td {
+    border-bottom-color: #edf2ef;
+  }
+
+  .articles-table tr:hover {
+    background: #f7fbf9;
+  }
+
+  .badge-category {
+    background: #e9f5ef;
+    color: #226043;
+  }
+
+  .btn-edit {
+    background: #2f7fd8;
+  }
+
+  .btn-edit:hover {
+    background: #2468b3;
+  }
+
+  [data-theme="dark"] .admin-header h1,
+  [data-theme="dark"] .article-title-link {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .stat-card,
+  [data-theme="dark"] .articles-table {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .stat-label {
+    color: #9cb7ad;
+  }
+
+  [data-theme="dark"] .stat-value {
+    color: #ffb69d;
+  }
+
+  [data-theme="dark"] .articles-table th {
+    background: #22352c;
+    color: #bdd7cc;
+  }
+
+  [data-theme="dark"] .articles-table td {
+    border-bottom-color: #2f4339;
+  }
+
+  [data-theme="dark"] .articles-table tr:hover {
+    background: #22352c;
+  }
+
+  [data-theme="dark"] .badge-category {
+    background: #234238;
+    color: #9fd7bb;
+  }
 </style>
 
 <div class="admin-container">

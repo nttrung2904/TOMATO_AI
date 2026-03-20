@@ -268,6 +268,142 @@
   [data-theme="dark"] .empty-section {
     background: var(--bg-tertiary);
   }
+
+  /* Official polish overrides */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+  .live-hero,
+  .streams-container {
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .live-hero {
+    background:
+      radial-gradient(circle at 18% 20%, rgba(248, 196, 120, 0.32), transparent 42%),
+      linear-gradient(135deg, #1d4436 0%, #2f6f58 56%, #3f8368 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 18px 40px rgba(20, 51, 40, 0.22);
+    border-radius: 30px;
+    max-width: 1240px;
+    margin: 14px auto 36px;
+  }
+
+  [data-theme="dark"] .live-hero {
+    background:
+      radial-gradient(circle at 18% 20%, rgba(248, 196, 120, 0.14), transparent 40%),
+      linear-gradient(135deg, #10231c 0%, #16372b 52%, #1e4a3a 100%);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .live-hero h1,
+  .section-title,
+  .stream-title {
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .section-title {
+    font-size: clamp(1.35rem, 2.3vw, 2rem);
+    color: #1e4939;
+  }
+
+  [data-theme="dark"] .section-title {
+    color: #98d7b7;
+  }
+
+  .live-badge {
+    border-radius: 999px;
+    background: linear-gradient(135deg, #d13e2f, #e24f3f);
+    font-size: 0.52em;
+    letter-spacing: 0.06em;
+  }
+
+  .stream-card {
+    border: 1px solid #dce9e1;
+    border-radius: 20px;
+    box-shadow: 0 14px 30px rgba(18, 49, 37, 0.11);
+  }
+
+  [data-theme="dark"] .stream-card {
+    background: #1a2822;
+    border-color: #30463b;
+  }
+
+  .stream-card.live {
+    border: 2px solid #de4b3f;
+    box-shadow: 0 14px 34px rgba(193, 66, 53, 0.24);
+  }
+
+  .stream-status-badge {
+    border-radius: 999px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    font-size: 0.76rem;
+    letter-spacing: 0.03em;
+  }
+
+  .status-live {
+    background: linear-gradient(135deg, #d13e2f, #e45545);
+  }
+
+  .status-scheduled {
+    background: linear-gradient(135deg, #d89b31, #ecb64f);
+  }
+
+  .stream-info {
+    padding: 22px;
+  }
+
+  .stream-description {
+    color: #51695f;
+  }
+
+  .stream-meta {
+    border-top-color: #dce9e1;
+    color: #688074;
+    font-weight: 500;
+  }
+
+  .stream-viewers {
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .empty-section,
+  .no-streams {
+    border: 1px dashed #c9ddd1;
+    border-radius: 18px;
+    background: #f8fcf9;
+    color: #577267;
+  }
+
+  [data-theme="dark"] .empty-section,
+  [data-theme="dark"] .no-streams {
+    background: #1a2521;
+    border-color: #375244;
+    color: #a5cbb7;
+  }
+
+  .streams-container a {
+    text-decoration: none;
+  }
+
+  @media (max-width: 768px) {
+    .live-hero {
+      border-radius: 20px;
+      padding: 54px 16px;
+      margin-top: 8px;
+      margin-bottom: 24px;
+    }
+
+    .streams-container {
+      padding: 0 14px 28px;
+    }
+
+    .streams-grid {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+  }
 </style>
 
 <div class="live-hero">

@@ -4,30 +4,45 @@
 
 {% block content %}
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
   .shop-container {
+    --shop-ink: #183036;
+    --shop-muted: #5d727a;
+    --shop-accent: #de5f3a;
+    --shop-accent-strong: #be4424;
+    --shop-border: #dfe7e4;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 24px 18px 36px;
+    font-family: 'Be Vietnam Pro', sans-serif;
   }
   
   .shop-header {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    background:
+      radial-gradient(circle at 15% 18%, rgba(252, 208, 124, 0.22), transparent 42%),
+      radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.18), transparent 35%),
+      linear-gradient(135deg, #1f4b3d 0%, #2e7b64 62%, #3b8f74 100%);
     color: white;
-    padding: 40px;
-    border-radius: 16px;
-    margin-bottom: 40px;
+    padding: 40px 28px;
+    border-radius: 24px;
+    margin-bottom: 30px;
     text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 18px 38px rgba(19, 60, 48, 0.28);
   }
   
   .shop-header h1 {
     margin: 0 0 10px 0;
-    font-size: 2.5em;
+    font-size: clamp(1.9rem, 4vw, 2.8rem);
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
   }
   
   .shop-header p {
     margin: 0;
-    opacity: 0.9;
-    font-size: 1.1em;
+    opacity: 0.95;
+    font-size: 1rem;
   }
   
   .cart-icon {
@@ -73,20 +88,26 @@
   .filter-section {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    margin-bottom: 30px;
+    gap: 10px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
+    padding: 8px;
+    border-radius: 16px;
+    background: #f3f7f6;
+    border: 1px solid #e4ece8;
   }
   
   .filter-btn {
-    padding: 10px 24px;
-    border: 2px solid #e0e0e0;
+    padding: 10px 18px;
+    border: 1px solid transparent;
     background: white;
-    border-radius: 25px;
+    border-radius: 999px;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.25s;
     font-weight: 600;
-    color: #555;
+    color: #456068;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.9rem;
   }
 
   .blind-box-section {
@@ -297,23 +318,25 @@
   }
   
   .filter-btn:hover, .filter-btn.active {
-    background: var(--tomato-500);
+    background: var(--shop-accent);
     color: white;
-    border-color: var(--tomato-500);
+    border-color: var(--shop-accent);
+    box-shadow: 0 8px 18px rgba(222, 95, 58, 0.24);
   }
   
   .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 18px;
     margin-bottom: 50px;
   }
   
   .product-card {
     background: white;
-    border-radius: 16px;
+    border-radius: 18px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border: 1px solid var(--shop-border);
+    box-shadow: 0 8px 20px rgba(17, 46, 37, 0.08);
     transition: transform 0.3s, box-shadow 0.3s;
     display: flex;
     flex-direction: column;
@@ -321,8 +344,8 @@
   }
   
   .product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    transform: translateY(-4px);
+    box-shadow: 0 14px 28px rgba(17, 46, 37, 0.14);
   }
   
   .wishlist-heart-btn {
@@ -375,12 +398,12 @@
   
   .product-category {
     display: inline-block;
-    padding: 4px 12px;
-    background: #e8f5e9;
-    color: #2e7d32;
+    padding: 5px 12px;
+    background: #e9f5ef;
+    color: #226043;
     border-radius: 12px;
     font-size: 0.75em;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     margin-bottom: 10px;
     width: fit-content;
@@ -388,13 +411,14 @@
   
   .product-name {
     margin: 0 0 10px 0;
-    font-size: 1.2em;
-    color: #333;
-    font-weight: 600;
+    font-size: 1.12rem;
+    color: var(--shop-ink);
+    font-weight: 700;
+    font-family: 'Manrope', sans-serif;
   }
   
   .product-description {
-    color: #666;
+    color: var(--shop-muted);
     font-size: 0.9em;
     line-height: 1.5;
     margin-bottom: 15px;
@@ -407,29 +431,30 @@
     align-items: center;
     margin-top: auto;
     padding-top: 15px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid #edf2ef;
   }
   
   .product-price {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: var(--tomato-600);
+    font-size: 1.38rem;
+    font-weight: 800;
+    color: var(--shop-accent-strong);
+    font-family: 'Manrope', sans-serif;
   }
   
   .add-to-cart-btn {
-    padding: 10px 20px;
-    background: var(--tomato-500);
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #de5f3a 0%, #f08b51 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     transition: background 0.3s, transform 0.2s;
   }
   
   .add-to-cart-btn:hover {
-    background: var(--tomato-600);
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #be4424 0%, #de6f35 100%);
+    transform: translateY(-1px);
   }
   
   .add-to-cart-btn:active {
@@ -497,12 +522,12 @@
 
   /* ===== Lucky Spin Section ===== */
   .lucky-spin-section {
-    background: linear-gradient(145deg, #2c1654 0%, #1a0f30 100%);
-    color: #f0e6ff;
+    background: linear-gradient(145deg, #143944 0%, #0d2732 100%);
+    color: #e8f6f9;
     border-radius: 18px;
     padding: 22px;
     margin-bottom: 30px;
-    box-shadow: 0 14px 34px rgba(40, 10, 70, 0.3);
+    box-shadow: 0 14px 34px rgba(10, 35, 46, 0.35);
     position: relative;
     overflow: hidden;
   }
@@ -511,7 +536,7 @@
     position: absolute;
     top: -60px; right: -60px;
     width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(200,100,255,0.15), transparent 70%);
+    background: radial-gradient(circle, rgba(241, 186, 83, 0.22), transparent 70%);
     pointer-events: none;
   }
   .spin-header {
@@ -522,11 +547,11 @@
     gap: 14px;
     margin-bottom: 16px;
   }
-  .spin-title { margin: 0; font-size: 1.35rem; color: #f0e6ff; }
-  .spin-subtitle { margin: 5px 0 0; font-size: 0.9rem; color: #c9b3e8; }
+  .spin-title { margin: 0; font-size: 1.35rem; color: #e8f6f9; }
+  .spin-subtitle { margin: 5px 0 0; font-size: 0.9rem; color: #b9d8e0; }
   .spin-price-badge {
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
-    color: #fff;
+    background: linear-gradient(135deg, #f2bf61, #dc8f2d);
+    color: #2b1c08;
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.85rem;
@@ -534,6 +559,7 @@
   }
   .spin-wallet-row {
     background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(186, 221, 230, 0.22);
     padding: 8px 14px;
     border-radius: 10px;
     font-size: 0.9rem;
@@ -554,9 +580,9 @@
   }
   .spin-pointer {
     font-size: 1.6rem;
-    color: #f7d87e;
+    color: #f2bf61;
     margin-bottom: -8px;
-    text-shadow: 0 2px 8px rgba(247,216,126,0.6);
+    text-shadow: 0 2px 8px rgba(242, 191, 97, 0.55);
     z-index: 2;
     position: relative;
   }
@@ -565,7 +591,7 @@
     width: 308px;
     height: 308px;
     border-radius: 50%;
-    box-shadow: 0 0 0 4px rgba(247,216,126,0.25), 0 8px 32px rgba(0,0,0,0.4);
+    box-shadow: 0 0 0 4px rgba(242, 191, 97, 0.24), 0 8px 32px rgba(0,0,0,0.4);
   }
   .spin-canvas-wrap canvas { display: block; border-radius: 50%; }
   .spin-control-col {
@@ -583,8 +609,8 @@
     gap: 10px;
     align-items: flex-start;
     font-size: 0.9rem;
-    color: #d4bff0;
-    border: 1px solid rgba(200,150,255,0.15);
+    color: #c1dfe7;
+    border: 1px solid rgba(173, 214, 224, 0.2);
   }
   .spin-btn-group { display: flex; flex-direction: column; gap: 10px; }
   .spin-free-btn, .spin-paid-btn {
@@ -613,13 +639,13 @@
     to   { box-shadow: 0 8px 28px rgba(16,185,129,0.75); }
   }
   .spin-paid-btn {
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    background: linear-gradient(135deg, #de5f3a, #bf4425);
     color: #fff;
-    box-shadow: 0 6px 20px rgba(124,58,237,0.3);
+    box-shadow: 0 6px 20px rgba(191, 68, 37, 0.34);
   }
   .spin-paid-btn:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(124,58,237,0.5);
+    box-shadow: 0 8px 24px rgba(191, 68, 37, 0.5);
   }
   .spin-free-btn:disabled, .spin-paid-btn:disabled {
     opacity: 0.45;
@@ -634,9 +660,9 @@
     max-height: 230px;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(200,150,255,0.3) transparent;
+    scrollbar-color: rgba(168,210,222,0.35) transparent;
   }
-  .odds-title { font-weight: 700; font-size: 0.85rem; color: #c9b3e8; margin-bottom: 8px; }
+  .odds-title { font-weight: 700; font-size: 0.85rem; color: #b8dbe3; margin-bottom: 8px; }
   .odds-row {
     display: flex;
     justify-content: space-between;
@@ -644,13 +670,13 @@
     font-size: 0.82rem;
     padding: 3px 0;
     border-bottom: 1px solid rgba(255,255,255,0.04);
-    color: #d4bff0;
+    color: #d5ebf1;
   }
-  .odds-pct { color: #a78bfa; font-weight: 600; font-size: 0.78rem; }
+  .odds-pct { color: #f2bf61; font-weight: 700; font-size: 0.78rem; }
   .spin-result-overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(20,10,40,0.88);
+    background: rgba(8, 26, 36, 0.88);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -659,8 +685,8 @@
     backdrop-filter: blur(4px);
   }
   .spin-result-card {
-    background: linear-gradient(145deg, #3a1e78, #251154);
-    border: 2px solid rgba(200,150,255,0.3);
+    background: linear-gradient(145deg, #1f4f5d, #133642);
+    border: 2px solid rgba(168, 214, 224, 0.28);
     border-radius: 18px;
     padding: 28px 32px;
     text-align: center;
@@ -673,12 +699,12 @@
     to   { transform: scale(1);   opacity: 1; }
   }
   .spin-result-emoji { font-size: 3rem; margin-bottom: 8px; }
-  .spin-result-title { font-size: 1.1rem; font-weight: 600; color: #c9b3e8; margin-bottom: 8px; }
-  .spin-result-prize { font-size: 1.4rem; font-weight: 800; color: #f7d87e; margin-bottom: 10px; }
-  .spin-result-detail { font-size: 0.88rem; color: #c9b3e8; line-height: 1.5; margin-bottom: 16px; }
+  .spin-result-title { font-size: 1.1rem; font-weight: 600; color: #b8dbe3; margin-bottom: 8px; }
+  .spin-result-prize { font-size: 1.4rem; font-weight: 800; color: #f2bf61; margin-bottom: 10px; }
+  .spin-result-detail { font-size: 0.88rem; color: #d5ebf1; line-height: 1.5; margin-bottom: 16px; }
   .spin-result-close {
     padding: 10px 24px;
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    background: linear-gradient(135deg, #de5f3a, #bf4425);
     color: #fff;
     border: none;
     border-radius: 10px;
@@ -785,14 +811,14 @@
             💰 Quay 30,000đ
           </button>
           {% else %}
-          <a href="{{ url_for('login') }}" style="display:block;text-align:center;padding:12px 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border-radius:12px;font-weight:700;text-decoration:none;">
+          <a href="{{ url_for('login') }}" style="display:block;text-align:center;padding:12px 18px;background:linear-gradient(135deg,#de5f3a,#bf4425);color:#fff;border-radius:12px;font-weight:700;text-decoration:none;">
             🔑 Đăng nhập để quay
           </a>
           {% endif %}
         </div>
         <div class="spin-odds-list" id="spin-odds-list">
           <div class="odds-title">📊 Bảng phần thưởng</div>
-          <div style="color:#c9b3e8;font-size:0.8rem">Đang tải...</div>
+          <div style="color:#b8dbe3;font-size:0.8rem">Đang tải...</div>
         </div>
       </div>
     </div>

@@ -1,276 +1,379 @@
 {% extends "base.html" %}
 
-{% block title %}❌ Thanh toán thất bại | Tomato AI{% endblock %}
+{% block title %}Thanh toán thất bại | Tomato AI{% endblock %}
 
 {% block content %}
+<section class="payment-shell payment-failed-shell">
+  <div class="payment-backdrop"></div>
+
+  <article class="payment-card">
+    <div class="status-icon status-failed" aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <line x1="16" y1="16" x2="36" y2="36"/>
+        <line x1="36" y1="16" x2="16" y2="36"/>
+      </svg>
+    </div>
+
+    <p class="status-kicker">Giao dịch chưa hoàn tất</p>
+    <h1 class="status-title">Thanh toán thất bại</h1>
+    <p class="status-subtitle">
+      Rất tiếc, hệ thống chưa thể ghi nhận thanh toán. Bạn có thể thử lại hoặc chọn phương thức khác.
+    </p>
+
+    {% if error %}
+    <section class="error-card">
+      <h2>Chi tiết lỗi</h2>
+      <p>{{ error }}</p>
+    </section>
+    {% endif %}
+
+    {% if payment_method %}
+    <div class="method-row">
+      <span>Phương thức đã chọn</span>
+      <strong>{{ payment_method }}</strong>
+    </div>
+    {% endif %}
+
+    <section class="help-card">
+      <h2>Nguyên nhân thường gặp</h2>
+      <ul>
+        <li>Số dư tài khoản không đủ</li>
+        <li>Thông tin thẻ không chính xác</li>
+        <li>Thẻ hết hạn hoặc tạm khóa</li>
+        <li>Vượt hạn mức giao dịch trong ngày</li>
+        <li>Kết nối mạng không ổn định</li>
+        <li>Người dùng hủy giao dịch giữa chừng</li>
+      </ul>
+    </section>
+
+    <div class="action-row">
+      <a href="{{ url_for('cart') }}" class="action-btn action-primary">Thử lại</a>
+      <a href="{{ url_for('index') }}" class="action-btn action-ghost">Về trang chủ</a>
+    </div>
+
+    <p class="note-text">Cần hỗ trợ nhanh? Liên hệ support@tomatoai.com hoặc hotline 1900-xxxx-xx.</p>
+
+    <div class="redirect-pill">Tự động quay lại giỏ hàng sau 15 giây</div>
+  </article>
+</section>
+
 <style>
-  .payment-result-container {
-    max-width: 700px;
-    margin: 50px auto;
-    padding: 40px;
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .payment-shell {
+    position: relative;
+    max-width: 840px;
+    margin: 32px auto 50px;
+    padding: 0 14px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .payment-backdrop {
+    position: absolute;
+    inset: -18px 0 auto 0;
+    height: 340px;
+    border-radius: 26px;
+    background:
+      radial-gradient(circle at 18% 24%, rgba(237, 86, 74, 0.24) 0%, rgba(237, 86, 74, 0) 54%),
+      radial-gradient(circle at 84% 20%, rgba(225, 138, 52, 0.2) 0%, rgba(225, 138, 52, 0) 56%),
+      linear-gradient(145deg, #fff6f6 0%, #ffffff 54%, #fff9f1 100%);
+    border: 1px solid #ecdada;
+    z-index: 0;
+  }
+
+  .payment-card {
+    position: relative;
+    z-index: 1;
+    background: #ffffffda;
+    backdrop-filter: blur(2px);
+    border: 1px solid #f1e4e4;
+    border-radius: 24px;
+    box-shadow: 0 20px 42px rgba(52, 22, 22, 0.12);
+    padding: 34px 30px;
     text-align: center;
+    animation: settle 0.5s ease both;
   }
-  
-  .error-icon {
-    width: 100px;
-    height: 100px;
-    margin: 0 auto 30px;
-    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: shakeIt 0.5s ease-out;
+
+  .status-icon {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 18px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
   }
-  
-  @keyframes shakeIt {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-    20%, 40%, 60%, 80% { transform: translateX(10px); }
-  }
-  
-  .error-icon svg {
-    width: 60px;
-    height: 60px;
-    stroke: white;
-    stroke-width: 3;
+
+  .status-icon svg {
+    width: 58px;
+    height: 58px;
     fill: none;
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-dasharray: 90;
+    stroke-dashoffset: 90;
+    animation: draw-path 0.85s ease 0.2s forwards;
   }
-  
-  .result-card {
-    background: white;
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    animation: fadeInUp 0.6s ease-out;
+
+  .status-failed {
+    background: linear-gradient(145deg, #d54842, #ee6b64);
+    box-shadow: 0 10px 24px rgba(213, 72, 66, 0.35);
   }
-  
-  [data-theme="dark"] .result-card {
-    background: var(--bg-secondary);
+
+  .status-failed svg {
+    stroke: #ffffff;
   }
-  
-  @keyframes fadeInUp {
+
+  .status-kicker {
+    margin: 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #c73a34;
+    font-weight: 700;
+  }
+
+  .status-title {
+    margin: 6px 0 10px;
+    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    font-family: 'Manrope', sans-serif;
+    color: #4f1e1e;
+  }
+
+  .status-subtitle {
+    margin: 0 auto;
+    max-width: 620px;
+    color: #725657;
+    line-height: 1.7;
+  }
+
+  .error-card {
+    margin-top: 20px;
+    border-radius: 14px;
+    border: 1px solid #efcaca;
+    background: #fff4f4;
+    padding: 14px;
+    text-align: left;
+  }
+
+  .error-card h2 {
+    margin: 0 0 6px;
+    color: #b12b26;
+    font-size: 0.98rem;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .error-card p {
+    margin: 0;
+    color: #714d4f;
+    line-height: 1.65;
+  }
+
+  .method-row {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 999px;
+    border: 1px solid #efc9c8;
+    background: #fff8f7;
+    padding: 8px 14px;
+    color: #8a4947;
+    font-size: 0.9rem;
+  }
+
+  .method-row strong {
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #d54842;
+    color: #fff;
+    font-size: 0.78rem;
+  }
+
+  .help-card {
+    margin-top: 20px;
+    border: 1px solid #f0dddd;
+    border-radius: 16px;
+    padding: 16px;
+    background: #fffafb;
+    text-align: left;
+  }
+
+  .help-card h2 {
+    margin: 0 0 8px;
+    color: #67393b;
+    font-size: 1.02rem;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .help-card ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 7px;
+    color: #73595a;
+    font-size: 0.93rem;
+  }
+
+  .help-card li::before {
+    content: '•';
+    color: #d54842;
+    font-weight: 800;
+    margin-right: 8px;
+  }
+
+  .action-row {
+    margin-top: 22px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    min-width: 180px;
+    text-decoration: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 700;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .action-primary {
+    background: linear-gradient(145deg, #d54842, #e66760);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(213, 72, 66, 0.3);
+  }
+
+  .action-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(213, 72, 66, 0.35);
+  }
+
+  .action-ghost {
+    background: #fff;
+    border: 1px solid #d54842;
+    color: #d54842;
+  }
+
+  .action-ghost:hover {
+    transform: translateY(-2px);
+    background: #fff5f5;
+  }
+
+  .note-text {
+    margin: 16px 0 0;
+    font-size: 0.9rem;
+    color: #826768;
+    line-height: 1.65;
+  }
+
+  .redirect-pill {
+    margin: 16px auto 0;
+    display: inline-flex;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #fff1f0;
+    color: #c73a34;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  @keyframes draw-path {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes settle {
     from {
       opacity: 0;
-      transform: translateY(30px);
+      transform: translateY(14px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
-  
-  .result-title {
-    font-size: 2em;
-    font-weight: 700;
-    color: #f44336;
-    margin: 0 0 15px 0;
+
+  [data-theme="dark"] .payment-backdrop {
+    background:
+      radial-gradient(circle at 18% 24%, rgba(237, 86, 74, 0.13) 0%, rgba(237, 86, 74, 0) 54%),
+      radial-gradient(circle at 84% 20%, rgba(225, 138, 52, 0.11) 0%, rgba(225, 138, 52, 0) 56%),
+      linear-gradient(145deg, #261b1c 0%, #171213 54%, #241c15 100%);
+    border-color: #423233;
   }
-  
-  .result-message {
-    font-size: 1.1em;
-    color: #666;
-    margin: 0 0 30px 0;
+
+  [data-theme="dark"] .payment-card {
+    background: rgba(32, 21, 21, 0.92);
+    border-color: #493739;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
   }
-  
-  [data-theme="dark"] .result-message {
-    color: #aaa;
+
+  [data-theme="dark"] .status-kicker,
+  [data-theme="dark"] .redirect-pill {
+    color: #ffb1ac;
   }
-  
-  .error-details {
-    background: #ffebee;
-    border-left: 4px solid #f44336;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 30px 0;
-    text-align: left;
+
+  [data-theme="dark"] .status-title,
+  [data-theme="dark"] .help-card h2 {
+    color: #ffe4e3;
   }
-  
-  [data-theme="dark"] .error-details {
-    background: rgba(244, 67, 54, 0.1);
+
+  [data-theme="dark"] .status-subtitle,
+  [data-theme="dark"] .note-text,
+  [data-theme="dark"] .help-card ul,
+  [data-theme="dark"] .error-card p,
+  [data-theme="dark"] .method-row {
+    color: #d7b4b4;
   }
-  
-  .error-title {
-    font-weight: 700;
-    color: #d32f2f;
-    margin: 0 0 10px 0;
-    font-size: 1.1em;
+
+  [data-theme="dark"] .help-card,
+  [data-theme="dark"] .error-card {
+    background: #281d1e;
+    border-color: #4a3436;
   }
-  
-  .error-text {
-    color: #666;
-    margin: 0;
+
+  [data-theme="dark"] .error-card h2 {
+    color: #ff9f9a;
   }
-  
-  [data-theme="dark"] .error-text {
-    color: #ccc;
+
+  [data-theme="dark"] .method-row {
+    background: #2c1f20;
+    border-color: #533537;
   }
-  
-  .help-section {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 25px;
-    margin: 30px 0;
-    text-align: left;
+
+  [data-theme="dark"] .action-ghost {
+    background: #211718;
+    border-color: #e57a74;
+    color: #f0a7a2;
   }
-  
-  [data-theme="dark"] .help-section {
-    background: var(--bg-tertiary);
+
+  [data-theme="dark"] .action-ghost:hover {
+    background: #2a1d1f;
   }
-  
-  .help-title {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 15px 0;
+
+  [data-theme="dark"] .redirect-pill {
+    background: #2a1e1f;
   }
-  
-  [data-theme="dark"] .help-title {
-    color: #ddd;
-  }
-  
-  .help-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .help-list li {
-    padding: 10px 0;
-    color: #555;
-    border-bottom: 1px solid #e0e0e0;
-  }
-  
-  [data-theme="dark"] .help-list li {
-    color: #bbb;
-    border-bottom-color: var(--border-color);
-  }
-  
-  .help-list li:last-child {
-    border-bottom: none;
-  }
-  
-  .help-list li::before {
-    content: "✓ ";
-    color: #4CAF50;
-    font-weight: bold;
-    margin-right: 8px;
-  }
-  
-  .action-buttons {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    margin-top: 30px;
-  }
-  
-  .btn-primary, .btn-secondary {
-    padding: 15px 35px;
-    border-radius: 12px;
-    font-size: 1em;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s ease;
-  }
-  
-  .btn-primary {
-    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.3);
-  }
-  
-  .btn-secondary {
-    background: white;
-    color: #4CAF50;
-    border: 2px solid #4CAF50;
-  }
-  
-  [data-theme="dark"] .btn-secondary {
-    background: var(--bg-secondary);
-  }
-  
-  .btn-secondary:hover {
-    background: #4CAF50;
-    color: white;
-  }
-  
-  .payment-method-badge {
-    display: inline-block;
-    padding: 6px 15px;
-    background: #f44336;
-    color: white;
-    border-radius: 20px;
-    font-size: 0.9em;
-    font-weight: 600;
+
+  @media (max-width: 680px) {
+    .payment-shell {
+      margin-top: 18px;
+      padding: 0 10px;
+    }
+
+    .payment-card {
+      padding: 24px 18px;
+      border-radius: 18px;
+    }
+
+    .action-btn {
+      width: 100%;
+      min-width: 0;
+    }
   }
 </style>
 
-<div class="payment-result-container">
-  <div class="error-icon">
-    <svg viewBox="0 0 52 52">
-      <line x1="16" y1="16" x2="36" y2="36"/>
-      <line x1="36" y1="16" x2="16" y2="36"/>
-    </svg>
-  </div>
-  
-  <div class="result-card">
-    <h1 class="result-title">❌ Thanh toán thất bại</h1>
-    <p class="result-message">
-      Rất tiếc, giao dịch của bạn không thể hoàn tất.<br>
-      Vui lòng thử lại hoặc chọn phương thức thanh toán khác.
-    </p>
-    
-    {% if error %}
-    <div class="error-details">
-      <div class="error-title">📋 Chi tiết lỗi:</div>
-      <p class="error-text">{{ error }}</p>
-    </div>
-    {% endif %}
-    
-    {% if payment_method %}
-    <p style="color: #666; margin: 20px 0;">
-      <strong>Phương thức thanh toán:</strong>
-      <span class="payment-method-badge">{{ payment_method }}</span>
-    </p>
-    {% endif %}
-    
-    <div class="help-section">
-      <div class="help-title">💡 Một số nguyên nhân thường gặp:</div>
-      <ul class="help-list">
-        <li>Số dư tài khoản không đủ</li>
-        <li>Thông tin thẻ không chính xác</li>
-        <li>Thẻ đã hết hạn hoặc bị khóa</li>
-        <li>Vượt quá giới hạn giao dịch</li>
-        <li>Lỗi kết nối mạng</li>
-        <li>Hủy giao dịch</li>
-      </ul>
-    </div>
-    
-    <div class="action-buttons">
-      <a href="{{ url_for('cart') }}" class="btn-primary">
-        🔄 Thử lại
-      </a>
-      <a href="{{ url_for('index') }}" class="btn-secondary">
-        🏠 Về trang chủ
-      </a>
-    </div>
-    
-    <p style="margin-top: 30px; color: #888; font-size: 0.9em;">
-      📞 Cần hỗ trợ? Liên hệ: support@tomatoai.com<br>
-      Hoặc gọi hotline: 1900-xxxx-xx (8h-22h hàng ngày)
-    </p>
-  </div>
-</div>
-
 <script>
-// Auto redirect to cart after 15 seconds
 setTimeout(() => {
   window.location.href = "{{ url_for('cart') }}";
 }, 15000);

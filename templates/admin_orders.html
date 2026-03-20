@@ -202,6 +202,102 @@
       display: block !important;
     }
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .admin-container {
+    --ao-ink: #1b3239;
+    --ao-border: #deebe6;
+    --ao-muted: #60757d;
+    max-width: 1460px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .admin-title {
+    color: var(--ao-ink);
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .stats-grid {
+    gap: 1rem;
+  }
+
+  .stat-card,
+  .orders-table {
+    border-radius: 16px;
+    border: 1px solid var(--ao-border);
+    box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+  }
+
+  .stat-label {
+    color: var(--ao-muted);
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-family: 'Manrope', sans-serif;
+    color: #bb4827;
+  }
+
+  .table-header {
+    background: #f2f7f5;
+    border-bottom: 1px solid #e2ebe7;
+    font-weight: 700;
+    color: #3b5b64;
+  }
+
+  .table-row {
+    border-bottom-color: #edf2ef;
+  }
+
+  .btn-view,
+  .back-btn {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .btn-view {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+  }
+
+  .btn-view:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+  }
+
+  [data-theme="dark"] .admin-title {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .stat-card,
+  [data-theme="dark"] .orders-table {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .table-header {
+    background: #23352d;
+    border-bottom-color: #33473d;
+    color: #b9d3c8;
+  }
+
+  [data-theme="dark"] .table-row {
+    border-bottom-color: #2f4339;
+  }
+
+  [data-theme="dark"] .table-row:hover {
+    background: #22352c;
+  }
+
+  [data-theme="dark"] .stat-label {
+    color: #9cb7ad;
+  }
+
+  [data-theme="dark"] .stat-value {
+    color: #ffb69d;
+  }
 </style>
 
 <div class="admin-container">

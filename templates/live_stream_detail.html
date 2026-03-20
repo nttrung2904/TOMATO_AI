@@ -287,6 +287,166 @@
     border-color: #667eea;
     transform: translateX(-5px);
   }
+
+  /* Official polish overrides */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+  .stream-detail {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    max-width: 1280px;
+  }
+
+  .back-button {
+    border-radius: 12px;
+    border-color: #d2e3d9;
+    font-weight: 700;
+  }
+
+  .back-button:hover {
+    border-color: #2f8f5b;
+    background: #edf7f1;
+    transform: translateX(-3px);
+  }
+
+  [data-theme="dark"] .back-button {
+    background: #1a2822;
+    border-color: #355044;
+  }
+
+  .video-player {
+    border-radius: 22px;
+    border: 1px solid #dce9e1;
+    box-shadow: 0 18px 38px rgba(19, 50, 39, 0.18);
+  }
+
+  .video-player.live {
+    border: 2px solid #de4b3f;
+  }
+
+  [data-theme="dark"] .video-player {
+    border-color: #30463b;
+    box-shadow: 0 20px 38px rgba(0, 0, 0, 0.3);
+  }
+
+  .stream-status-banner {
+    border-radius: 999px;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22);
+  }
+
+  .banner-live {
+    background: linear-gradient(135deg, #d13e2f, #e45545);
+  }
+
+  .banner-scheduled {
+    background: linear-gradient(135deg, #d89b31, #ecb64f);
+  }
+
+  .stream-details {
+    border: 1px solid #dce9e1;
+    border-radius: 18px;
+    box-shadow: 0 14px 30px rgba(18, 49, 38, 0.11);
+  }
+
+  [data-theme="dark"] .stream-details {
+    background: #1a2822;
+    border-color: #30463b;
+  }
+
+  .stream-title,
+  .instructor-info h3 {
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .stream-title {
+    font-size: clamp(1.6rem, 2.8vw, 2.3rem);
+    color: #1e4939;
+  }
+
+  [data-theme="dark"] .stream-title {
+    color: #9fd8bd;
+  }
+
+  .stream-meta {
+    border-bottom-color: #dce9e1;
+    color: #557067;
+  }
+
+  .stream-description {
+    color: #4e675d;
+    font-size: 1.04rem;
+  }
+
+  .instructor-card {
+    background: linear-gradient(135deg, #2f8f5b, #3f7b5d);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+  }
+
+  .instructor-avatar {
+    background: rgba(255, 255, 255, 0.24);
+  }
+
+  .scheduled-info {
+    background: #fff7e8;
+    border-left-color: #d89b31;
+    border: 1px solid #f5d39c;
+    border-radius: 12px;
+  }
+
+  [data-theme="dark"] .scheduled-info {
+    background: #2f291b;
+    border-color: #6a5730;
+  }
+
+  .countdown {
+    color: #8a5c0f;
+  }
+
+  .tag {
+    background: #edf5f0;
+    color: #315846;
+    border: 1px solid #d2e3d9;
+  }
+
+  [data-theme="dark"] .tag {
+    background: #24362e;
+    color: #99d3b4;
+    border-color: #355044;
+  }
+
+  .placeholder-content {
+    background: linear-gradient(135deg, #214d3f, #2f8f5b);
+  }
+
+  @media (max-width: 768px) {
+    .stream-detail {
+      margin-top: 14px;
+      padding: 0 14px;
+    }
+
+    .video-player,
+    .stream-details {
+      border-radius: 14px;
+    }
+
+    .stream-details {
+      padding: 20px;
+    }
+
+    .instructor-card {
+      padding: 18px;
+      gap: 12px;
+    }
+
+    .stream-status-banner {
+      top: 14px;
+      left: 14px;
+      padding: 9px 14px;
+    }
+  }
 </style>
 
 <div class="stream-detail">

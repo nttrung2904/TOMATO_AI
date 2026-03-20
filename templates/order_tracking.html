@@ -4,106 +4,206 @@
 
 {% block content %}
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
   .tracking-container {
-    max-width: 1200px;
+    max-width: 1260px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 24px 16px 36px;
+    font-family: 'Be Vietnam Pro', sans-serif;
   }
   
   /* Header */
   .tracking-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background:
+      radial-gradient(circle at 80% 15%, rgba(249, 184, 96, 0.24), transparent 42%),
+      linear-gradient(135deg, #1f3f34 0%, #2f5e4e 52%, #36554f 100%);
     color: white;
-    padding: 30px;
-    border-radius: 20px;
+    padding: 30px 32px;
+    border-radius: 24px;
     margin-bottom: 30px;
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 16px 34px rgba(24, 52, 41, 0.28);
   }
   
   .tracking-header h1 {
     margin: 0 0 10px 0;
-    font-size: 2em;
+    font-size: clamp(1.6rem, 2.9vw, 2.2rem);
+    font-family: 'Manrope', sans-serif;
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
   }
   
   .tracking-header p {
     margin: 5px 0;
-    opacity: 0.9;
-    font-size: 1.1em;
+    opacity: 0.94;
+    font-size: 0.98rem;
   }
   
   .status-badge {
     display: inline-block;
-    padding: 8px 20px;
-    border-radius: 20px;
+    padding: 7px 14px;
+    border-radius: 999px;
     font-weight: 600;
-    font-size: 0.9em;
-    margin-left: 15px;
+    font-size: 0.78rem;
+    margin-left: 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
   }
   
   .status-badge.pending {
-    background: #ffc107;
-    color: #000;
+    background: #ffe8a3;
+    color: #614201;
+    border-color: #ffd35b;
   }
   
   .status-badge.processing {
-    background: #2196f3;
-    color: white;
+    background: #d4ebff;
+    color: #0f4f88;
+    border-color: #8bc6f8;
   }
-  
+
   .status-badge.shipped {
-    background: #ff9800;
-    color: white;
+    background: #ffe2c2;
+    color: #7a3f00;
+    border-color: #ffba74;
   }
-  
+
   .status-badge.delivered {
-    background: #4caf50;
-    color: white;
+    background: #d8f4e2;
+    color: #12542e;
+    border-color: #8ed8ac;
   }
-  
+
   .status-badge.cancelled {
-    background: #f44336;
-    color: white;
+    background: #ffe0dd;
+    color: #8a1e1e;
+    border-color: #f3a19b;
   }
-  
-  /* Main Content */
+
+  [data-theme="dark"] .status-badge.pending {
+    background: rgba(255, 211, 91, 0.2);
+    color: #ffd35b;
+    border-color: rgba(255, 211, 91, 0.5);
+  }
+
+  [data-theme="dark"] .status-badge.processing {
+    background: rgba(118, 190, 245, 0.2);
+    color: #8bc6f8;
+    border-color: rgba(118, 190, 245, 0.48);
+  }
+
+  [data-theme="dark"] .status-badge.shipped {
+    background: rgba(255, 186, 116, 0.17);
+    color: #ffba74;
+    border-color: rgba(255, 186, 116, 0.45);
+  }
+
+  [data-theme="dark"] .status-badge.delivered {
+    background: rgba(142, 216, 172, 0.19);
+    color: #8ed8ac;
+    border-color: rgba(142, 216, 172, 0.45);
+  }
+
+  [data-theme="dark"] .status-badge.cancelled {
+    background: rgba(243, 161, 155, 0.2);
+    color: #f3a19b;
+    border-color: rgba(243, 161, 155, 0.45);
+  }
+
   .tracking-content {
     display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+    gap: 24px;
   }
-  
+
   @media (max-width: 968px) {
     .tracking-content {
       grid-template-columns: 1fr;
     }
   }
-  
-  /* Card Styles */
+
   .tracking-card {
-    background: white;
-    border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: #fff;
+    border-radius: 18px;
+    padding: 24px;
+    border: 1px solid #e7efea;
+    box-shadow: 0 10px 24px rgba(17, 43, 33, 0.08);
   }
-  
+
   [data-theme="dark"] .tracking-card {
-    background: #2d2d2d;
+    background: #1c2a24;
+    border-color: #30433a;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
   }
-  
+
   .tracking-card h2 {
-    margin: 0 0 25px 0;
-    color: #2d5016;
-    font-size: 1.5em;
+    margin: 0 0 20px;
+    color: #204738;
+    font-size: 1.26rem;
+    font-family: 'Manrope', sans-serif;
     display: flex;
     align-items: center;
     gap: 10px;
   }
-  
+
   [data-theme="dark"] .tracking-card h2 {
-    color: #a8d08d;
+    color: #9fd8bd;
+  }
+
+  .support-box {
+    background: linear-gradient(145deg, #fff7e8 0%, #fffef8 100%);
+    border: 1px solid #f5d39c;
+    border-left: 4px solid #e49f2a;
+    border-radius: 14px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+
+  [data-theme="dark"] .support-box {
+    background: #2f291b;
+    border-color: #6a5730;
+    border-left-color: #d9a24a;
+  }
+
+  .support-box h3 {
+    margin: 0 0 10px;
+    color: #7f4f00;
+    font-size: 1.05rem;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  [data-theme="dark"] .support-box h3 {
+    color: #ffd489;
+  }
+
+  .support-box p {
+    margin: 5px 0;
+    color: #8a611f;
+  }
+
+  [data-theme="dark"] .support-box p {
+    color: #e6c084;
+  }
+
+  .btn-action {
+    padding: 11px 16px;
+    border: none;
+    border-radius: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.24s;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 0.92rem;
+  }
+
+  .btn-primary {
+    background: #2f8f5b;
+    color: white;
   }
   
   /* Timeline */
@@ -372,25 +472,10 @@
     flex-wrap: wrap;
   }
   
-  .btn-action {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-decoration: none;
-    display: inline-block;
-  }
-  
-  .btn-primary {
-    background: #4caf50;
-    color: white;
-  }
-  
   .btn-primary:hover {
-    background: #45a049;
+    background: #2a7b4d;
     transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(47, 143, 91, 0.3);
   }
   
   .btn-secondary {
@@ -411,39 +496,95 @@
   [data-theme="dark"] .btn-secondary:hover {
     background: #555;
   }
-  
-  /* Contact Support */
-  .support-box {
-    background: #fff3cd;
-    border: 2px solid #ffc107;
-    border-radius: 12px;
-    padding: 20px;
-    margin-top: 20px;
+
+  /* Additional consistency polish */
+  .tracking-card,
+  .support-box,
+  .status-badge,
+  .btn-action {
+    transition: all 0.24s ease;
+  }
+
+  .tracking-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(19, 47, 36, 0.14);
+  }
+
+  [data-theme="dark"] .tracking-card:hover {
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .timeline-event {
+    border-radius: 10px;
+    border-left-width: 5px;
+  }
+
+  .timeline-event-title {
+    color: #204738;
+  }
+
+  .estimated-delivery {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 12px 24px rgba(43, 112, 59, 0.25);
+  }
+
+  .support-box a {
+    text-decoration: none;
+    border-bottom: 1px dashed currentColor;
+  }
+
+  .support-box a:hover {
+    opacity: 0.85;
+  }
+
+  @media (max-width: 968px) {
+    .tracking-header {
+      padding: 24px 20px;
+      border-radius: 18px;
+    }
+
+    .tracking-card {
+      padding: 18px;
+      border-radius: 14px;
+    }
+
+    .timeline {
+      padding-left: 34px;
+    }
+
+    .milestone-icon {
+      left: -33px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .order-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .order-info-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .order-info-row .info-value {
+      text-align: left !important;
+      max-width: 100% !important;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .btn-action {
+      width: 100%;
+      text-align: center;
+    }
   }
   
-  [data-theme="dark"] .support-box {
-    background: #3a3020;
-    border-color: #8b6f00;
-  }
-  
-  .support-box h3 {
-    margin: 0 0 10px 0;
-    color: #856404;
-    font-size: 1.2em;
-  }
-  
-  [data-theme="dark"] .support-box h3 {
-    color: #ffc107;
-  }
-  
-  .support-box p {
-    margin: 5px 0;
-    color: #856404;
-  }
-  
-  [data-theme="dark"] .support-box p {
-    color: #d4a000;
-  }
 </style>
 
 <div class="tracking-container">
@@ -452,7 +593,19 @@
     <h1>
       📦 Theo dõi đơn hàng
       <span class="status-badge {{ tracking.current_status }}">
-        {{ tracking.current_status|upper }}
+        {% if tracking.current_status == 'pending' %}
+          Chờ xử lý
+        {% elif tracking.current_status == 'processing' %}
+          Đang xử lý
+        {% elif tracking.current_status == 'shipped' %}
+          Đang giao
+        {% elif tracking.current_status == 'delivered' %}
+          Đã giao
+        {% elif tracking.current_status == 'cancelled' %}
+          Đã hủy
+        {% else %}
+          {{ tracking.current_status }}
+        {% endif %}
       </span>
     </h1>
     <p><strong>Mã đơn hàng:</strong> #{{ tracking.order.id }}</p>

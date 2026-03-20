@@ -706,6 +706,9 @@ async function loadCrops() {
     `;
   }
 }
+      .crop-actions {
+        flex-direction: column;
+        align-items: stretch;
 
 // Display crops
 function displayCrops(crops) {
@@ -724,9 +727,33 @@ function displayCrops(crops) {
     `;
     return;
   }
-  
+      font-size: 2rem;
   grid.innerHTML = crops.map(crop => {
     const statusText = {
+
+  /* Theme alignment with main site */
+  .crop-header {
+    padding: 24px;
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.14), transparent 34%),
+      linear-gradient(120deg, #cf4652 0%, #2e8a57 100%);
+    box-shadow: 0 14px 30px rgba(18, 49, 38, 0.18);
+  }
+
+  .crop-header h1,
+  .crop-header p {
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+    background: none;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  }
+
+  [data-theme="dark"] .crop-header {
+    background:
+      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.08), transparent 34%),
+      linear-gradient(120deg, #a73a46 0%, #226f45 100%);
+  }
       'planning': 'Lên kế hoạch',
       'growing': 'Đang trồng',
       'harvested': 'Đã thu hoạch'

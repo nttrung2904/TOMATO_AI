@@ -210,6 +210,127 @@
       grid-template-columns: 1fr;
     }
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .order-detail-container {
+    --aod-ink: #1b3239;
+    --aod-border: #deebe6;
+    --aod-muted: #60757d;
+    max-width: 1280px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .order-title,
+  .card-title,
+  .item-name {
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .order-title {
+    color: var(--aod-ink);
+    letter-spacing: -0.02em;
+  }
+
+  .order-card {
+    border-radius: 16px;
+    border: 1px solid var(--aod-border);
+    box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+    padding: 1.4rem;
+  }
+
+  .card-title {
+    color: #2c4e57;
+  }
+
+  .info-row {
+    border-bottom-color: #edf2ef;
+  }
+
+  .info-label,
+  .item-meta,
+  .history-time {
+    color: var(--aod-muted);
+  }
+
+  .item-row {
+    border-radius: 12px;
+    border: 1px solid #e8efeb;
+    background: #f9fcfb;
+  }
+
+  .item-price {
+    color: #bb4827;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .form-select,
+  .form-textarea {
+    border-color: #d7e4df;
+    border-radius: 10px;
+  }
+
+  .btn-update,
+  .back-btn {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .btn-update {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.24);
+  }
+
+  .btn-update:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+  }
+
+  .history-item {
+    border-left-color: #dd603a;
+    border-radius: 0 10px 10px 0;
+  }
+
+  [data-theme="dark"] .order-title,
+  [data-theme="dark"] .card-title,
+  [data-theme="dark"] .item-name {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .order-card {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .info-row {
+    border-bottom-color: #33473d;
+  }
+
+  [data-theme="dark"] .info-label,
+  [data-theme="dark"] .item-meta,
+  [data-theme="dark"] .history-time {
+    color: #9cb7ad;
+  }
+
+  [data-theme="dark"] .item-row {
+    background: #21322b;
+    border-color: #344940;
+  }
+
+  [data-theme="dark"] .item-price {
+    color: #ffb69d;
+  }
+
+  [data-theme="dark"] .form-select,
+  [data-theme="dark"] .form-textarea {
+    background: #23332c;
+    border-color: #3a4f46;
+  }
+
+  [data-theme="dark"] .history-item {
+    background: #22352c;
+  }
 </style>
 
 <div class="order-detail-container">

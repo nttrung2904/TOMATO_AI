@@ -1811,6 +1811,176 @@
   .error-state {
     color: #f44336;
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .profile-container {
+    --pf-ink: #1b3138;
+    --pf-muted: #607780;
+    --pf-border: #dce7e3;
+    --pf-accent: #dd603a;
+    --pf-accent-strong: #bb4827;
+    padding: 24px 16px 36px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .profile-header {
+    background:
+      radial-gradient(circle at 82% 12%, rgba(250, 188, 102, 0.24), transparent 38%),
+      radial-gradient(circle at 15% 78%, rgba(84, 181, 130, 0.18), transparent 45%),
+      linear-gradient(140deg, #1d4a3a 0%, #2a6651 55%, #33715b 100%);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 20px 38px rgba(24, 58, 45, 0.26);
+    padding: 30px;
+  }
+
+  .user-avatar {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  }
+
+  .user-details h1 {
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(1.5rem, 2.5vw, 2rem);
+    letter-spacing: -0.02em;
+    color: #ffffff !important;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+
+  .user-details p {
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+
+  .profile-header .membership-card,
+  .profile-header .tier-badge,
+  .profile-header .tier-progress-label,
+  .profile-header .tier-progress-label span,
+  .profile-header .membership-card p,
+  .profile-header .membership-card strong {
+    color: #ffffff !important;
+  }
+
+  .logout-btn,
+  .checkin-btn {
+    border-radius: 12px;
+    font-weight: 700;
+  }
+
+  .quick-stats {
+    gap: 14px;
+  }
+
+  .stat-card {
+    border: 1px solid var(--pf-border);
+    border-radius: 18px;
+    box-shadow: 0 10px 22px rgba(23, 53, 42, 0.08);
+  }
+
+  .stat-card:hover {
+    box-shadow: 0 14px 28px rgba(23, 53, 42, 0.14);
+  }
+
+  .stat-value {
+    color: var(--pf-accent-strong);
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.9em;
+  }
+
+  .stat-label {
+    color: var(--pf-muted);
+  }
+
+  .profile-content {
+    gap: 22px;
+  }
+
+  .profile-menu {
+    border-radius: 18px;
+    border: 1px solid var(--pf-border);
+    box-shadow: 0 10px 22px rgba(23, 53, 42, 0.08);
+    padding: 12px;
+  }
+
+  .menu-item {
+    border-radius: 12px;
+    font-weight: 600;
+    color: #3d5962;
+  }
+
+  .menu-item.active {
+    background: linear-gradient(135deg, var(--pf-accent) 0%, #f08a52 100%) !important;
+    color: white !important;
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.28);
+  }
+
+  .section {
+    border-radius: 18px;
+    border: 1px solid var(--pf-border);
+    box-shadow: 0 10px 22px rgba(23, 53, 42, 0.08);
+  }
+
+  .section-title {
+    font-family: 'Manrope', sans-serif;
+    color: var(--pf-ink);
+  }
+
+  [data-theme="dark"] .profile-header {
+    background:
+      radial-gradient(circle at 82% 12%, rgba(250, 188, 102, 0.13), transparent 38%),
+      radial-gradient(circle at 15% 78%, rgba(84, 181, 130, 0.11), transparent 45%),
+      linear-gradient(140deg, #183126 0%, #224136 55%, #2a4d40 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  [data-theme="dark"] .user-details h1,
+  [data-theme="dark"] .user-details p,
+  [data-theme="dark"] .profile-header .membership-card,
+  [data-theme="dark"] .profile-header .tier-badge,
+  [data-theme="dark"] .profile-header .tier-progress-label,
+  [data-theme="dark"] .profile-header .tier-progress-label span,
+  [data-theme="dark"] .profile-header .membership-card p,
+  [data-theme="dark"] .profile-header .membership-card strong {
+    color: #f4fff8 !important;
+  }
+
+  [data-theme="dark"] .profile-menu,
+  [data-theme="dark"] .stat-card,
+  [data-theme="dark"] .section {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .menu-item {
+    color: #acc5bd;
+  }
+
+  [data-theme="dark"] .menu-item:hover {
+    background: #22352c;
+  }
+
+  [data-theme="dark"] .stat-label {
+    color: #9db5ad;
+  }
+
+  [data-theme="dark"] .section-title,
+  [data-theme="dark"] .stat-value {
+    color: #eaf6f1;
+  }
+
+  @media (max-width: 900px) {
+    .profile-container {
+      padding: 16px 10px 26px;
+    }
+
+    .profile-header {
+      padding: 22px;
+      border-radius: 18px;
+    }
+  }
 </style>
 
 <div class="profile-container">

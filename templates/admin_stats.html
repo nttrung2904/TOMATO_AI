@@ -253,6 +253,121 @@
             width: 100%;
         }
     }
+
+    /* ===== Modern Polish Overrides ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+    .stats-container {
+        --as-ink: #1b3239;
+        --as-border: #deebe6;
+        --as-muted: #60757d;
+        max-width: 1460px;
+        font-family: 'Be Vietnam Pro', sans-serif;
+    }
+
+    .stats-title,
+    .chart-title,
+    .stat-value,
+    .model-count {
+        font-family: 'Manrope', sans-serif;
+    }
+
+    .stats-title,
+    .chart-title {
+        color: var(--as-ink);
+        letter-spacing: -0.02em;
+    }
+
+    .stat-card,
+    .chart-section {
+        border-radius: 16px;
+        border: 1px solid var(--as-border);
+        box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+    }
+
+    .stat-label,
+    .stat-subtext,
+    .disease-count {
+        color: var(--as-muted);
+    }
+
+    .stat-value {
+        color: #bb4827;
+    }
+
+    .disease-bar {
+        background: #edf3f0;
+    }
+
+    .disease-bar-fill {
+        background: linear-gradient(90deg, #dd603a, #f09a57);
+    }
+
+    .model-card {
+        background: linear-gradient(135deg, #1f5a48 0%, #2d7960 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .recent-table th {
+        background: #f2f7f5;
+        color: #355861;
+        border-bottom-color: #deebe6;
+    }
+
+    .recent-table td {
+        border-bottom-color: #edf2ef;
+    }
+
+    .recent-table tr:hover {
+        background: #f7fbf9;
+    }
+
+    .back-btn {
+        border-radius: 10px;
+        font-weight: 700;
+    }
+
+    [data-theme="dark"] .stats-title,
+    [data-theme="dark"] .chart-title {
+        color: #eaf6f1;
+    }
+
+    [data-theme="dark"] .stat-card,
+    [data-theme="dark"] .chart-section {
+        background: #1c2a24;
+        border-color: #31453b;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+    }
+
+    [data-theme="dark"] .stat-label,
+    [data-theme="dark"] .stat-subtext,
+    [data-theme="dark"] .disease-count,
+    [data-theme="dark"] .disease-name,
+    [data-theme="dark"] .recent-table td {
+        color: #9cb7ad;
+    }
+
+    [data-theme="dark"] .stat-value {
+        color: #ffb69d;
+    }
+
+    [data-theme="dark"] .disease-bar {
+        background: #2a3c33;
+    }
+
+    [data-theme="dark"] .recent-table th {
+        background: #22352c;
+        color: #bdd7cc;
+        border-bottom-color: #33473d;
+    }
+
+    [data-theme="dark"] .recent-table td {
+        border-bottom-color: #2f4339;
+    }
+
+    [data-theme="dark"] .recent-table tr:hover {
+        background: #22352c;
+    }
 </style>
 {% endblock %}
 

@@ -119,6 +119,96 @@
 
   /* Make selection buttons visually consistent */
   .btn.small { border-radius: 8px; }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .admin-header,
+  .action-bar,
+  .feedback-group {
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .admin-header h1,
+  .feedback-group h2 {
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
+    color: #1b3239;
+  }
+
+  .admin-header {
+    margin-top: 24px;
+    margin-bottom: 14px;
+  }
+
+  .stats-link {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.24);
+    border-radius: 10px;
+  }
+
+  .stats-link:hover {
+    box-shadow: 0 10px 20px rgba(187, 72, 39, 0.3);
+  }
+
+  .action-bar {
+    border-radius: 14px;
+    border-color: #deebe6;
+    background: #f3f7f6;
+    box-shadow: 0 10px 22px rgba(17, 46, 37, 0.06);
+  }
+
+  .action-bar .btn {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .feedback-group.card {
+    border-radius: 16px;
+    border: 1px solid #deebe6;
+    box-shadow: 0 12px 24px rgba(17, 46, 37, 0.08);
+  }
+
+  .img-card {
+    border-radius: 10px;
+    border-color: #e2ebe7;
+  }
+
+  .img-card .img-name {
+    background: #f5f9f7;
+    color: #4f6972;
+    font-weight: 600;
+  }
+
+  .img-card.selected {
+    border-color: #dd603a;
+    box-shadow: 0 0 0 3px rgba(221, 96, 58, 0.18);
+  }
+
+  [data-theme="dark"] .admin-header h1,
+  [data-theme="dark"] .feedback-group h2 {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .action-bar {
+    background: #1f3029;
+    border-color: #344940;
+  }
+
+  [data-theme="dark"] .feedback-group.card {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .img-card {
+    border-color: #344940;
+  }
+
+  [data-theme="dark"] .img-card .img-name {
+    background: #243730;
+    color: #a7beb6;
+  }
 </style>
 
 <div class="admin-header">

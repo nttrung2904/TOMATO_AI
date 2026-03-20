@@ -220,6 +220,157 @@
   .slug-generator button:hover {
     background: var(--tomato-200);
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .form-container {
+    --awf-ink: #1b3239;
+    --awf-border: #deebe6;
+    --awf-muted: #60757d;
+    max-width: 980px;
+    padding: 24px 14px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .form-header h1,
+  .form-group label,
+  .markdown-guide h4 {
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .form-header h1 {
+    color: var(--awf-ink);
+    letter-spacing: -0.02em;
+  }
+
+  .form-header a,
+  .form-help {
+    color: var(--awf-muted);
+  }
+
+  .form-card {
+    border-radius: 18px;
+    border: 1px solid var(--awf-border);
+    box-shadow: 0 14px 28px rgba(17, 46, 37, 0.08);
+    padding: 30px;
+  }
+
+  .form-group label {
+    color: #355861;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    border-color: #d7e4df;
+    border-radius: 10px;
+  }
+
+  .form-group textarea {
+    min-height: 430px;
+    font-family: Consolas, 'Courier New', monospace;
+  }
+
+  .form-actions {
+    border-top-color: #e7efec;
+  }
+
+  .btn {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.24);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+  }
+
+  .btn-secondary {
+    background: #e8eeeb;
+    color: #33525a;
+  }
+
+  .btn-secondary:hover {
+    background: #dce5e1;
+  }
+
+  .markdown-guide {
+    border: 1px solid #e2ebe7;
+    border-radius: 12px;
+    background: #f7fbf9;
+  }
+
+  .markdown-guide h4 {
+    color: #335861;
+  }
+
+  .slug-generator button {
+    border-radius: 8px;
+    font-weight: 700;
+    background: #edf4f1;
+    color: #365962;
+  }
+
+  .slug-generator button:hover {
+    background: #dee9e4;
+  }
+
+  [data-theme="dark"] .form-header h1,
+  [data-theme="dark"] .form-group label,
+  [data-theme="dark"] .markdown-guide h4 {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .form-header a,
+  [data-theme="dark"] .form-help {
+    color: #9cb7ad;
+  }
+
+  [data-theme="dark"] .form-card {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .form-actions {
+    border-top-color: #33473d;
+  }
+
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select,
+  [data-theme="dark"] .form-group textarea {
+    background: #23332c;
+    border-color: #3a4f46;
+    color: #e7f4ef;
+  }
+
+  [data-theme="dark"] .markdown-guide {
+    background: #22352c;
+    border-color: #344940;
+  }
+
+  [data-theme="dark"] .btn-secondary {
+    background: #243730;
+    color: #bcd6cc;
+  }
+
+  [data-theme="dark"] .btn-secondary:hover {
+    background: #2c4138;
+  }
+
+  [data-theme="dark"] .slug-generator button {
+    background: #2b3f36;
+    color: #bdd7cc;
+  }
+
+  [data-theme="dark"] .slug-generator button:hover {
+    background: #344940;
+  }
 </style>
 
 <div class="form-container">

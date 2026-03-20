@@ -22,11 +22,13 @@
   .game-header h1 {
     margin: 0 0 10px 0;
     font-size: 2.5em;
+    color: #ffffff;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
   }
   
   .game-header p {
     margin: 0;
+    color: rgba(255, 255, 255, 0.92);
     opacity: 0.9;
     font-size: 1.1em;
   }
@@ -229,6 +231,28 @@
     .leaderboard-table {
       font-size: 0.9em;
     }
+  }
+
+  /* Theme alignment with main site */
+  .game-header {
+    background:
+      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.14), transparent 34%),
+      linear-gradient(120deg, #cf4652 0%, #2e8a57 100%);
+    box-shadow: 0 14px 30px rgba(18, 49, 38, 0.2);
+  }
+
+  .play-btn {
+    background: linear-gradient(135deg, #cf4652 0%, #2e8a57 100%);
+  }
+
+  .play-btn:hover {
+    box-shadow: 0 6px 20px rgba(18, 49, 38, 0.32);
+  }
+
+  [data-theme="dark"] .game-header {
+    background:
+      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.08), transparent 34%),
+      linear-gradient(120deg, #a73a46 0%, #226f45 100%);
   }
 </style>
 

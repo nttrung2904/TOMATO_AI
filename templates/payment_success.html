@@ -1,261 +1,350 @@
 {% extends "base.html" %}
 
-{% block title %}✅ Thanh toán thành công | Tomato AI{% endblock %}
+{% block title %}Thanh toán thành công | Tomato AI{% endblock %}
 
 {% block content %}
+<section class="payment-shell payment-success-shell">
+  <div class="payment-backdrop"></div>
+
+  <article class="payment-card">
+    <div class="status-icon status-success" aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <path d="M14 27l8 8L38 20"/>
+      </svg>
+    </div>
+
+    <p class="status-kicker">Thanh toán xác nhận</p>
+    <h1 class="status-title">Giao dịch thành công</h1>
+    <p class="status-subtitle">
+      Cảm ơn bạn đã mua sắm tại Tomato AI. Đơn hàng đã vào hệ thống và đang được xử lý.
+    </p>
+
+    <section class="detail-card">
+      <h2>Thông tin đơn hàng</h2>
+
+      <div class="detail-row">
+        <span>📦 Mã đơn hàng</span>
+        <strong>#{{ order_id }}</strong>
+      </div>
+
+      <div class="detail-row">
+        <span>💳 Phương thức</span>
+        <strong>
+          {{ payment_method }}
+          <span class="method-badge">{{ payment_method }}</span>
+        </strong>
+      </div>
+
+      <div class="detail-row total-row">
+        <span>💰 Tổng thanh toán</span>
+        <strong>{{ "{:,.0f}".format(amount).replace(',', '.') }} đ</strong>
+      </div>
+
+      <div class="detail-row">
+        <span>📅 Thời gian</span>
+        <strong>{{ datetime.datetime.now().strftime('%d/%m/%Y %H:%M') }}</strong>
+      </div>
+    </section>
+
+    <div class="action-row">
+      <a href="{{ url_for('index') }}" class="action-btn action-primary">Về trang chủ</a>
+      <a href="{{ url_for('shop') }}" class="action-btn action-ghost">Tiếp tục mua sắm</a>
+    </div>
+
+    <p class="note-text">Email xác nhận đã được gửi đến hộp thư của bạn. Nếu cần hỗ trợ, vui lòng liên hệ support@tomatoai.com.</p>
+
+    <div class="redirect-pill">Tự động quay về trang chủ sau 10 giây</div>
+  </article>
+</section>
+
 <style>
-  .payment-result-container {
-    max-width: 700px;
-    margin: 50px auto;
-    padding: 40px;
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .payment-shell {
+    position: relative;
+    max-width: 840px;
+    margin: 32px auto 50px;
+    padding: 0 14px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .payment-backdrop {
+    position: absolute;
+    inset: -18px 0 auto 0;
+    height: 340px;
+    border-radius: 26px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(67, 173, 112, 0.25) 0%, rgba(67, 173, 112, 0) 52%),
+      radial-gradient(circle at 82% 24%, rgba(224, 124, 66, 0.26) 0%, rgba(224, 124, 66, 0) 55%),
+      linear-gradient(150deg, #f4fff8 0%, #ffffff 58%, #fff8f2 100%);
+    border: 1px solid #dce9df;
+    z-index: 0;
+  }
+
+  .payment-card {
+    position: relative;
+    z-index: 1;
+    background: #ffffffd9;
+    backdrop-filter: blur(2px);
+    border: 1px solid #e6efe7;
+    border-radius: 24px;
+    box-shadow: 0 20px 42px rgba(22, 43, 36, 0.12);
+    padding: 34px 30px;
     text-align: center;
+    animation: settle 0.5s ease both;
   }
-  
-  .success-icon {
-    width: 100px;
-    height: 100px;
-    margin: 0 auto 30px;
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: scaleIn 0.5s ease-out;
+
+  .status-icon {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 18px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
   }
-  
-  @keyframes scaleIn {
-    from {
-      transform: scale(0);
-      opacity: 0;
-    }
-    to {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-  
-  .success-icon svg {
-    width: 60px;
-    height: 60px;
-    stroke: white;
-    stroke-width: 3;
+
+  .status-icon svg {
+    width: 58px;
+    height: 58px;
     fill: none;
+    stroke-width: 3.2;
     stroke-dasharray: 100;
     stroke-dashoffset: 100;
-    animation: drawCheck 0.8s ease-out 0.3s forwards;
+    animation: draw-path 0.85s ease 0.2s forwards;
   }
-  
-  @keyframes drawCheck {
-    to {
-      stroke-dashoffset: 0;
-    }
+
+  .status-success {
+    background: linear-gradient(145deg, #2f8f5b, #45b474);
+    box-shadow: 0 10px 24px rgba(47, 143, 91, 0.35);
   }
-  
-  .result-card {
-    background: white;
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    animation: fadeInUp 0.6s ease-out;
+
+  .status-success svg {
+    stroke: #ffffff;
   }
-  
-  [data-theme="dark"] .result-card {
-    background: var(--bg-secondary);
+
+  .status-kicker {
+    margin: 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: #2f8f5b;
+    font-weight: 700;
   }
-  
-  @keyframes fadeInUp {
+
+  .status-title {
+    margin: 6px 0 10px;
+    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    font-family: 'Manrope', sans-serif;
+    color: #163429;
+  }
+
+  .status-subtitle {
+    margin: 0 auto;
+    max-width: 620px;
+    color: #546b60;
+    line-height: 1.7;
+  }
+
+  .detail-card {
+    margin-top: 22px;
+    border: 1px solid #dce9df;
+    border-radius: 16px;
+    padding: 18px;
+    background: #f8fdf9;
+    text-align: left;
+  }
+
+  .detail-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.02rem;
+    color: #284838;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed #cddfce;
+    color: #355748;
+  }
+
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .detail-row strong {
+    color: #1d3f2f;
+    font-weight: 700;
+  }
+
+  .total-row strong {
+    font-size: 1.2rem;
+    color: #2f8f5b;
+  }
+
+  .method-badge {
+    margin-left: 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    background: #2f8f5b;
+    color: #fff;
+  }
+
+  .action-row {
+    margin-top: 22px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    min-width: 180px;
+    text-decoration: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 700;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .action-primary {
+    background: linear-gradient(145deg, #2f8f5b, #44aa70);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(47, 143, 91, 0.3);
+  }
+
+  .action-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(47, 143, 91, 0.35);
+  }
+
+  .action-ghost {
+    background: #fff;
+    border: 1px solid #2f8f5b;
+    color: #2f8f5b;
+  }
+
+  .action-ghost:hover {
+    transform: translateY(-2px);
+    background: #f0faf4;
+  }
+
+  .note-text {
+    margin: 16px 0 0;
+    font-size: 0.9rem;
+    color: #667f73;
+    line-height: 1.65;
+  }
+
+  .redirect-pill {
+    margin: 16px auto 0;
+    display: inline-flex;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #ebf6ee;
+    color: #2f8f5b;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  @keyframes draw-path {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes settle {
     from {
       opacity: 0;
-      transform: translateY(30px);
+      transform: translateY(14px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
-  
-  .result-title {
-    font-size: 2em;
-    font-weight: 700;
-    color: #4CAF50;
-    margin: 0 0 15px 0;
+
+  [data-theme="dark"] .payment-backdrop {
+    background:
+      radial-gradient(circle at 15% 20%, rgba(67, 173, 112, 0.15) 0%, rgba(67, 173, 112, 0) 52%),
+      radial-gradient(circle at 82% 24%, rgba(224, 124, 66, 0.16) 0%, rgba(224, 124, 66, 0) 55%),
+      linear-gradient(150deg, #1a2421 0%, #111a16 58%, #201913 100%);
+    border-color: #2f3c35;
   }
-  
-  .result-message {
-    font-size: 1.1em;
-    color: #666;
-    margin: 0 0 30px 0;
+
+  [data-theme="dark"] .payment-card {
+    background: rgba(20, 30, 24, 0.92);
+    border-color: #33433b;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
   }
-  
-  [data-theme="dark"] .result-message {
-    color: #aaa;
+
+  [data-theme="dark"] .status-kicker,
+  [data-theme="dark"] .redirect-pill {
+    color: #80dfac;
   }
-  
-  .order-details {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 25px;
-    margin: 30px 0;
-    text-align: left;
+
+  [data-theme="dark"] .status-title,
+  [data-theme="dark"] .detail-row strong,
+  [data-theme="dark"] .detail-card h2 {
+    color: #edf8f2;
   }
-  
-  [data-theme="dark"] .order-details {
-    background: var(--bg-tertiary);
+
+  [data-theme="dark"] .status-subtitle,
+  [data-theme="dark"] .detail-row,
+  [data-theme="dark"] .note-text {
+    color: #abc5b7;
   }
-  
-  .order-detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid #e0e0e0;
+
+  [data-theme="dark"] .detail-card {
+    background: #18231f;
+    border-color: #34453d;
   }
-  
-  [data-theme="dark"] .order-detail-row {
-    border-bottom-color: var(--border-color);
+
+  [data-theme="dark"] .detail-row {
+    border-bottom-color: #30423a;
   }
-  
-  .order-detail-row:last-child {
-    border-bottom: none;
+
+  [data-theme="dark"] .action-ghost {
+    background: #15211b;
+    border-color: #52b47f;
+    color: #8ddab0;
   }
-  
-  .detail-label {
-    font-weight: 600;
-    color: #555;
+
+  [data-theme="dark"] .action-ghost:hover {
+    background: #1b2c24;
   }
-  
-  [data-theme="dark"] .detail-label {
-    color: #bbb;
+
+  [data-theme="dark"] .redirect-pill {
+    background: #1d2d24;
   }
-  
-  .detail-value {
-    color: #333;
-    font-weight: 500;
-  }
-  
-  [data-theme="dark"] .detail-value {
-    color: #ddd;
-  }
-  
-  .total-amount {
-    font-size: 1.5em;
-    color: #4CAF50;
-    font-weight: 700;
-  }
-  
-  .action-buttons {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    margin-top: 30px;
-  }
-  
-  .btn-primary, .btn-secondary {
-    padding: 15px 35px;
-    border-radius: 12px;
-    font-size: 1em;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s ease;
-  }
-  
-  .btn-primary {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
-  }
-  
-  .btn-secondary {
-    background: white;
-    color: #4CAF50;
-    border: 2px solid #4CAF50;
-  }
-  
-  [data-theme="dark"] .btn-secondary {
-    background: var(--bg-secondary);
-    color: #4CAF50;
-  }
-  
-  .btn-secondary:hover {
-    background: #4CAF50;
-    color: white;
-  }
-  
-  .payment-method-badge {
-    display: inline-block;
-    padding: 6px 15px;
-    background: #4CAF50;
-    color: white;
-    border-radius: 20px;
-    font-size: 0.9em;
-    font-weight: 600;
-    margin-left: 10px;
+
+  @media (max-width: 680px) {
+    .payment-shell {
+      margin-top: 18px;
+      padding: 0 10px;
+    }
+
+    .payment-card {
+      padding: 24px 18px;
+      border-radius: 18px;
+    }
+
+    .detail-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .action-btn {
+      width: 100%;
+      min-width: 0;
+    }
   }
 </style>
 
-<div class="payment-result-container">
-  <div class="success-icon">
-    <svg viewBox="0 0 52 52">
-      <path d="M14 27l8 8L38 20"/>
-    </svg>
-  </div>
-  
-  <div class="result-card">
-    <h1 class="result-title">🎉 Thanh toán thành công!</h1>
-    <p class="result-message">
-      Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của chúng tôi.<br>
-      Đơn hàng của bạn đã được xác nhận và đang được xử lý.
-    </p>
-    
-    <div class="order-details">
-      <div class="order-detail-row">
-        <span class="detail-label">📦 Mã đơn hàng:</span>
-        <span class="detail-value">#{{ order_id }}</span>
-      </div>
-      
-      <div class="order-detail-row">
-        <span class="detail-label">💳 Phương thức thanh toán:</span>
-        <span class="detail-value">
-          {{ payment_method }}
-          <span class="payment-method-badge">{{ payment_method }}</span>
-        </span>
-      </div>
-      
-      <div class="order-detail-row">
-        <span class="detail-label">💰 Tổng tiền:</span>
-        <span class="detail-value total-amount">{{ "{:,.0f}".format(amount).replace(',', '.') }} đ</span>
-      </div>
-      
-      <div class="order-detail-row">
-        <span class="detail-label">📅 Thời gian:</span>
-        <span class="detail-value">{{ datetime.datetime.now().strftime('%d/%m/%Y %H:%M') }}</span>
-      </div>
-    </div>
-    
-    <div class="action-buttons">
-      <a href="{{ url_for('index') }}" class="btn-primary">
-        🏠 Về trang chủ
-      </a>
-      <a href="{{ url_for('shop') }}" class="btn-secondary">
-        🛒 Tiếp tục mua sắm
-      </a>
-    </div>
-    
-    <p style="margin-top: 30px; color: #888; font-size: 0.9em;">
-      📧 Email xác nhận đã được gửi đến hộp thư của bạn.<br>
-      Nếu có thắc mắc, vui lòng liên hệ: support@tomatoai.com
-    </p>
-  </div>
-</div>
-
 <script>
-// Auto redirect after 10 seconds
 setTimeout(() => {
   window.location.href = "{{ url_for('index') }}";
 }, 10000);

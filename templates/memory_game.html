@@ -26,6 +26,7 @@
   .memory-title {
     font-size: 1.8em;
     margin: 0;
+    color: #ffffff;
   }
   
   .memory-stats {
@@ -389,6 +390,37 @@
     .result-stats-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  /* Theme alignment with main site */
+  .memory-header,
+  .start-btn,
+  .result-header,
+  .action-btn-primary {
+    background: linear-gradient(120deg, #cf4652 0%, #2e8a57 100%);
+  }
+
+  .start-btn:hover,
+  .action-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(18, 49, 38, 0.32);
+  }
+
+  #voucher-box {
+    background: linear-gradient(120deg, #cf4652 0%, #2e8a57 100%) !important;
+    box-shadow: 0 8px 24px rgba(18, 49, 38, 0.32) !important;
+  }
+
+  #voucher-code,
+  #voucher-box button {
+    color: #2e8a57 !important;
+  }
+
+  [data-theme="dark"] .memory-header,
+  [data-theme="dark"] .start-btn,
+  [data-theme="dark"] .result-header,
+  [data-theme="dark"] .action-btn-primary,
+  [data-theme="dark"] #voucher-box {
+    background: linear-gradient(120deg, #a73a46 0%, #226f45 100%) !important;
   }
 </style>
 

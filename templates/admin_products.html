@@ -236,6 +236,122 @@
     background: #5a6268;
     color: white;
   }
+
+  /* ===== Modern Polish Overrides ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .admin-container {
+    --ap-ink: #1b3239;
+    --ap-border: #deebe6;
+    --ap-muted: #61757e;
+    max-width: 1460px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .admin-title {
+    font-family: 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
+    color: var(--ap-ink);
+  }
+
+  .btn-add,
+  .back-btn,
+  .btn-edit,
+  .btn-delete {
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  .btn-add {
+    background: linear-gradient(135deg, #dd603a 0%, #ef8a52 100%);
+    box-shadow: 0 8px 18px rgba(221, 96, 58, 0.24);
+  }
+
+  .btn-add:hover {
+    background: linear-gradient(135deg, #bb4827 0%, #db6f38 100%);
+  }
+
+  .products-grid {
+    gap: 1.2rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+
+  .product-card {
+    border-radius: 16px;
+    border: 1px solid var(--ap-border);
+    box-shadow: 0 10px 24px rgba(17, 46, 37, 0.08);
+  }
+
+  .product-card:hover {
+    box-shadow: 0 16px 30px rgba(17, 46, 37, 0.15);
+  }
+
+  .product-body {
+    padding: 1.1rem;
+  }
+
+  .product-name,
+  .product-price {
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .product-name {
+    color: var(--ap-ink);
+  }
+
+  .product-category {
+    background: #e9f5ef;
+    color: #226043;
+    font-weight: 700;
+  }
+
+  .product-stats,
+  .stock-label {
+    color: var(--ap-muted);
+  }
+
+  .status-badge {
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    font-weight: 700;
+  }
+
+  .status-active {
+    background: rgba(76, 175, 80, 0.12);
+  }
+
+  .status-inactive {
+    background: rgba(244, 67, 54, 0.12);
+  }
+
+  [data-theme="dark"] .admin-title,
+  [data-theme="dark"] .product-name {
+    color: #eaf6f1;
+  }
+
+  [data-theme="dark"] .product-card {
+    background: #1c2a24;
+    border-color: #31453b;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  [data-theme="dark"] .product-category {
+    background: #234238;
+    color: #9fd7bb;
+  }
+
+  [data-theme="dark"] .product-meta {
+    border-bottom-color: #33473d;
+  }
+
+  [data-theme="dark"] .product-stats,
+  [data-theme="dark"] .stock-label {
+    color: #9cb7ad;
+  }
+
+  [data-theme="dark"] .status-badge {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(14, 24, 21, 0.72);
+  }
 </style>
 
 <div class="admin-container">

@@ -214,6 +214,52 @@
 </div>
 
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+  .community-shell {
+    font-family: 'Be Vietnam Pro', sans-serif;
+  }
+
+  .community-hero h1,
+  .feed-tab,
+  .author-name,
+  .suggested-name,
+  .trending-title,
+  .empty-title {
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .card-surface {
+    border: 1px solid #e2ebe6;
+  }
+
+  .post-card {
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 30px rgba(24, 39, 75, 0.1);
+  }
+
+  .feed-tab.active {
+    background: linear-gradient(135deg, #de603a 0%, #f08a52 100%);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(222, 96, 58, 0.25);
+  }
+
+  [data-theme="dark"] .card-surface,
+  [data-theme="dark"] .hero-stat,
+  [data-theme="dark"] .insights-grid > div,
+  [data-theme="dark"] .trending-item,
+  [data-theme="dark"] .secondary-link,
+  [data-theme="dark"] .action-btn,
+  [data-theme="dark"] .action-link,
+  [data-theme="dark"] .icon-btn,
+  [data-theme="dark"] .composer-body textarea {
+    border-color: rgba(255, 255, 255, 0.09);
+  }
+
   .community-shell {
     max-width: 1240px;
     margin: 40px auto;

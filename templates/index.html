@@ -2,6 +2,98 @@
 
 {% block content %}
 
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap');
+
+      .home-shell {
+        max-width: 1260px;
+        margin: 22px auto 34px;
+        font-family: 'Be Vietnam Pro', sans-serif;
+      }
+
+      .home-hero {
+        border-radius: 24px !important;
+        border: 1px solid #e5ece8;
+        box-shadow: 0 16px 34px rgba(20, 45, 36, 0.09) !important;
+        background:
+          radial-gradient(circle at 86% 16%, rgba(247, 190, 105, 0.2), transparent 38%),
+          radial-gradient(circle at 12% 84%, rgba(84, 183, 131, 0.16), transparent 46%),
+          linear-gradient(145deg, #fffaf4 0%, #ffffff 58%, #f2faf6 100%);
+      }
+
+      .home-hero h1 {
+        font-family: 'Manrope', sans-serif;
+        letter-spacing: -0.02em;
+        font-size: clamp(1.55rem, 2.8vw, 2.2rem);
+      }
+
+      .home-layout {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 20px !important;
+        align-items: start !important;
+      }
+
+      .home-main > .card,
+      .home-side .card {
+        border-radius: 18px;
+        border: 1px solid #deebe6;
+        box-shadow: 0 10px 24px rgba(17, 46, 37, 0.08);
+      }
+
+      .home-main .card {
+        padding: 18px;
+      }
+
+      .home-side {
+        width: 100% !important;
+      }
+
+      .home-tip-card h3,
+      .home-side h3 {
+        font-family: 'Manrope', sans-serif;
+      }
+
+      .home-hero ol li,
+      .home-tip-card li {
+        color: #4f666f;
+      }
+
+      [data-theme="dark"] .home-hero,
+      [data-theme="dark"] .home-main > .card,
+      [data-theme="dark"] .home-side .card {
+        background: #1c2a24;
+        border-color: #31453b;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+      }
+
+      [data-theme="dark"] .home-hero h1 {
+        color: #eaf6f1 !important;
+      }
+
+      [data-theme="dark"] .home-hero p,
+      [data-theme="dark"] .home-hero ol li,
+      [data-theme="dark"] .home-tip-card li {
+        color: #a8c0b8 !important;
+      }
+
+      @media (max-width: 980px) {
+        .home-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .home-shell {
+          margin-top: 14px;
+        }
+
+        .home-hero {
+          border-radius: 18px !important;
+        }
+      }
+    </style>
+
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <div class="alert alert--error">
@@ -12,7 +104,8 @@
       {% endif %}
     {% endwith %}
 
-    <section class="hero card">
+    <div class="home-shell">
+    <section class="hero card home-hero">
       <div style="display:flex;gap:20px;align-items:center;">
         <div style="flex:1; padding-right: 20px;">
           <h1 style="margin:0 0 8px 0;color:var(--tomato-700)">Nhận diện bệnh trên lá cà chua bằng các mô hình học sâu</h1>
@@ -29,8 +122,8 @@
       </div>
     </section>
 
-    <section style="display:flex;gap:24px;margin-top:18px;align-items:flex-start;">
-      <div style="flex:1;min-width:360px">
+    <section class="home-layout" style="display:flex;gap:24px;margin-top:18px;align-items:flex-start;">
+      <div class="home-main" style="flex:1;min-width:360px">
         <div class="card"> 
           <!-- Toggle giữa Single và Batch mode -->
           <div style="margin-bottom:16px;display:flex;gap:8px;background:#f5f5f5;padding:4px;border-radius:8px;">
@@ -154,7 +247,7 @@
           </div>
         </div>
         
-        <div style="margin-top:14px" class="card">
+        <div style="margin-top:14px" class="card home-tip-card">
           <h3 style="margin-top:0">Mẹo chụp ảnh</h3>
           <ul>
             <li>Ánh sáng tự nhiên, tránh bóng tối vùng lá.</li>
@@ -164,7 +257,7 @@
         </div>
       </div>
 
-      <aside style="width:320px">
+      <aside class="home-side" style="width:320px">
         
         <div class="card">
           <h3 style="margin-top:0; text-align:center;">Ảnh đầu vào</h3>
@@ -183,6 +276,7 @@
         </div>
       </aside>
     </section>
+    </div>
 
 {% endblock %}
 

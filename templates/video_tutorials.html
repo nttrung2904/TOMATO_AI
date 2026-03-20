@@ -311,6 +311,199 @@
     font-size: 2em;
     margin-bottom: 15px;
   }
+
+    /* Official polish overrides */
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+    .video-hero,
+    .video-grid,
+    .video-filters,
+    .sidebar,
+    .no-results {
+      font-family: 'Be Vietnam Pro', sans-serif;
+    }
+
+    .video-hero {
+      background:
+        radial-gradient(circle at 84% 16%, rgba(244, 194, 112, 0.34), transparent 42%),
+        linear-gradient(135deg, #1d4436 0%, #2e6b55 56%, #3e8066 100%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 18px 42px rgba(20, 52, 40, 0.22);
+      border-radius: 30px;
+      max-width: 1240px;
+      margin: 14px auto 36px;
+    }
+
+    [data-theme="dark"] .video-hero {
+      background:
+        radial-gradient(circle at 84% 16%, rgba(244, 194, 112, 0.18), transparent 40%),
+        linear-gradient(135deg, #12251d 0%, #173429 52%, #214739 100%);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .video-hero h1 {
+      font-family: 'Manrope', sans-serif;
+      letter-spacing: -0.03em;
+    }
+
+    .video-search input {
+      border: 2px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .video-search button {
+      background: linear-gradient(135deg, #d97e2b 0%, #e39d33 100%);
+      box-shadow: 0 10px 24px rgba(107, 71, 19, 0.32);
+    }
+
+    .video-search button:hover {
+      background: linear-gradient(135deg, #c06a20 0%, #cf8624 100%);
+    }
+
+    .filter-select {
+      border-radius: 12px;
+      border-color: #d8e7dd;
+      font-weight: 600;
+      min-height: 48px;
+      box-shadow: 0 8px 22px rgba(34, 68, 53, 0.08);
+    }
+
+    .filter-select:hover {
+      border-color: #2e6b55;
+      box-shadow: 0 10px 22px rgba(46, 107, 85, 0.2);
+    }
+
+    .video-card {
+      border-radius: 20px;
+      border: 1px solid #e0ece5;
+      box-shadow: 0 14px 32px rgba(20, 53, 40, 0.11);
+      position: relative;
+    }
+
+    .video-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      transition: border-color 0.25s ease;
+      pointer-events: none;
+    }
+
+    .video-card:hover::after {
+      border-color: #2f8f5b;
+    }
+
+    [data-theme="dark"] .video-card {
+      border-color: #30453a;
+      background: #1c2a24;
+    }
+
+    .video-play-icon {
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .video-card:hover .video-play-icon {
+      background: #2f8f5b;
+    }
+
+    .video-play-icon svg {
+      fill: #2f8f5b;
+    }
+
+    .video-info {
+      padding: 22px;
+    }
+
+    .video-title {
+      font-family: 'Manrope', sans-serif;
+      font-size: 1.1rem;
+    }
+
+    .video-instructor {
+      color: #5c6f65;
+      font-weight: 600;
+    }
+
+    .video-search input:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.48);
+      box-shadow: 0 10px 30px rgba(20, 52, 40, 0.3);
+    }
+
+    [data-theme="dark"] .video-meta {
+      color: #99b6a8;
+    }
+
+    .video-badge {
+      border-radius: 999px;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-beginner {
+      background: #e7f7ef;
+      color: #1d6f46;
+    }
+
+    .badge-intermediate {
+      background: #fff4df;
+      color: #9d610f;
+    }
+
+    .badge-advanced {
+      background: #ffe7e0;
+      color: #a73d20;
+    }
+
+    .popular-videos h2 {
+      font-family: 'Manrope', sans-serif;
+      font-size: clamp(1.45rem, 2.2vw, 2rem);
+      color: #1e4939;
+    }
+
+    [data-theme="dark"] .popular-videos h2 {
+      color: #98d7b7;
+    }
+
+    .no-results {
+      max-width: 840px;
+      margin: 0 auto 24px;
+      border-radius: 18px;
+      border: 1px dashed #c8ddd1;
+      background: #f9fcfa;
+    }
+
+    [data-theme="dark"] .no-results {
+      background: #1a2520;
+      border-color: #375244;
+    }
+
+    .video-grid > a {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .video-hero {
+        border-radius: 20px;
+        padding: 54px 16px;
+        margin-top: 8px;
+      }
+
+      .video-search form {
+        flex-direction: column;
+      }
+
+      .video-search button {
+        width: 100%;
+        padding: 14px 24px;
+      }
+
+      .video-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+        padding: 0 16px 28px;
+      }
+    }
 </style>
 
 <div class="video-hero">
