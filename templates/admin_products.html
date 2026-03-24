@@ -43,6 +43,20 @@
     background: var(--tomato-600);
     color: white;
   }
+
+  .btn-migrate {
+    padding: 0.75rem 1.2rem;
+    background: #2f8f46;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-migrate:hover {
+    background: #26743a;
+  }
   
   .products-grid {
     display: grid;
@@ -213,6 +227,20 @@
     font-weight: 600;
     background: rgba(255,255,255,0.9);
   }
+
+  .low-variant-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    background: #d84315;
+    box-shadow: 0 4px 10px rgba(216, 67, 21, 0.35);
+    z-index: 2;
+  }
   
   .status-active {
     color: #4caf50;
@@ -235,6 +263,79 @@
   .back-btn:hover {
     background: #5a6268;
     color: white;
+  }
+
+  .filter-bar {
+    margin-bottom: 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid #deebe6;
+    border-radius: 10px;
+    background: #f7fbf9;
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #2f4f45;
+    font-weight: 600;
+  }
+
+  .filter-check input {
+    accent-color: #2f8f46;
+  }
+
+  .filter-bar select {
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid #d6e4de;
+    min-width: 220px;
+  }
+
+  .filter-btn {
+    padding: 0.5rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    background: #2f8f46;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .filter-reset {
+    color: #1b5e20;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .active-filters {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.28rem 0.72rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 1px solid #cde6d2;
+  }
+
+  .filter-chip.alert {
+    background: #ffe9e2;
+    color: #c23a12;
+    border-color: #ffd2c5;
   }
 
   /* ===== Modern Polish Overrides ===== */
@@ -352,24 +453,99 @@
     border-color: rgba(255, 255, 255, 0.08);
     background: rgba(14, 24, 21, 0.72);
   }
+
+  [data-theme="dark"] .low-variant-badge {
+    background: #e05a33;
+    box-shadow: 0 4px 10px rgba(224, 90, 51, 0.3);
+  }
+
+  [data-theme="dark"] .filter-bar {
+    background: #1c2a24;
+    border-color: #31453b;
+  }
+
+  [data-theme="dark"] .filter-bar select {
+    background: #23352d;
+    color: #e4f3ed;
+    border-color: #395047;
+  }
+
+  [data-theme="dark"] .filter-reset {
+    color: #9fd7bb;
+  }
+
+  [data-theme="dark"] .filter-check {
+    color: #c9e7db;
+  }
+
+  [data-theme="dark"] .filter-chip {
+    background: #264236;
+    color: #b9e7cb;
+    border-color: #355848;
+  }
+
+  [data-theme="dark"] .filter-chip.alert {
+    background: #4a2b24;
+    color: #ffc1ae;
+    border-color: #6a3b31;
+  }
 </style>
 
 <div class="admin-container">
   <div class="admin-header">
     <h1 class="admin-title">📦 Quản lý sản phẩm</h1>
     <div style="display: flex; gap: 1rem;">
-      <a href="{{ url_for('admin_add_product') }}" class="btn-add">
+      <form action="{{ url_for('admin_migrate_products_default_variant') }}"
+            method="POST"
+            onsubmit="return confirm('Chuyển toàn bộ sản phẩm cũ sang biến thể mặc định?')">
+        <input type="hidden" name="next" value="{{ current_products_url }}">
+        <button type="submit" class="btn-migrate">🔁 Chuẩn hóa biến thể</button>
+      </form>
+      <a href="{{ url_for('admin_add_product', next=current_products_url) }}" class="btn-add">
         <span>➕</span>
         <span>Thêm sản phẩm</span>
       </a>
       <a href="{{ url_for('profile') }}" class="back-btn">← Quay lại</a>
     </div>
   </div>
+
+  <form method="GET" action="{{ url_for('admin_products') }}" class="filter-bar">
+    <strong style="color: #2f4f45;">Bộ lọc tồn kho</strong>
+    <input type="hidden" name="filters_submitted" value="1">
+    <label class="filter-check">
+      <input type="checkbox" name="f_low_variant" value="1" {% if filter_low_variant %}checked{% endif %}>
+      Sắp hết biến thể (&lt; 10) - {{ low_variant_count or 0 }}
+    </label>
+    <label class="filter-check">
+      <input type="checkbox" name="f_no_variant" value="1" {% if filter_no_variant %}checked{% endif %}>
+      Chưa có biến thể - {{ no_variant_count or 0 }}
+    </label>
+    <button type="submit" class="filter-btn">Lọc</button>
+    {% if filter_low_variant or filter_no_variant %}
+    <a href="{{ url_for('admin_products', clear_filters=1) }}" class="filter-reset">Bỏ lọc</a>
+    {% endif %}
+  </form>
+
+  {% if filter_low_variant or filter_no_variant %}
+  <div class="active-filters">
+    <strong style="color: #2f4f45;">Đang lọc:</strong>
+    {% if filter_low_variant %}
+    <span class="filter-chip alert">Biến thể sắp hết (&lt; 10)</span>
+    {% endif %}
+    {% if filter_no_variant %}
+    <span class="filter-chip">Chưa có biến thể</span>
+    {% endif %}
+  </div>
+  {% endif %}
   
   {% if products %}
   <div class="products-grid">
     {% for product in products %}
+    {% set low_variants = product.variants | selectattr('stock', 'lt', 10) | list if product.variants and product.variants|length > 0 else [] %}
     <div class="product-card" style="position: relative;">
+      {% if low_variants|length > 0 %}
+      <span class="low-variant-badge">⚠️ Sắp hết: {{ low_variants|length }}</span>
+      {% endif %}
       <span class="status-badge status-{{ product.status }}">
         {{ 'Hoạt động' if product.status == 'active' else 'Ẩn' }}
       </span>
@@ -400,6 +576,15 @@
             </span>
           </div>
         </div>
+
+        {% if product.variants and product.variants|length > 0 %}
+        <div style="font-size: 0.85rem; color: #5f747d; margin-bottom: 0.9rem;">
+          Biến thể: {{ product.variants|length }}
+          {% if low_variants|length > 0 %}
+            | <span style="color: #d84315; font-weight: 700;">Sắp hết: {{ low_variants|length }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
         
         <div class="product-stats">
           <span>⭐ {{ product.rating_avg or 0 }} ({{ product.rating_count or 0 }})</span>
@@ -407,13 +592,14 @@
         </div>
         
         <div class="product-actions">
-          <a href="{{ url_for('admin_edit_product', product_id=product.id) }}" class="btn-edit">
+          <a href="{{ url_for('admin_edit_product', product_id=product.id, next=current_products_url) }}" class="btn-edit">
             ✏️ Sửa
           </a>
           <form action="{{ url_for('admin_delete_product', product_id=product.id) }}" 
                 method="POST" 
                 style="flex: 1;"
                 onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này?')">
+            <input type="hidden" name="next" value="{{ current_products_url }}">
             <button type="submit" class="btn-delete">🗑️ Xóa</button>
           </form>
         </div>
@@ -425,11 +611,21 @@
   <div style="text-align: center; padding: 3rem; color: #999;">
     <div style="font-size: 4rem; margin-bottom: 1rem;">📦</div>
     <p>Chưa có sản phẩm nào</p>
-    <a href="{{ url_for('admin_add_product') }}" class="btn-add" style="margin-top: 1rem;">
+    <a href="{{ url_for('admin_add_product', next=current_products_url) }}" class="btn-add" style="margin-top: 1rem;">
       Thêm sản phẩm đầu tiên
     </a>
   </div>
   {% endif %}
 </div>
+
+{% if restored_from_session %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.toast && typeof window.toast.info === 'function') {
+    window.toast.info('Đã khôi phục bộ lọc gần nhất');
+  }
+});
+</script>
+{% endif %}
 
 {% endblock %}

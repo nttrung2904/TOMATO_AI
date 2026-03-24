@@ -555,6 +555,11 @@
       <span>Thêm mùa vụ mới</span>
     </button>
 
+    <button class="btn btn-primary" onclick="window.location.href='/crop-yield-prediction'" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+      <span>📊</span>
+      <span>Dự đoán Năng suất</span>
+    </button>
+
     <div class="filter-tabs">
       <button class="filter-tab active" data-status="">Tất cả</button>
       <button class="filter-tab" data-status="planning">Lên kế hoạch</button>
@@ -649,6 +654,17 @@
         <input type="text" id="yieldTarget" placeholder="VD: 2000 kg, 5 tấn">
       </div>
 
+      <div class="form-row">
+        <div class="form-group">
+          <label>Giá dự kiến (đ/kg)</label>
+          <input type="number" id="estimatedPrice" min="0" step="100" placeholder="VD: 18000">
+        </div>
+        <div class="form-group">
+          <label>Giá bán thực tế (đ/kg)</label>
+          <input type="number" id="salePrice" min="0" step="100" placeholder="VD: 22000">
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Ghi chú</label>
         <textarea id="notes" placeholder="Ghi chú thêm về mùa vụ..."></textarea>
@@ -680,6 +696,14 @@
 let currentFilter = '';
 let allCrops = [];
 let editingCropId = null;
+let currentDetailCropId = null;
+
+function formatCurrency(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return 'N/A';
+  }
+  return Number(value).toLocaleString('vi-VN') + 'đ';
+}
 
 // Load crops
 async function loadCrops() {
@@ -706,9 +730,6 @@ async function loadCrops() {
     `;
   }
 }
-      .crop-actions {
-        flex-direction: column;
-        align-items: stretch;
 
 // Display crops
 function displayCrops(crops) {
@@ -727,33 +748,8 @@ function displayCrops(crops) {
     `;
     return;
   }
-      font-size: 2rem;
   grid.innerHTML = crops.map(crop => {
     const statusText = {
-
-  /* Theme alignment with main site */
-  .crop-header {
-    padding: 24px;
-    border-radius: 20px;
-    background:
-      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.14), transparent 34%),
-      linear-gradient(120deg, #cf4652 0%, #2e8a57 100%);
-    box-shadow: 0 14px 30px rgba(18, 49, 38, 0.18);
-  }
-
-  .crop-header h1,
-  .crop-header p {
-    color: #ffffff;
-    -webkit-text-fill-color: #ffffff;
-    background: none;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  }
-
-  [data-theme="dark"] .crop-header {
-    background:
-      radial-gradient(circle at 14% 14%, rgba(255, 255, 255, 0.08), transparent 34%),
-      linear-gradient(120deg, #a73a46 0%, #226f45 100%);
-  }
       'planning': 'Lên kế hoạch',
       'growing': 'Đang trồng',
       'harvested': 'Đã thu hoạch'
@@ -857,6 +853,8 @@ async function submitCrop(event) {
     status: document.getElementById('status').value,
     stage: document.getElementById('stage').value,
     yield_target: document.getElementById('yieldTarget').value,
+    estimated_price_per_kg: document.getElementById('estimatedPrice').value,
+    sale_price_per_kg: document.getElementById('salePrice').value,
     notes: document.getElementById('notes').value
   };
 
@@ -909,6 +907,7 @@ async function viewCropDetail(cropId) {
     
     if (data.ok) {
       const crop = data.crop;
+      currentDetailCropId = cropId;
       
       // Calculate total expenses
       const totalExpenses = crop.expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -1004,11 +1003,74 @@ async function viewCropDetail(cropId) {
           </div>
           ` : ''}
         </div>
+
+        <div class="section-divider">
+          <h3 class="section-title">📅 Lịch công việc mùa vụ</h3>
+          <form onsubmit="addReminderForCurrentCrop(event)" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; margin-bottom: 12px;">
+            <input id="reminderTitle" type="text" placeholder="Tên công việc" required>
+            <input id="reminderDate" type="date" required>
+            <select id="reminderType">
+              <option value="water">Tưới</option>
+              <option value="fertilize">Bón phân</option>
+              <option value="spray">Phun phòng</option>
+              <option value="prune">Tỉa cành</option>
+              <option value="other">Khác</option>
+            </select>
+            <select id="reminderFrequency">
+              <option value="once">Một lần</option>
+              <option value="daily">Hàng ngày</option>
+              <option value="weekly">Hàng tuần</option>
+              <option value="monthly">Hàng tháng</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Thêm</button>
+          </form>
+          <div id="cropRemindersList" class="activities-list"></div>
+        </div>
+
+        <div class="section-divider">
+          <h3 class="section-title">🛡️ Cảnh báo rủi ro sâu bệnh</h3>
+          <div id="cropRiskBox" class="activity-item">Đang tải đánh giá rủi ro...</div>
+        </div>
+
+        <div class="section-divider">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <h3 class="section-title" style="margin-bottom: 0;">🗓️ Kế hoạch chăm sóc theo tuần</h3>
+            <button class="btn btn-secondary" type="button" onclick="applyWeeklyPlanForCurrentCrop()">Áp dụng thành lịch nhắc</button>
+          </div>
+          <div id="cropWeeklyPlan" class="activities-list"></div>
+        </div>
+
+        <div class="section-divider">
+          <h3 class="section-title">📊 Báo cáo lãi lỗ mùa vụ</h3>
+          <form onsubmit="saveFinanceForCurrentCrop(event)" class="form-row">
+            <div class="form-group">
+              <label>Sản lượng thực tế (kg)</label>
+              <input id="financeYieldActual" type="number" min="0" step="0.1" value="${crop.yield_actual || ''}">
+            </div>
+            <div class="form-group">
+              <label>Giá bán thực tế (đ/kg)</label>
+              <input id="financeSalePrice" type="number" min="0" step="100" value="${crop.sale_price_per_kg || ''}">
+            </div>
+            <div class="form-group">
+              <label>Mục tiêu sản lượng (kg)</label>
+              <input id="financeYieldTarget" type="number" min="0" step="0.1" value="${crop.yield_target || ''}">
+            </div>
+            <div class="form-group">
+              <label>Giá dự kiến (đ/kg)</label>
+              <input id="financeEstimatedPrice" type="number" min="0" step="100" value="${crop.estimated_price_per_kg || ''}">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <button class="btn btn-primary" type="submit">Lưu số liệu tài chính</button>
+            </div>
+          </form>
+          <div id="cropFinanceSummary" class="total-expenses" style="margin-top: 10px;"></div>
+        </div>
       `;
       
       document.getElementById('detailTitle').textContent = crop.crop_name;
       document.getElementById('detailContent').innerHTML = detailHTML;
       document.getElementById('detailModal').classList.add('active');
+      loadCropDashboard(cropId);
     }
   } catch (error) {
     console.error('Error loading crop detail:', error);
@@ -1021,6 +1083,157 @@ async function viewCropDetail(cropId) {
 // Close detail modal
 function closeDetailModal() {
   document.getElementById('detailModal').classList.remove('active');
+  currentDetailCropId = null;
+}
+
+async function loadCropDashboard(cropId) {
+  try {
+    const response = await fetch(`/api/crops/${cropId}/dashboard`);
+    const data = await response.json();
+    if (!data.ok) {
+      throw new Error(data.error || 'Không tải được dữ liệu dashboard mùa vụ');
+    }
+
+    const remindersHtml = (data.reminders || []).length > 0
+      ? data.reminders.map(item => `
+          <div class="activity-item">
+            <div class="activity-date">📅 ${new Date(item.next_due).toLocaleDateString('vi-VN')} • ${item.frequency}</div>
+            <div class="activity-text">${item.title}</div>
+            ${item.description ? `<div class="activity-note">${item.description}</div>` : ''}
+          </div>
+        `).join('')
+      : '<p style="color: #6b7280;">Chưa có lịch nhắc việc cho mùa vụ này</p>';
+
+    const risk = (data.risk || {}).risk;
+    let riskHtml = 'Không lấy được dữ liệu rủi ro thời tiết';
+    if (risk) {
+      const riskColor = risk.risk_level === 'high' ? '#ef4444' : (risk.risk_level === 'medium' ? '#f59e0b' : '#10b981');
+      const recommendations = (risk.recommendations || []).slice(0, 5).map(r => `<li>${r}</li>`).join('');
+      riskHtml = `
+        <div style="border-left: 4px solid ${riskColor}; padding-left: 12px;">
+          <div style="font-weight: 700; color: ${riskColor};">Mức rủi ro: ${risk.risk_text} (điểm ${risk.risk_score})</div>
+          <div style="margin-top: 6px;">Giai đoạn: ${risk.stage || 'N/A'}</div>
+          <ul style="margin: 8px 0 0 18px;">${recommendations}</ul>
+        </div>
+      `;
+    }
+
+    const weeklyHtml = (data.weekly_plan || []).length > 0
+      ? data.weekly_plan.map(item => `
+          <div class="activity-item">
+            <div class="activity-date">📅 ${new Date(item.next_due).toLocaleDateString('vi-VN')} • ${item.priority || 'normal'}</div>
+            <div class="activity-text">${item.title}</div>
+          </div>
+        `).join('')
+      : '<p style="color: #6b7280;">Chưa có kế hoạch tuần</p>';
+
+    const finance = data.finance || {};
+    const summaryHtml = `
+      <div class="total-expenses-label">Tổng chi phí</div>
+      <div class="total-expenses-value" style="font-size: 1.4rem;">${formatCurrency(finance.total_expenses)}</div>
+      <div style="margin-top: 8px; color: #374151;">Doanh thu thực tế: <strong>${formatCurrency(finance.revenue_actual)}</strong></div>
+      <div style="margin-top: 4px; color: #374151;">Lợi nhuận thực tế: <strong>${formatCurrency(finance.profit_actual)}</strong></div>
+      <div style="margin-top: 4px; color: #374151;">ROI: <strong>${finance.roi_percent !== null && finance.roi_percent !== undefined ? finance.roi_percent + '%' : 'N/A'}</strong></div>
+      <div style="margin-top: 4px; color: #374151;">Doanh thu dự kiến: <strong>${formatCurrency(finance.revenue_estimated)}</strong></div>
+    `;
+
+    const remindersEl = document.getElementById('cropRemindersList');
+    const riskEl = document.getElementById('cropRiskBox');
+    const weeklyEl = document.getElementById('cropWeeklyPlan');
+    const financeEl = document.getElementById('cropFinanceSummary');
+
+    if (remindersEl) remindersEl.innerHTML = remindersHtml;
+    if (riskEl) riskEl.innerHTML = riskHtml;
+    if (weeklyEl) weeklyEl.innerHTML = weeklyHtml;
+    if (financeEl) financeEl.innerHTML = summaryHtml;
+  } catch (error) {
+    console.error('Error loading crop dashboard:', error);
+  }
+}
+
+async function addReminderForCurrentCrop(event) {
+  event.preventDefault();
+  if (!currentDetailCropId) return;
+
+  try {
+    const payload = {
+      title: document.getElementById('reminderTitle').value,
+      next_due: document.getElementById('reminderDate').value,
+      task_type: document.getElementById('reminderType').value,
+      frequency: document.getElementById('reminderFrequency').value
+    };
+
+    const response = await fetch(`/api/crops/${currentDetailCropId}/reminder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || 'Không tạo được nhắc việc');
+
+    document.getElementById('reminderTitle').value = '';
+    if (window.showToast) {
+      window.showToast('✅ ' + (data.message || 'Đã thêm nhắc việc'), 'success');
+    }
+    loadCropDashboard(currentDetailCropId);
+  } catch (error) {
+    if (window.showToast) {
+      window.showToast('❌ ' + error.message, 'error');
+    }
+  }
+}
+
+async function applyWeeklyPlanForCurrentCrop() {
+  if (!currentDetailCropId) return;
+
+  try {
+    const response = await fetch(`/api/crops/${currentDetailCropId}/weekly-plan/apply`, {
+      method: 'POST'
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || 'Không áp dụng được kế hoạch tuần');
+
+    if (window.showToast) {
+      window.showToast('✅ ' + (data.message || 'Đã áp dụng kế hoạch tuần'), 'success');
+    }
+    loadCropDashboard(currentDetailCropId);
+  } catch (error) {
+    if (window.showToast) {
+      window.showToast('❌ ' + error.message, 'error');
+    }
+  }
+}
+
+async function saveFinanceForCurrentCrop(event) {
+  event.preventDefault();
+  if (!currentDetailCropId) return;
+
+  try {
+    const payload = {
+      yield_actual: document.getElementById('financeYieldActual').value,
+      yield_target: document.getElementById('financeYieldTarget').value,
+      sale_price_per_kg: document.getElementById('financeSalePrice').value,
+      estimated_price_per_kg: document.getElementById('financeEstimatedPrice').value
+    };
+
+    const response = await fetch(`/api/crops/${currentDetailCropId}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || 'Không lưu được dữ liệu tài chính');
+
+    if (window.showToast) {
+      window.showToast('✅ Đã lưu dữ liệu tài chính', 'success');
+    }
+    loadCropDashboard(currentDetailCropId);
+    loadCrops();
+  } catch (error) {
+    if (window.showToast) {
+      window.showToast('❌ ' + error.message, 'error');
+    }
+  }
 }
 
 // Edit crop
@@ -1043,6 +1256,8 @@ async function editCrop(cropId) {
       document.getElementById('status').value = crop.status;
       document.getElementById('stage').value = crop.stage;
       document.getElementById('yieldTarget').value = crop.yield_target || '';
+      document.getElementById('estimatedPrice').value = crop.estimated_price_per_kg || '';
+      document.getElementById('salePrice').value = crop.sale_price_per_kg || '';
       document.getElementById('notes').value = crop.notes || '';
       
       document.getElementById('cropModal').classList.add('active');

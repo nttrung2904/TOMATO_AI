@@ -830,6 +830,26 @@ let selectedAddress = null;
 let selectedPayment = 'cod';
 let appliedCoupon = null;
 
+function getCartItemKey(item) {
+  return item.cart_key || `${item.id}__${item.variant_id || 'default'}`;
+}
+
+function normalizeCartItems(items) {
+  return (items || []).map(item => {
+    const normalized = { ...item };
+    normalized.cart_key = getCartItemKey(normalized);
+    if (!Object.prototype.hasOwnProperty.call(normalized, 'variant_id')) {
+      normalized.variant_id = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(normalized, 'variant_name')) {
+      normalized.variant_name = '';
+    }
+    return normalized;
+  });
+}
+
+cart = normalizeCartItems(cart);
+
 // Select default address
 if (addresses && addresses.length > 0) {
   selectedAddress = addresses.find(a => a.is_default) || addresses[0];
@@ -839,8 +859,8 @@ function formatPrice(price) {
   return price.toLocaleString('vi-VN') + 'đ';
 }
 
-function updateQuantity(itemId, change) {
-  const item = cart.find(i => i.id === itemId);
+function updateQuantity(itemKey, change) {
+  const item = cart.find(i => getCartItemKey(i) === itemKey);
   if (!item) return;
   
   const newQty = item.quantity + change;
@@ -861,9 +881,9 @@ function updateQuantity(itemId, change) {
   renderCart();
 }
 
-function removeItem(itemId) {
+function removeItem(itemKey) {
   if (confirm('Bạn có chắc muốn xóa sản phẩm này?')) {
-    cart = cart.filter(i => i.id !== itemId);
+    cart = cart.filter(i => getCartItemKey(i) !== itemKey);
     saveCart();
     renderCart();
     showToast('Đã xóa sản phẩm khỏi giỏ hàng', 'info');
@@ -871,6 +891,7 @@ function removeItem(itemId) {
 }
 
 function saveCart() {
+  cart = normalizeCartItems(cart);
   localStorage.setItem('tomatoCart', JSON.stringify(cart));
 }
 
@@ -913,23 +934,28 @@ function renderCart() {
   
   const finalTotal = total + shipping - discount;
   
-  const cartItemsHtml = cart.map(item => `
+  const cartItemsHtml = cart.map(item => {
+    const itemKey = getCartItemKey(item);
+    const variantText = item.variant_name ? `<div style="font-size: 0.85em; color: #5f747d; margin-top: 3px;">Biến thể: ${item.variant_name}</div>` : '';
+
+    return `
     <div class="cart-item">
       <img src="${item.image || defaultImage}" 
            alt="${item.name}" 
            class="item-image">
       <div class="item-details">
         <h3 class="item-name">${item.name}</h3>
+        ${variantText}
         <div class="item-price">${formatPrice(item.price)}</div>
         <div class="item-actions">
           <div class="quantity-control">
-            <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)" 
+            <button class="qty-btn" onclick="updateQuantity('${itemKey}', -1)" 
                     ${item.quantity <= 1 ? 'disabled' : ''}>−</button>
             <span class="qty-number">${item.quantity}</span>
-            <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)"
+            <button class="qty-btn" onclick="updateQuantity('${itemKey}', 1)"
                     ${item.quantity >= item.maxStock ? 'disabled' : ''}>+</button>
           </div>
-          <button class="remove-btn" onclick="removeItem(${item.id})">
+          <button class="remove-btn" onclick="removeItem('${itemKey}')">
             Xóa
           </button>
         </div>
@@ -938,7 +964,8 @@ function renderCart() {
         ${formatPrice(item.price * item.quantity)}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
   
   // Address section
   let addressSection = '';

@@ -192,10 +192,13 @@
     <h1 class="form-title">
       {{ '✏️ Sửa sản phẩm' if product else '➕ Thêm sản phẩm mới' }}
     </h1>
-    <a href="{{ url_for('admin_products') }}" class="back-btn">← Quay lại</a>
+    <a href="{{ next_url if next_url and next_url.startswith('/admin/products') else url_for('admin_products') }}" class="back-btn">← Quay lại</a>
   </div>
   
   <form class="product-form" method="POST" enctype="multipart/form-data">
+    {% if next_url and next_url.startswith('/admin/products') %}
+    <input type="hidden" name="next" value="{{ next_url }}">
+    {% endif %}
     <div class="form-row">
       <div class="form-group">
         <label for="name">Tên sản phẩm <span class="required">*</span></label>
@@ -250,6 +253,15 @@
         <small>Số lượng sản phẩm hiện có</small>
       </div>
     </div>
+
+    <div class="form-group">
+      <label for="variants_text">Tồn kho theo biến thể (tùy chọn)</label>
+      <textarea id="variants_text"
+                name="variants_text"
+                placeholder="Mỗi dòng 1 biến thể theo định dạng: Tên biến thể|Số lượng&#10;Ví dụ: Chai 250ml|30&#10;Chai 500ml|12">{% if product and product.variants %}{% for variant in product.variants %}{{ variant.name }}|{{ variant.stock }}{% if not loop.last %}
+{% endif %}{% endfor %}{% endif %}</textarea>
+      <small>Nếu nhập biến thể, hệ thống sẽ tự tính tổng tồn kho và trừ tồn theo từng biến thể.</small>
+    </div>
     
     <div class="form-group">
       <label for="description">Mô tả sản phẩm <span class="required">*</span></label>
@@ -301,7 +313,7 @@
       <button type="submit" class="btn-submit">
         {{ '💾 Lưu thay đổi' if product else '➕ Thêm sản phẩm' }}
       </button>
-      <a href="{{ url_for('admin_products') }}" class="btn-cancel">Hủy</a>
+      <a href="{{ next_url if next_url and next_url.startswith('/admin/products') else url_for('admin_products') }}" class="btn-cancel">Hủy</a>
     </div>
   </form>
 </div>

@@ -2086,6 +2086,10 @@
         <span class="menu-icon">📦</span>
         <span>Quản lý Đơn hàng</span>
       </div>
+      <div class="menu-item" data-href="{{ url_for('admin_returns') }}">
+        <span class="menu-icon">↩️</span>
+        <span>Yêu cầu Đổi trả</span>
+      </div>
       <div class="menu-item" data-href="{{ url_for('admin_products') }}">
         <span class="menu-icon">🏪</span>
         <span>Quản lý Sản phẩm</span>
@@ -2157,6 +2161,9 @@
             <div style="display: flex; flex-direction: column; gap: 10px;">
               <a href="{{ url_for('admin_orders') }}" class="btn btn-primary">
                 📦 Quản lý Đơn hàng
+              </a>
+              <a href="{{ url_for('admin_returns') }}" class="btn btn-primary">
+                ↩️ Yêu cầu Đổi trả/Hoàn tiền
               </a>
               <a href="{{ url_for('admin_products') }}" class="btn btn-primary">
                 🏪 Quản lý Sản phẩm
@@ -2501,6 +2508,7 @@
         <div class="orders-list" id="ordersList">
           {% for order in orders %}
           <div class="order-card">
+            {% set rr = order_return_requests.get(order.id) if order_return_requests else None %}
             <div class="order-header">
               <div>
                 <div class="order-id">Đơn hàng #{{ order.id }}</div>
@@ -2531,6 +2539,24 @@
               <span>Tổng cộng:</span>
               <span>{{ order.total|int|format_number }}đ</span>
             </div>
+
+            {% if rr %}
+            <div style="margin-top: 10px; font-size: 0.92rem; color: #455a64; background: #f1f7ff; padding: 10px 12px; border-radius: 8px;">
+              ↩️ Yêu cầu {{ 'hoàn tiền' if rr.action == 'refund' else 'đổi hàng' }}:
+              <strong>
+                {% if rr.status == 'requested' %}Đang chờ duyệt
+                {% elif rr.status == 'approved' %}Đã duyệt
+                {% elif rr.status == 'received' %}Đã nhận hàng hoàn
+                {% elif rr.status == 'exchange_shipped' %}Đã gửi hàng đổi
+                {% elif rr.status == 'refunded' %}Đã hoàn tiền
+                {% elif rr.status == 'completed' %}Hoàn tất
+                {% elif rr.status == 'rejected' %}Từ chối
+                {% elif rr.status == 'cancelled' %}Đã hủy
+                {% else %}{{ rr.status }}
+                {% endif %}
+              </strong>
+            </div>
+            {% endif %}
             
             <!-- Tracking Button -->
             <div style="margin-top: 15px; display: flex; gap: 10px;">
@@ -2539,6 +2565,13 @@
                  style="flex: 1; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none;">
                 🔍 Theo dõi đơn hàng
               </a>
+              {% if order.status in ['delivered', 'completed'] and (not rr or rr.status in ['rejected', 'cancelled', 'completed']) %}
+              <button onclick="requestReturn('{{ order.id }}')"
+                      class="btn btn-secondary"
+                      style="flex: 0.8; padding: 10px; border-radius: 8px;">
+                ↩️ Đổi trả/Hoàn tiền
+              </button>
+              {% endif %}
               {% if order.status == 'pending' %}
               <button onclick="cancelOrder('{{ order.id }}')" 
                       class="btn btn-secondary" 
@@ -3262,6 +3295,52 @@ function cancelOrder(orderId) {
   });
 }
 
+function requestReturn(orderId) {
+  const actionInput = prompt('Nhập hình thức yêu cầu: "refund" (hoàn tiền) hoặc "exchange" (đổi hàng)', 'refund');
+  if (!actionInput) {
+    return;
+  }
+
+  const action = actionInput.trim().toLowerCase();
+  if (!['refund', 'exchange'].includes(action)) {
+    alert('❌ Hình thức không hợp lệ. Chỉ chấp nhận refund hoặc exchange.');
+    return;
+  }
+
+  const reason = prompt('Nhập lý do đổi trả/hoàn tiền:');
+  if (!reason || !reason.trim()) {
+    alert('❌ Vui lòng nhập lý do.');
+    return;
+  }
+
+  const details = prompt('Mô tả thêm (không bắt buộc):', '') || '';
+
+  fetch(`/api/order/${orderId}/return-request`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      action,
+      reason: reason.trim(),
+      details: details.trim()
+    })
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        alert('✅ Đã gửi yêu cầu đổi trả/hoàn tiền thành công.');
+        location.reload();
+      } else {
+        alert('❌ Lỗi: ' + (data.error || 'Không thể gửi yêu cầu'));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('❌ Có lỗi xảy ra khi gửi yêu cầu đổi trả/hoàn tiền');
+    });
+}
+
 function applyOrderFilters() {
   const status = document.getElementById('orderStatusFilter').value;
   const payment = document.getElementById('orderPaymentFilter').value;
@@ -3314,12 +3393,45 @@ function displayFilteredOrders(orders) {
         <span style="font-weight: 600;">${(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
       </div>
     `).join('');
+
+    const returnRequest = order.return_request;
+    let returnStatusHtml = '';
+    if (returnRequest) {
+      const returnStatusText = {
+        'requested': 'Đang chờ duyệt',
+        'approved': 'Đã duyệt',
+        'received': 'Đã nhận hàng hoàn',
+        'exchange_shipped': 'Đã gửi hàng đổi',
+        'refunded': 'Đã hoàn tiền',
+        'completed': 'Hoàn tất',
+        'rejected': 'Từ chối',
+        'cancelled': 'Đã hủy'
+      }[returnRequest.status] || returnRequest.status;
+
+      const actionText = returnRequest.action === 'refund' ? 'hoàn tiền' : 'đổi hàng';
+      returnStatusHtml = `
+        <div style="margin-top: 10px; font-size: 0.92rem; color: #455a64; background: #f1f7ff; padding: 10px 12px; border-radius: 8px;">
+          ↩️ Yêu cầu ${actionText}: <strong>${returnStatusText}</strong>
+        </div>
+      `;
+    }
     
     const cancelBtn = order.status === 'pending' ? `
       <button onclick="cancelOrder('${order.id}')" 
               class="btn btn-secondary" 
               style="flex: 0.5; padding: 10px; border-radius: 8px;">
         ❌ Hủy
+      </button>
+    ` : '';
+
+    const canRequestReturn = ['delivered', 'completed'].includes(order.status) &&
+      (!returnRequest || ['rejected', 'cancelled', 'completed'].includes(returnRequest.status));
+
+    const returnBtn = canRequestReturn ? `
+      <button onclick="requestReturn('${order.id}')"
+              class="btn btn-secondary"
+              style="flex: 0.8; padding: 10px; border-radius: 8px;">
+        ↩️ Đổi trả/Hoàn tiền
       </button>
     ` : '';
     
@@ -3341,6 +3453,8 @@ function displayFilteredOrders(orders) {
           <span>Tổng cộng:</span>
           <span>${order.total.toLocaleString('vi-VN')}đ</span>
         </div>
+
+        ${returnStatusHtml}
         
         <div style="margin-top: 15px; display: flex; gap: 10px;">
           <a href="/order/track/${order.id}" 
@@ -3348,6 +3462,7 @@ function displayFilteredOrders(orders) {
              style="flex: 1; text-align: center; padding: 10px; border-radius: 8px; text-decoration: none;">
             🔍 Theo dõi đơn hàng
           </a>
+          ${returnBtn}
           ${cancelBtn}
         </div>
       </div>

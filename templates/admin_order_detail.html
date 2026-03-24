@@ -486,6 +486,102 @@
           {% endfor %}
         </div>
         {% endif %}
+
+        <!-- Return / Refund Requests -->
+        <div class="status-history" style="margin-top: 2rem;">
+          <h3 style="margin-bottom: 1rem;">↩️ Yêu cầu đổi trả/hoàn tiền</h3>
+          {% set status_vi = {
+            'requested': 'Đang chờ duyệt',
+            'approved': 'Đã duyệt',
+            'received': 'Đã nhận hàng hoàn',
+            'exchange_shipped': 'Đã gửi hàng đổi',
+            'refunded': 'Đã hoàn tiền',
+            'completed': 'Hoàn tất',
+            'rejected': 'Từ chối',
+            'cancelled': 'Đã hủy'
+          } %}
+          {% if order_return_requests %}
+            {% for req in order_return_requests %}
+            <div class="history-item" style="border-left-color: #2196f3;">
+              <div style="display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div>
+                  <strong>#{{ req.id }}</strong>
+                  <span style="margin-left: 8px; color: #607d8b;">
+                    {{ 'Hoàn tiền' if req.action == 'refund' else 'Đổi hàng' }}
+                  </span>
+                </div>
+                <span style="font-weight: 600; color: #1565c0;">{{ status_vi.get(req.status, req.status) }}</span>
+              </div>
+              <div style="margin-top: 0.5rem;"><strong>Lý do:</strong> {{ req.reason }}</div>
+              {% if req.details %}
+              <div style="margin-top: 0.5rem;"><strong>Chi tiết:</strong> {{ req.details }}</div>
+              {% endif %}
+              {% if req.action == 'refund' %}
+              <div style="margin-top: 0.5rem;"><strong>Số tiền hoàn:</strong> {{ "{:,.0f}".format(req.refund_amount or 0) }}đ</div>
+              {% endif %}
+              <div class="history-time" style="margin-top: 0.5rem;">{{ req.created_at[:16].replace('T', ' ') }}</div>
+
+              <form action="{{ url_for('admin_update_return_request_status', request_id=req.id) }}"
+                    method="POST"
+                    style="margin-top: 1rem; border-top: 1px dashed #cfd8dc; padding-top: 1rem;">
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <label class="form-label">Cập nhật trạng thái yêu cầu</label>
+                  <select name="status" class="form-select" required>
+                    <option value="requested" {% if req.status == 'requested' %}selected{% endif %}>{{ status_vi.get('requested') }}</option>
+                    <option value="approved" {% if req.status == 'approved' %}selected{% endif %}>{{ status_vi.get('approved') }}</option>
+                    <option value="received" {% if req.status == 'received' %}selected{% endif %}>{{ status_vi.get('received') }}</option>
+                    <option value="exchange_shipped" {% if req.status == 'exchange_shipped' %}selected{% endif %}>{{ status_vi.get('exchange_shipped') }}</option>
+                    <option value="refunded" {% if req.status == 'refunded' %}selected{% endif %}>{{ status_vi.get('refunded') }}</option>
+                    <option value="completed" {% if req.status == 'completed' %}selected{% endif %}>{{ status_vi.get('completed') }}</option>
+                    <option value="rejected" {% if req.status == 'rejected' %}selected{% endif %}>{{ status_vi.get('rejected') }}</option>
+                    <option value="cancelled" {% if req.status == 'cancelled' %}selected{% endif %}>{{ status_vi.get('cancelled') }}</option>
+                  </select>
+                </div>
+
+                {% if req.action == 'refund' %}
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <label class="form-label">Số tiền hoàn (đ) - tùy chọn</label>
+                  <input type="number"
+                         step="1000"
+                         min="0"
+                         name="refund_amount"
+                         placeholder="{{ req.refund_amount or order.total }}"
+                         class="form-select">
+                </div>
+                {% endif %}
+
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                  <label class="form-label">Ghi chú nội bộ</label>
+                  <textarea name="note"
+                            class="form-textarea"
+                            placeholder="Ghi chú xử lý yêu cầu đổi trả..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-update">Cập nhật yêu cầu</button>
+              </form>
+
+              {% if req.timeline %}
+              <div style="margin-top: 1rem;">
+                <strong style="font-size: 0.95rem; color: #455a64;">Timeline yêu cầu</strong>
+                {% for step in req.timeline|reverse %}
+                <div class="history-time" style="margin-top: 0.35rem;">
+                  {{ step.timestamp[:16].replace('T', ' ') }}: {{ status_vi.get(step.from, step.from or 'Mới') }} → {{ status_vi.get(step.to, step.to) }}
+                  {% if step.actor_role or step.actor_id %}
+                  - {{ step.actor_role or 'actor' }}: {{ step.actor_id or 'N/A' }}
+                  {% endif %}
+                  {% if step.note %}({{ step.note }}){% endif %}
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="history-item" style="border-left-color: #cfd8dc;">
+              Chưa có yêu cầu đổi trả/hoàn tiền cho đơn này.
+            </div>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>

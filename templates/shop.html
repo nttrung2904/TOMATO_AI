@@ -860,6 +860,46 @@ const BLIND_BOX_PRICE = 99000;
 let isOpeningBlindBox = false;
 let selectedGiftBox = null;
 
+function getCartItemKey(item) {
+  return item.cart_key || `${item.id}__${item.variant_id || 'default'}`;
+}
+
+function normalizeCartItems(items) {
+  return (items || []).map(item => {
+    const normalized = { ...item };
+    normalized.cart_key = getCartItemKey(normalized);
+    if (!Object.prototype.hasOwnProperty.call(normalized, 'variant_id')) {
+      normalized.variant_id = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(normalized, 'variant_name')) {
+      normalized.variant_name = '';
+    }
+    return normalized;
+  });
+}
+
+function getVariants(product) {
+  return Array.isArray(product.variants) ? product.variants : [];
+}
+
+function getSelectedVariant(productId) {
+  const product = products.find(p => p.id === productId);
+  if (!product) return null;
+
+  const variants = getVariants(product);
+  if (variants.length === 0) return null;
+
+  const selectEl = document.getElementById(`variant-select-${productId}`);
+  if (!selectEl) {
+    return variants.find(v => Number(v.stock || 0) > 0) || variants[0] || null;
+  }
+
+  const selectedId = selectEl.value;
+  return variants.find(v => String(v.id) === String(selectedId)) || null;
+}
+
+cart = normalizeCartItems(cart);
+
 function selectGiftBox(index) {
   if (isOpeningBlindBox) return;
 
@@ -1123,15 +1163,37 @@ function renderProducts(category = 'all') {
   }
   
   grid.innerHTML = filteredProducts.map(product => {
+    const variants = getVariants(product);
+    const hasVariants = variants.length > 0;
+    const totalStock = hasVariants
+      ? variants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0)
+      : Number(product.stock || 0);
+
     let stockClass = 'in-stock';
-    let stockText = `Còn ${product.stock} sản phẩm`;
-    
-    if (product.stock === 0) {
+    let stockText = hasVariants
+      ? `Tổng ${totalStock} sản phẩm | ${variants.length} biến thể`
+      : `Còn ${totalStock} sản phẩm`;
+
+    if (totalStock === 0) {
       stockClass = 'out-of-stock';
       stockText = 'Hết hàng';
-    } else if (product.stock < 20) {
+    } else if (totalStock < 20) {
       stockClass = 'low-stock';
     }
+
+    const defaultVariant = hasVariants
+      ? (variants.find(variant => Number(variant.stock || 0) > 0) || variants[0])
+      : null;
+
+    const variantSelectorHtml = hasVariants ? `
+      <select id="variant-select-${product.id}" style="margin-top: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d8e5df;">
+        ${variants.map(variant => {
+          const variantStock = Number(variant.stock || 0);
+          const isDefault = defaultVariant && String(defaultVariant.id) === String(variant.id);
+          return `<option value="${variant.id}" ${variantStock === 0 ? 'disabled' : ''} ${isDefault ? 'selected' : ''}>${variant.name} (${variantStock})</option>`;
+        }).join('')}
+      </select>
+    ` : '';
     
     const imageUrl = getImageUrl(product.image);
     
@@ -1155,23 +1217,24 @@ function renderProducts(category = 'all') {
             <div>
               <div class="product-price">${formatPrice(product.price)}</div>
               <div class="product-stock ${stockClass}">${stockText}</div>
+              ${variantSelectorHtml}
             </div>
             <div style="display: flex; gap: 8px; flex-direction: column;">
               <button 
                 class="add-to-cart-btn" 
                 onclick="addToCart(${product.id}, event)"
-                ${product.stock === 0 ? 'disabled' : ''}
+                ${totalStock === 0 ? 'disabled' : ''}
                 style="font-size: 0.9em; padding: 10px 16px;"
               >
-                ${product.stock === 0 ? 'Hết hàng' : '🛒 Thêm vào giỏ'}
+                ${totalStock === 0 ? 'Hết hàng' : '🛒 Thêm vào giỏ'}
               </button>
               <button 
                 class="buy-now-btn" 
                 onclick="buyNow(${product.id})"
-                ${product.stock === 0 ? 'disabled' : ''}
+                ${totalStock === 0 ? 'disabled' : ''}
                 style="font-size: 0.9em; padding: 10px 16px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); border: none; color: white; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s;"
               >
-                ${product.stock === 0 ? 'Hết hàng' : '⚡ Mua ngay'}
+                ${totalStock === 0 ? 'Hết hàng' : '⚡ Mua ngay'}
               </button>
             </div>
           </div>
@@ -1197,12 +1260,21 @@ function formatPrice(price) {
 
 function addToCart(productId, event) {
   const product = products.find(p => p.id === productId);
-  if (!product || product.stock === 0) return;
-  
-  const existingItem = cart.find(item => item.id === productId);
+  if (!product) return;
+
+  const selectedVariant = getSelectedVariant(productId);
+  const maxStock = selectedVariant ? Number(selectedVariant.stock || 0) : Number(product.stock || 0);
+  if (maxStock === 0) {
+    showToast('Biến thể này đã hết hàng!', 'warning');
+    return;
+  }
+
+  const cartKey = `${product.id}__${selectedVariant ? selectedVariant.id : 'default'}`;
+  const existingItem = cart.find(item => getCartItemKey(item) === cartKey);
   if (existingItem) {
-    if (existingItem.quantity < product.stock) {
+    if (existingItem.quantity < maxStock) {
       existingItem.quantity++;
+      existingItem.maxStock = maxStock;
     } else {
       showToast('Đã đạt số lượng tối đa trong kho!', 'warning');
       return;
@@ -1213,14 +1285,18 @@ function addToCart(productId, event) {
       name: product.name,
       price: product.price,
       quantity: 1,
-      maxStock: product.stock,
-      image: product.image
+      maxStock: maxStock,
+      image: product.image,
+      variant_id: selectedVariant ? selectedVariant.id : null,
+      variant_name: selectedVariant ? selectedVariant.name : '',
+      cart_key: cartKey
     });
   }
   
   saveCart();
   updateCartCount();
-  showToast(`Đã thêm "${product.name}" vào giỏ hàng!`, 'success');
+  const variantText = selectedVariant ? ` (${selectedVariant.name})` : '';
+  showToast(`Đã thêm "${product.name}${variantText}" vào giỏ hàng!`, 'success');
   
   // Animation effect
   if (event) {
@@ -1232,11 +1308,22 @@ function addToCart(productId, event) {
 
 function buyNow(productId) {
   const product = products.find(p => p.id === productId);
-  if (!product || product.stock === 0) return;
-  
+  if (!product) return;
+
+  const selectedVariant = getSelectedVariant(productId);
+  const maxStock = selectedVariant ? Number(selectedVariant.stock || 0) : Number(product.stock || 0);
+  if (maxStock === 0) {
+    showToast('Biến thể này đã hết hàng!', 'warning');
+    return;
+  }
+
+  const cartKey = `${product.id}__${selectedVariant ? selectedVariant.id : 'default'}`;
+
   // Check if item already in cart
-  const existingItem = cart.find(item => item.id === productId);
+  const existingItem = cart.find(item => getCartItemKey(item) === cartKey);
   if (existingItem) {
+    existingItem.maxStock = maxStock;
+    saveCart();
     // Go directly to cart
     window.location.href = '{{ url_for("cart") }}';
   } else {
@@ -1246,8 +1333,11 @@ function buyNow(productId) {
       name: product.name,
       price: product.price,
       quantity: 1,
-      maxStock: product.stock,
-      image: product.image
+      maxStock: maxStock,
+      image: product.image,
+      variant_id: selectedVariant ? selectedVariant.id : null,
+      variant_name: selectedVariant ? selectedVariant.name : '',
+      cart_key: cartKey
     });
     saveCart();
     window.location.href = '{{ url_for("cart") }}';
@@ -1255,6 +1345,7 @@ function buyNow(productId) {
 }
 
 function saveCart() {
+  cart = normalizeCartItems(cart);
   localStorage.setItem('tomatoCart', JSON.stringify(cart));
 }
 

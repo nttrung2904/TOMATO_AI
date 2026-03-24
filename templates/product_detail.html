@@ -640,6 +640,19 @@
       </div>
       
       <div class="product-price">{{ "{:,.0f}".format(product.price) }}đ</div>
+
+      {% if product.variants and product.variants|length > 0 %}
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="variant-select">Biến thể</label>
+        <select id="variant-select" style="padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid #d8e5df; width: 100%; max-width: 360px;">
+          {% for variant in product.variants %}
+          <option value="{{ variant.id }}" {% if variant.stock == 0 %}disabled{% endif %}>
+            {{ variant.name }} ({{ variant.stock }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       
       <div class="product-stock {% if product.stock == 0 %}out-of-stock{% elif product.stock < 20 %}low-stock{% else %}in-stock{% endif %}">
         {% if product.stock == 0 %}
@@ -742,7 +755,8 @@ const productData = {
   name: '{{ product.name }}',
   price: {{ product.price }},
   stock: {{ product.stock }},
-  image: '{{ url_for("static", filename=product.image) }}'
+  image: '{{ url_for("static", filename=product.image) }}',
+  variants: {{ (product.variants or []) | tojson | safe }}
 };
 
 let isInWishlist = false;
@@ -995,11 +1009,20 @@ async function submitReview(event) {
 // Add to cart
 function addToCart() {
   let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
-  
-  const existingItem = cart.find(item => item.id === productData.id);
+
+  const selectedVariant = getSelectedVariantFromDetail();
+  const maxStock = selectedVariant ? Number(selectedVariant.stock || 0) : Number(productData.stock || 0);
+  if (maxStock === 0) {
+    window.toast.warning('Biến thể này đã hết hàng!');
+    return;
+  }
+
+  const cartKey = `${productData.id}__${selectedVariant ? selectedVariant.id : 'default'}`;
+  const existingItem = cart.find(item => (item.cart_key || `${item.id}__${item.variant_id || 'default'}`) === cartKey);
   if (existingItem) {
-    if (existingItem.quantity < productData.stock) {
+    if (existingItem.quantity < maxStock) {
       existingItem.quantity++;
+      existingItem.maxStock = maxStock;
     } else {
       window.toast.warning('Đã đạt số lượng tối đa trong kho!');
       return;
@@ -1010,33 +1033,66 @@ function addToCart() {
       name: productData.name,
       price: productData.price,
       quantity: 1,
-      maxStock: productData.stock,
-      image: productData.image
+      maxStock: maxStock,
+      image: productData.image,
+      variant_id: selectedVariant ? selectedVariant.id : null,
+      variant_name: selectedVariant ? selectedVariant.name : '',
+      cart_key: cartKey
     });
   }
   
   localStorage.setItem('tomatoCart', JSON.stringify(cart));
-  window.toast.success(`Đã thêm "${productData.name}" vào giỏ hàng!`);
+  const variantText = selectedVariant ? ` (${selectedVariant.name})` : '';
+  window.toast.success(`Đã thêm "${productData.name}${variantText}" vào giỏ hàng!`);
 }
 
 // Buy now
 function buyNow() {
   let cart = JSON.parse(localStorage.getItem('tomatoCart') || '[]');
-  
-  const existingItem = cart.find(item => item.id === productData.id);
+
+  const selectedVariant = getSelectedVariantFromDetail();
+  const maxStock = selectedVariant ? Number(selectedVariant.stock || 0) : Number(productData.stock || 0);
+  if (maxStock === 0) {
+    window.toast.warning('Biến thể này đã hết hàng!');
+    return;
+  }
+
+  const cartKey = `${productData.id}__${selectedVariant ? selectedVariant.id : 'default'}`;
+  const existingItem = cart.find(item => (item.cart_key || `${item.id}__${item.variant_id || 'default'}`) === cartKey);
   if (!existingItem) {
     cart.push({
       id: productData.id,
       name: productData.name,
       price: productData.price,
       quantity: 1,
-      maxStock: productData.stock,
-      image: productData.image
+      maxStock: maxStock,
+      image: productData.image,
+      variant_id: selectedVariant ? selectedVariant.id : null,
+      variant_name: selectedVariant ? selectedVariant.name : '',
+      cart_key: cartKey
     });
-    localStorage.setItem('tomatoCart', JSON.stringify(cart));
+  } else {
+    existingItem.maxStock = maxStock;
   }
+
+  localStorage.setItem('tomatoCart', JSON.stringify(cart));
   
   window.location.href = '{{ url_for("cart") }}';
+}
+
+function getSelectedVariantFromDetail() {
+  const variants = Array.isArray(productData.variants) ? productData.variants : [];
+  if (variants.length === 0) {
+    return null;
+  }
+
+  const selectEl = document.getElementById('variant-select');
+  if (!selectEl) {
+    return variants.find(v => Number(v.stock || 0) > 0) || variants[0] || null;
+  }
+
+  const selectedId = selectEl.value;
+  return variants.find(v => String(v.id) === String(selectedId)) || null;
 }
 </script>
 

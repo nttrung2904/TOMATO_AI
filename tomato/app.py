@@ -1,5 +1,6 @@
 ﻿import io
 import sys
+import csv
 
 # Fix Windows console encoding FIRST (before any print statements)
 if sys.platform == 'win32':
@@ -3714,10 +3715,19 @@ def submit_order():
             if not product:
                 stock_errors.append(f"{item['name']}: Sản phẩm không tồn tại")
                 continue
-            
-            current_stock = product.get('stock', 0)
+
+            variant_id = (item.get('variant_id') or '').strip() if isinstance(item.get('variant_id'), str) else item.get('variant_id')
+            variant_name = (item.get('variant_name') or '').strip()
+            variant = get_product_variant(product, variant_id=variant_id, variant_name=variant_name)
+
+            if variant_id and not variant:
+                stock_errors.append(f"{item['name']}: Biến thể không tồn tại")
+                continue
+
+            current_stock = get_product_available_stock(product, variant_id=variant_id, variant_name=variant_name)
+            item_label = f"{item['name']} ({variant.get('name')})" if variant else item['name']
             if current_stock < item['quantity']:
-                stock_errors.append(f"{item['name']}: Chỉ còn {current_stock} sản phẩm")
+                stock_errors.append(f"{item_label}: Chỉ còn {current_stock} sản phẩm")
         
         if stock_errors:
             return {
@@ -3746,12 +3756,24 @@ def submit_order():
         
         # Decrement stock for each item
         for item in items:
-            update_product_stock(item['id'], -item['quantity'])
-            
+            variant_id = (item.get('variant_id') or '').strip() if isinstance(item.get('variant_id'), str) else item.get('variant_id')
+            variant_name = (item.get('variant_name') or '').strip()
+
+            update_product_stock(
+                item['id'],
+                -item['quantity'],
+                variant_id=variant_id,
+                variant_name=variant_name
+            )
+
             # Check for low stock and alert admin
             product = get_product_by_id(item['id'])
-            if product and product.get('stock', 0) < 10:
-                send_low_stock_alert(product)
+            if product:
+                send_low_stock_alert(
+                    product,
+                    variant_id=variant_id,
+                    variant_name=variant_name
+                )
         
         # Save order
         orders_dir = BASE_DIR / 'data'
@@ -4751,6 +4773,7 @@ def profile():
             user=user,
             addresses=addresses,
             orders=orders,
+            order_return_requests={},
             stats=stats,
             daily_checkin_popup=None
         )
@@ -4781,6 +4804,16 @@ def profile():
             orders.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
     except Exception:
         app.logger.exception('Error loading orders')
+
+    order_return_requests = {}
+    try:
+        return_requests = get_return_requests_for_user(user_id)
+        for req in sorted(return_requests, key=lambda x: x.get('created_at', ''), reverse=True):
+            order_id = req.get('order_id')
+            if order_id and order_id not in order_return_requests:
+                order_return_requests[order_id] = req
+    except Exception:
+        app.logger.exception('Error loading return requests')
     
     daily_checkin_popup = session.pop('daily_checkin_popup', None)
     return render_template(
@@ -4788,6 +4821,7 @@ def profile():
         user=user,
         addresses=addresses,
         orders=orders,
+        order_return_requests=order_return_requests,
         stats=stats,
         daily_checkin_popup=daily_checkin_popup
     )
@@ -5082,6 +5116,165 @@ def validate_coupon():
 
 # ==================== Product Management ====================
 
+LOW_STOCK_THRESHOLD = 10
+
+
+def normalize_product_inventory(product):
+    """Normalize product inventory so legacy and variant products share one shape."""
+    variants = product.get('variants')
+    normalized_variants = []
+
+    if isinstance(variants, list):
+        for idx, variant in enumerate(variants):
+            if not isinstance(variant, dict):
+                continue
+
+            name = str(variant.get('name', '')).strip()
+            if not name:
+                continue
+
+            variant_id = str(variant.get('id', '')).strip()
+            if not variant_id:
+                variant_id = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') or f'v{idx + 1}'
+
+            try:
+                stock = max(0, int(variant.get('stock', 0)))
+            except (TypeError, ValueError):
+                stock = 0
+
+            normalized_variant = {
+                'id': variant_id,
+                'name': name,
+                'stock': stock
+            }
+
+            # Preserve alert marker to avoid duplicate warning spam.
+            if variant.get('low_stock_alerted_at'):
+                normalized_variant['low_stock_alerted_at'] = variant.get('low_stock_alerted_at')
+
+            normalized_variants.append(normalized_variant)
+
+    if normalized_variants:
+        product['variants'] = normalized_variants
+        product['stock'] = sum(v.get('stock', 0) for v in normalized_variants)
+    else:
+        product.pop('variants', None)
+        try:
+            product['stock'] = max(0, int(product.get('stock', 0)))
+        except (TypeError, ValueError):
+            product['stock'] = 0
+
+    return product
+
+
+def get_product_variant(product, variant_id=None, variant_name=None):
+    """Resolve a product variant by id, with optional name fallback for old orders."""
+    if not product or not isinstance(product.get('variants'), list):
+        return None
+
+    if variant_id:
+        for variant in product['variants']:
+            if str(variant.get('id')) == str(variant_id):
+                return variant
+
+    if variant_name:
+        variant_name_lower = str(variant_name).strip().lower()
+        for variant in product['variants']:
+            if str(variant.get('name', '')).strip().lower() == variant_name_lower:
+                return variant
+
+    return None
+
+
+def get_product_available_stock(product, variant_id=None, variant_name=None):
+    """Get available stock for either full product or one variant."""
+    variant = get_product_variant(product, variant_id=variant_id, variant_name=variant_name)
+    if variant:
+        return max(0, int(variant.get('stock', 0)))
+
+    try:
+        return max(0, int(product.get('stock', 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def parse_variant_lines(raw_text):
+    """Parse textarea lines in format: Ten bien the|So luong."""
+    variants = []
+    if not raw_text:
+        return variants
+
+    lines = [line.strip() for line in str(raw_text).splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        if '|' in line:
+            name_part, stock_part = line.split('|', 1)
+        elif ',' in line:
+            name_part, stock_part = line.rsplit(',', 1)
+        else:
+            continue
+
+        name = name_part.strip()
+        if not name:
+            continue
+
+        try:
+            stock = max(0, int(stock_part.strip()))
+        except (TypeError, ValueError):
+            stock = 0
+
+        variant_id = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') or f'v{idx + 1}'
+
+        # Ensure unique ids when names normalize to same slug.
+        if any(v['id'] == variant_id for v in variants):
+            variant_id = f'{variant_id}-{idx + 1}'
+
+        variants.append({
+            'id': variant_id,
+            'name': name,
+            'stock': stock
+        })
+
+    return variants
+
+
+def migrate_legacy_products_to_default_variant():
+    """Convert products without variants to a single default variant."""
+    products = load_products()
+    updated_count = 0
+
+    for product in products:
+        variants = product.get('variants')
+        if isinstance(variants, list) and variants:
+            continue
+
+        try:
+            stock = max(0, int(product.get('stock', 0)))
+        except (TypeError, ValueError):
+            stock = 0
+
+        default_variant = {
+            'id': 'default',
+            'name': 'Mặc định',
+            'stock': stock
+        }
+
+        if product.get('low_stock_alerted_at'):
+            default_variant['low_stock_alerted_at'] = product.get('low_stock_alerted_at')
+
+        product['variants'] = [default_variant]
+        product['stock'] = stock
+        product.pop('low_stock_alerted_at', None)
+        updated_count += 1
+
+    if updated_count > 0:
+        products_file = BASE_DIR / 'data' / 'products.jsonl'
+        with open(products_file, 'w', encoding='utf-8') as f:
+            for product in products:
+                product = normalize_product_inventory(product)
+                f.write(json.dumps(product, ensure_ascii=False) + '\n')
+
+    return updated_count
+
 def load_products():
     """Load all products from database"""
     products = []
@@ -5091,7 +5284,11 @@ def load_products():
         with open(products_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
-                    products.append(json.loads(line))
+                    try:
+                        product = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    products.append(normalize_product_inventory(product))
     
     return products
 
@@ -5107,6 +5304,7 @@ def save_product(product_data):
     """Save or update product"""
     products = load_products()
     products_file = BASE_DIR / 'data' / 'products.jsonl'
+    product_data = normalize_product_inventory(product_data)
     
     # Check if updating existing product
     product_id = product_data.get('id')
@@ -5137,37 +5335,77 @@ def delete_product(product_id):
         for product in products:
             f.write(json.dumps(product, ensure_ascii=False) + '\n')
 
-def update_product_stock(product_id, quantity_change):
-    """Update product stock"""
+def update_product_stock(product_id, quantity_change, variant_id=None, variant_name=None):
+    """Update product stock (supports variant-level adjustments)."""
     product = get_product_by_id(product_id)
     if product:
-        product['stock'] = max(0, product.get('stock', 0) + quantity_change)
+        variant = get_product_variant(product, variant_id=variant_id, variant_name=variant_name)
+
+        if variant:
+            variant['stock'] = max(0, int(variant.get('stock', 0)) + quantity_change)
+            # Reset low stock alert marker when variant is healthy again.
+            if variant['stock'] >= LOW_STOCK_THRESHOLD:
+                variant.pop('low_stock_alerted_at', None)
+
+        product['stock'] = sum(v.get('stock', 0) for v in product.get('variants', [])) if product.get('variants') else max(0, product.get('stock', 0) + quantity_change)
+
+        if not product.get('variants') and product['stock'] >= LOW_STOCK_THRESHOLD:
+            product.pop('low_stock_alerted_at', None)
+
         product['sold'] = product.get('sold', 0) + abs(quantity_change) if quantity_change < 0 else product.get('sold', 0)
         save_product(product)
         return product
     return None
 
-def send_low_stock_alert(product):
-    """Send low stock alert to all admins"""
+def send_low_stock_alert(product, variant_id=None, variant_name=None):
+    """Send low stock alert to all admins for product or variant."""
     try:
-        stock = product.get('stock', 0)
-        if stock >= 10:
+        variant = get_product_variant(product, variant_id=variant_id, variant_name=variant_name)
+        if variant:
+            stock = int(variant.get('stock', 0))
+            if stock >= LOW_STOCK_THRESHOLD:
+                variant.pop('low_stock_alerted_at', None)
+                save_product(product)
+                return
+
+            if variant.get('low_stock_alerted_at'):
+                return
+        else:
+            stock = int(product.get('stock', 0))
+            if stock >= LOW_STOCK_THRESHOLD:
+                product.pop('low_stock_alerted_at', None)
+                save_product(product)
+                return
+
+            if product.get('low_stock_alerted_at'):
+                return
+
+        if stock >= LOW_STOCK_THRESHOLD:
             return
         
         # Find all admin users
         users = load_users()
         admin_users = [u for u in users if u.get('is_admin', False)]
+
+        item_label = f'{product["name"]} - {variant.get("name")}' if variant else product['name']
         
         for admin in admin_users:
             create_notification(
                 user_id=admin['id'],
                 title='⚠️ Cảnh báo tồn kho thấp',
-                message=f'Sản phẩm "{product["name"]}" chỉ còn {stock} sản phẩm trong kho!',
+                message=f'Sản phẩm "{item_label}" chỉ còn {stock} sản phẩm trong kho!',
                 notification_type='warning',
                 link='/admin/products'
             )
-        
-        app.logger.warning(f'Low stock alert: {product["name"]} -只 còn {stock}')
+
+        alerted_at = datetime.utcnow().isoformat()
+        if variant:
+            variant['low_stock_alerted_at'] = alerted_at
+        else:
+            product['low_stock_alerted_at'] = alerted_at
+        save_product(product)
+
+        app.logger.warning(f'Low stock alert: {item_label} - con {stock}')
     except Exception as e:
         app.logger.error(f'Error sending low stock alert: {e}')
 
@@ -5634,6 +5872,301 @@ def load_orders():
     
     return orders
 
+
+def load_return_requests():
+    """Load all order return/refund requests."""
+    requests_file = BASE_DIR / 'data' / 'order_return_requests.jsonl'
+    requests_list = []
+
+    if requests_file.exists():
+        with open(requests_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        requests_list.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+    requests_list.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return requests_list
+
+
+def save_return_requests(requests_list):
+    """Persist return/refund requests list."""
+    requests_file = BASE_DIR / 'data' / 'order_return_requests.jsonl'
+    requests_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(requests_file, 'w', encoding='utf-8') as f:
+        for req in requests_list:
+            f.write(json.dumps(req, ensure_ascii=False) + '\n')
+
+
+def get_return_requests_for_user(user_id):
+    """Get all return requests for a user."""
+    return [r for r in load_return_requests() if r.get('user_id') == user_id]
+
+
+def get_return_requests_for_order(order_id):
+    """Get all return requests for an order."""
+    return [r for r in load_return_requests() if r.get('order_id') == order_id]
+
+
+def get_return_request_by_id(request_id):
+    """Get return request by ID."""
+    for req in load_return_requests():
+        if req.get('id') == request_id:
+            return req
+    return None
+
+
+def has_active_return_request(order_id, user_id=None):
+    """Check if an order has active return/refund request."""
+    active_statuses = {'requested', 'approved', 'received', 'exchange_shipped'}
+    for req in load_return_requests():
+        if req.get('order_id') != order_id:
+            continue
+        if user_id and req.get('user_id') != user_id:
+            continue
+        if req.get('status') in active_statuses:
+            return True
+    return False
+
+
+def append_return_request_audit_log(
+    request_id,
+    order_id,
+    action_name,
+    actor_role,
+    actor_id,
+    from_status='',
+    to_status='',
+    note=''
+):
+    """Append audit log entry for return/refund workflow."""
+    logs_file = BASE_DIR / 'data' / 'return_request_audit_logs.jsonl'
+    logs_file.parent.mkdir(parents=True, exist_ok=True)
+
+    log_entry = {
+        'id': str(uuid4()),
+        'request_id': request_id,
+        'order_id': order_id,
+        'action_name': action_name,
+        'actor_role': actor_role,
+        'actor_id': actor_id,
+        'from_status': from_status,
+        'to_status': to_status,
+        'note': note,
+        'ip': request.remote_addr if request else '',
+        'user_agent': request.headers.get('User-Agent', '')[:240] if request else '',
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+    with open(logs_file, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
+
+    return log_entry
+
+
+def load_return_request_audit_logs(request_id=None):
+    """Load audit logs for return/refund workflow."""
+    logs_file = BASE_DIR / 'data' / 'return_request_audit_logs.jsonl'
+    logs = []
+
+    if logs_file.exists():
+        with open(logs_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    log = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if request_id and log.get('request_id') != request_id:
+                    continue
+                logs.append(log)
+
+    logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    return logs
+
+
+def filter_return_request_audit_logs(logs, actor_filter='all', to_status_filter='all', start_date='', end_date=''):
+    """Apply actor/status/date filters to return-request audit logs."""
+    filtered = logs
+
+    if actor_filter != 'all':
+        filtered = [l for l in filtered if (l.get('actor_id') or '').lower() == actor_filter]
+    if to_status_filter != 'all':
+        filtered = [l for l in filtered if (l.get('to_status') or '').lower() == to_status_filter]
+
+    if start_date:
+        start_iso = f'{start_date}T00:00:00'
+        filtered = [l for l in filtered if (l.get('timestamp') or '') >= start_iso]
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
+            filtered = [l for l in filtered if (l.get('timestamp') or '') < end_dt.isoformat()]
+        except Exception:
+            pass
+
+    return filtered
+
+
+def create_return_request(order, user_id, action, reason, details=''):
+    """Create a return/refund request for an order."""
+    now = datetime.utcnow().isoformat()
+    request_id = str(uuid4())[:10]
+    refund_amount = float(order.get('total', 0) or 0)
+
+    return_request = {
+        'id': request_id,
+        'order_id': order.get('id'),
+        'user_id': user_id,
+        'action': action,
+        'reason': reason,
+        'details': details,
+        'status': 'requested',
+        'refund_amount': refund_amount if action == 'refund' else 0,
+        'refund_method': 'wallet' if action == 'refund' else '',
+        'created_at': now,
+        'updated_at': now,
+        'timeline': [
+            {
+                'from': '',
+                'to': 'requested',
+                'note': 'Khách hàng gửi yêu cầu đổi trả/hoàn tiền',
+                'actor_role': 'user',
+                'actor_id': user_id,
+                'timestamp': now
+            }
+        ]
+    }
+
+    requests_list = load_return_requests()
+    requests_list.append(return_request)
+    save_return_requests(requests_list)
+
+    try:
+        append_return_request_audit_log(
+            request_id=request_id,
+            order_id=order.get('id'),
+            action_name='create_request',
+            actor_role='user',
+            actor_id=user_id,
+            from_status='',
+            to_status='requested',
+            note=reason
+        )
+    except Exception as e:
+        app.logger.error(f'Failed to append return-request audit log: {e}')
+
+    return return_request
+
+
+def update_return_request_status(
+    request_id,
+    new_status,
+    admin_note='',
+    refund_amount=None,
+    actor_role='system',
+    actor_id='system'
+):
+    """Update return/refund request status and handle wallet refund when needed."""
+    requests_list = load_return_requests()
+
+    valid_statuses = {
+        'requested', 'approved', 'received', 'exchange_shipped',
+        'refunded', 'completed', 'rejected', 'cancelled'
+    }
+    if new_status not in valid_statuses:
+        return False, 'Trạng thái yêu cầu không hợp lệ', None
+
+    for req in requests_list:
+        if req.get('id') != request_id:
+            continue
+
+        old_status = req.get('status', 'requested')
+        req['status'] = new_status
+        req['updated_at'] = datetime.utcnow().isoformat()
+
+        if 'timeline' not in req:
+            req['timeline'] = []
+        req['timeline'].append({
+            'from': old_status,
+            'to': new_status,
+            'note': admin_note,
+            'actor_role': actor_role,
+            'actor_id': actor_id,
+            'timestamp': req['updated_at']
+        })
+
+        if new_status == 'refunded':
+            if req.get('action') != 'refund':
+                return False, 'Yêu cầu đổi hàng không thể chuyển sang hoàn tiền', req
+
+            if req.get('refund_transaction_id'):
+                return False, 'Yêu cầu này đã được hoàn tiền trước đó', req
+
+            amount = float(refund_amount) if refund_amount is not None else float(req.get('refund_amount', 0) or 0)
+            if amount <= 0:
+                order = get_order_by_id(req.get('order_id'))
+                amount = float(order.get('total', 0) if order else 0)
+
+            if amount <= 0:
+                return False, 'Số tiền hoàn không hợp lệ', req
+
+            tx = add_wallet_transaction(
+                req.get('user_id'),
+                amount,
+                'refund',
+                f'Hoàn tiền đơn hàng #{req.get("order_id")}',
+                reference_id=f'return:{request_id}'
+            )
+            req['refund_amount'] = amount
+            req['refund_transaction_id'] = tx.get('id')
+            req['refund_method'] = 'wallet'
+
+        save_return_requests(requests_list)
+
+        try:
+            append_return_request_audit_log(
+                request_id=req.get('id'),
+                order_id=req.get('order_id'),
+                action_name='update_status',
+                actor_role=actor_role,
+                actor_id=actor_id,
+                from_status=old_status,
+                to_status=new_status,
+                note=admin_note
+            )
+        except Exception as e:
+            app.logger.error(f'Failed to append status-update audit log: {e}')
+
+        if req.get('user_id'):
+            status_messages = {
+                'requested': 'Yêu cầu của bạn đã được ghi nhận',
+                'approved': 'Yêu cầu đã được duyệt, vui lòng gửi hàng về kho',
+                'received': 'Kho đã nhận hàng hoàn trả và đang kiểm tra',
+                'exchange_shipped': 'Đơn đổi hàng đã được gửi lại cho bạn',
+                'refunded': 'Hoàn tiền đã được cộng vào ví của bạn',
+                'completed': 'Yêu cầu đổi trả đã hoàn tất',
+                'rejected': 'Yêu cầu đổi trả đã bị từ chối',
+                'cancelled': 'Yêu cầu đổi trả đã bị hủy'
+            }
+            try:
+                create_notification(
+                    user_id=req['user_id'],
+                    title=f'Cập nhật yêu cầu #{req.get("id")}',
+                    message=status_messages.get(new_status, f'Trạng thái mới: {new_status}'),
+                    notification_type='info',
+                    link='/profile'
+                )
+            except Exception as e:
+                app.logger.error(f'Failed to create return-request notification: {e}')
+
+        return True, '', req
+
+    return False, 'Không tìm thấy yêu cầu đổi trả', None
+
 def get_order_by_id(order_id):
     """Get order by ID"""
     orders = load_orders()
@@ -5657,7 +6190,12 @@ def update_order_status_new(order_id, new_status, admin_note=''):
             if new_status == 'cancelled' and old_status != 'cancelled':
                 try:
                     for item in order.get('items', []):
-                        update_product_stock(item['id'], item['quantity'])
+                        update_product_stock(
+                            item['id'],
+                            item['quantity'],
+                            variant_id=item.get('variant_id'),
+                            variant_name=item.get('variant_name')
+                        )
                         app.logger.info(f"Restored {item['quantity']} units of product {item['id']} from cancelled order {order_id}")
                 except Exception as e:
                     app.logger.error(f'Error restoring stock for cancelled order {order_id}: {e}')
@@ -5885,6 +6423,13 @@ def api_my_orders():
         user_id = session.get('user_id')
         all_orders = load_orders()
         user_orders = [o for o in all_orders if o.get('user_id') == user_id]
+
+        user_return_requests = get_return_requests_for_user(user_id)
+        latest_return_by_order = {}
+        for req in sorted(user_return_requests, key=lambda x: x.get('created_at', ''), reverse=True):
+            order_id = req.get('order_id')
+            if order_id and order_id not in latest_return_by_order:
+                latest_return_by_order[order_id] = req
         
         # Filter by status
         status = request.args.get('status')
@@ -5924,6 +6469,9 @@ def api_my_orders():
         start = (page - 1) * per_page
         end = start + per_page
         orders_page = user_orders[start:end]
+
+        for order in orders_page:
+            order['return_request'] = latest_return_by_order.get(order.get('id'))
         
         # Calculate stats
         stats = {
@@ -5999,6 +6547,88 @@ def api_cancel_order(order_id):
             return {'ok': False, 'error': 'Không thể hủy đơn hàng'}, 500
     except Exception as e:
         app.logger.error(f'Error cancelling order: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/order/<order_id>/return-request', methods=['POST'])
+@login_required
+def api_create_return_request(order_id):
+    """Create return/exchange/refund request for delivered orders."""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Tài khoản admin không dùng luồng này'}, 403
+
+        user_id = session.get('user_id')
+        order = get_order_by_id(order_id)
+        if not order:
+            return {'ok': False, 'error': 'Đơn hàng không tồn tại'}, 404
+
+        if order.get('user_id') != user_id:
+            return {'ok': False, 'error': 'Bạn không có quyền thao tác đơn hàng này'}, 403
+
+        if order.get('status') not in ['delivered', 'completed']:
+            return {'ok': False, 'error': 'Chỉ có thể gửi yêu cầu sau khi đơn đã giao thành công'}, 400
+
+        if has_active_return_request(order_id, user_id=user_id):
+            return {'ok': False, 'error': 'Đơn hàng này đang có yêu cầu đổi trả đang xử lý'}, 400
+
+        data = request.get_json(silent=True) or {}
+        action = (data.get('action') or 'refund').strip().lower()
+        reason = (data.get('reason') or '').strip()
+        details = (data.get('details') or '').strip()
+
+        if action not in ['refund', 'exchange']:
+            return {'ok': False, 'error': 'Hình thức yêu cầu không hợp lệ'}, 400
+        if not reason:
+            return {'ok': False, 'error': 'Vui lòng nhập lý do đổi trả/hoàn tiền'}, 400
+
+        delivered_at_raw = order.get('status_updated_at') or order.get('timestamp')
+        try:
+            delivered_at = datetime.fromisoformat(delivered_at_raw)
+            if datetime.utcnow() - delivered_at > timedelta(days=14):
+                return {
+                    'ok': False,
+                    'error': 'Đơn hàng đã quá hạn 14 ngày để gửi yêu cầu đổi trả/hoàn tiền'
+                }, 400
+        except Exception:
+            pass
+
+        return_request = create_return_request(order, user_id, action, reason, details)
+
+        try:
+            create_notification(
+                user_id=user_id,
+                title='Đã gửi yêu cầu đổi trả',
+                message=f'Yêu cầu #{return_request.get("id")} cho đơn #{order_id} đang chờ duyệt',
+                notification_type='info',
+                link='/profile'
+            )
+        except Exception as e:
+            app.logger.error(f'Failed to create user return-request notification: {e}')
+
+        app.logger.info(
+            'Return request created: %s (order=%s, action=%s)',
+            return_request.get('id'), order_id, action
+        )
+        return {'ok': True, 'request': return_request}
+    except Exception as e:
+        app.logger.error(f'Error creating return request: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/returns/my', methods=['GET'])
+@login_required
+def api_my_return_requests():
+    """Get current user's return/refund requests."""
+    try:
+        if session.get('is_admin'):
+            return {'ok': False, 'error': 'Admin account'}, 403
+
+        user_id = session.get('user_id')
+        requests_list = get_return_requests_for_user(user_id)
+        return {'ok': True, 'requests': requests_list}
+    except Exception as e:
+        app.logger.error(f'Error getting return requests: {e}')
         return {'ok': False, 'error': str(e)}, 500
 
 
@@ -7815,6 +8445,154 @@ def admin_orders():
         flash('Lỗi khi tải danh sách đơn hàng', 'error')
         return redirect(url_for('profile'))
 
+
+@app.route('/admin/returns')
+@requires_admin_auth
+def admin_returns():
+    """Admin return/refund requests dashboard."""
+    try:
+        active_tab = (request.args.get('tab') or 'requests').strip().lower()
+        if active_tab not in ['requests', 'logs']:
+            active_tab = 'requests'
+
+        requests_list = load_return_requests()
+        logs_all = load_return_request_audit_logs()
+
+        orders_map = {o.get('id'): o for o in load_orders()}
+        request_map = {r.get('id'): r for r in requests_list}
+
+        # Request tab filters
+        status_filter = (request.args.get('status') or 'all').strip().lower()
+        action_filter = (request.args.get('action') or 'all').strip().lower()
+
+        filtered = requests_list
+        if status_filter != 'all':
+            filtered = [r for r in filtered if r.get('status') == status_filter]
+        if action_filter != 'all':
+            filtered = [r for r in filtered if r.get('action') == action_filter]
+
+        # Attach order/customer display data
+        for req in filtered:
+            order = orders_map.get(req.get('order_id'), {})
+            req['order_customer_name'] = order.get('customer_name', 'N/A')
+            req['order_total'] = order.get('total', 0)
+
+        # Audit logs tab filters: admin + time + status
+        actor_filter = (request.args.get('actor') or 'all').strip().lower()
+        to_status_filter = (request.args.get('to_status') or 'all').strip().lower()
+        start_date = (request.args.get('start_date') or '').strip()
+        end_date = (request.args.get('end_date') or '').strip()
+
+        logs_filtered = filter_return_request_audit_logs(
+            logs=logs_all,
+            actor_filter=actor_filter,
+            to_status_filter=to_status_filter,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        for log in logs_filtered:
+            order = orders_map.get(log.get('order_id'), {})
+            rr = request_map.get(log.get('request_id'), {})
+            log['order_customer_name'] = order.get('customer_name', 'N/A')
+            log['request_action'] = rr.get('action', '')
+
+        admin_actors = sorted({
+            (l.get('actor_id') or '').strip()
+            for l in logs_all
+            if (l.get('actor_role') == 'admin' and (l.get('actor_id') or '').strip())
+        })
+
+        stats = {
+            'total': len(requests_list),
+            'requested': len([r for r in requests_list if r.get('status') == 'requested']),
+            'approved': len([r for r in requests_list if r.get('status') == 'approved']),
+            'refunded': len([r for r in requests_list if r.get('status') == 'refunded']),
+            'completed': len([r for r in requests_list if r.get('status') == 'completed']),
+            'rejected': len([r for r in requests_list if r.get('status') == 'rejected']),
+            'log_total': len(logs_all)
+        }
+
+        return render_template(
+            'admin_returns.html',
+            requests=filtered,
+            logs=logs_filtered,
+            stats=stats,
+            active_tab=active_tab,
+            selected_status=status_filter,
+            selected_action=action_filter,
+            selected_actor=actor_filter,
+            selected_to_status=to_status_filter,
+            selected_start_date=start_date,
+            selected_end_date=end_date,
+            admin_actors=admin_actors
+        )
+    except Exception as e:
+        app.logger.error(f'Error loading return requests: {e}')
+        flash('Lỗi khi tải danh sách yêu cầu đổi trả', 'error')
+        return redirect(url_for('admin_orders'))
+
+
+@app.route('/admin/returns/logs/export')
+@requires_admin_auth
+def admin_export_return_logs_csv():
+    """Export return/refund audit logs to CSV with current filters."""
+    try:
+        actor_filter = (request.args.get('actor') or 'all').strip().lower()
+        to_status_filter = (request.args.get('to_status') or 'all').strip().lower()
+        start_date = (request.args.get('start_date') or '').strip()
+        end_date = (request.args.get('end_date') or '').strip()
+
+        logs = load_return_request_audit_logs()
+        logs = filter_return_request_audit_logs(
+            logs=logs,
+            actor_filter=actor_filter,
+            to_status_filter=to_status_filter,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            'timestamp',
+            'request_id',
+            'order_id',
+            'action_name',
+            'actor_role',
+            'actor_id',
+            'from_status',
+            'to_status',
+            'note',
+            'ip',
+            'user_agent'
+        ])
+
+        for log in logs:
+            writer.writerow([
+                log.get('timestamp', ''),
+                log.get('request_id', ''),
+                log.get('order_id', ''),
+                log.get('action_name', ''),
+                log.get('actor_role', ''),
+                log.get('actor_id', ''),
+                log.get('from_status', ''),
+                log.get('to_status', ''),
+                log.get('note', ''),
+                log.get('ip', ''),
+                log.get('user_agent', '')
+            ])
+
+        filename = f"return_audit_logs_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
+    except Exception as e:
+        app.logger.error(f'Error exporting return audit logs: {e}')
+        flash('Lỗi khi xuất CSV audit logs', 'error')
+        return redirect(url_for('admin_returns', tab='logs'))
+
 @app.route('/admin/order/<order_id>')
 @requires_admin_auth
 def admin_order_detail(order_id):
@@ -7823,8 +8601,13 @@ def admin_order_detail(order_id):
     if not order:
         flash('Không tìm thấy đơn hàng', 'error')
         return redirect(url_for('admin_orders'))
-    
-    return render_template('admin_order_detail.html', order=order)
+
+    order_return_requests = get_return_requests_for_order(order_id)
+    return render_template(
+        'admin_order_detail.html',
+        order=order,
+        order_return_requests=order_return_requests
+    )
 
 @app.route('/admin/order/<order_id>/update_status', methods=['POST'])
 @requires_admin_auth
@@ -7844,80 +8627,246 @@ def admin_update_order_status(order_id):
     
     return redirect(url_for('admin_order_detail', order_id=order_id))
 
+
+@app.route('/admin/return/<request_id>/update_status', methods=['POST'])
+@requires_admin_auth
+def admin_update_return_request_status(request_id):
+    """Admin updates return/refund request status."""
+    req = None
+    try:
+        req = get_return_request_by_id(request_id)
+        if not req:
+            flash('Không tìm thấy yêu cầu đổi trả', 'error')
+            return redirect(url_for('admin_orders'))
+
+        new_status = (request.form.get('status') or '').strip()
+        admin_note = (request.form.get('note') or '').strip()
+        refund_amount_raw = (request.form.get('refund_amount') or '').strip()
+        refund_amount = None
+
+        if refund_amount_raw:
+            try:
+                refund_amount = float(refund_amount_raw)
+            except ValueError:
+                flash('Số tiền hoàn không hợp lệ', 'error')
+                return redirect(url_for('admin_order_detail', order_id=req.get('order_id')))
+
+        ok, err, _ = update_return_request_status(
+            request_id=request_id,
+            new_status=new_status,
+            admin_note=admin_note,
+            refund_amount=refund_amount,
+            actor_role='admin',
+            actor_id=(session.get('user_email') or ADMIN_USERNAME)
+        )
+
+        if ok:
+            flash(f'Đã cập nhật yêu cầu #{request_id}', 'success')
+        else:
+            flash(err or 'Không thể cập nhật yêu cầu đổi trả', 'error')
+    except Exception as e:
+        app.logger.error(f'Error updating return request status: {e}')
+        flash('Lỗi khi cập nhật yêu cầu đổi trả', 'error')
+
+    next_url = (request.form.get('next') or '').strip()
+    if next_url.startswith('/admin/returns'):
+        return redirect(next_url)
+
+    order_id = req.get('order_id') if req else ''
+    if order_id:
+        return redirect(url_for('admin_order_detail', order_id=order_id))
+    return redirect(url_for('admin_orders'))
+
 @app.route('/admin/products')
 @requires_admin_auth
 def admin_products():
     """Admin products management page"""
     try:
         products = load_products()
+        clear_filters = (request.args.get('clear_filters') or '').strip() in ['1', 'true', 'on']
+        filters_submitted = (request.args.get('filters_submitted') or '').strip() in ['1', 'true', 'on']
+        restored_from_session = False
+
+        if clear_filters:
+            filter_low_variant = False
+            filter_no_variant = False
+            session.pop('admin_products_filter_low_variant', None)
+            session.pop('admin_products_filter_no_variant', None)
+        elif filters_submitted:
+            # User explicitly submitted filter form, so absent checkbox means False.
+            filter_low_variant = (request.args.get('f_low_variant') or '').strip() in ['1', 'true', 'on']
+            filter_no_variant = (request.args.get('f_no_variant') or '').strip() in ['1', 'true', 'on']
+            session['admin_products_filter_low_variant'] = filter_low_variant
+            session['admin_products_filter_no_variant'] = filter_no_variant
+        else:
+            # Backward compatibility for old single-select query param.
+            legacy_filter = (request.args.get('inventory') or '').strip().lower()
+            if legacy_filter in ['low_variant', 'no_variant']:
+                filter_low_variant = legacy_filter == 'low_variant'
+                filter_no_variant = legacy_filter == 'no_variant'
+                session['admin_products_filter_low_variant'] = filter_low_variant
+                session['admin_products_filter_no_variant'] = filter_no_variant
+            else:
+                filter_low_variant = bool(session.get('admin_products_filter_low_variant', False))
+                filter_no_variant = bool(session.get('admin_products_filter_no_variant', False))
+                restored_from_session = filter_low_variant or filter_no_variant
+
+        low_variant_count = 0
+        no_variant_count = 0
+        for product in products:
+            variants = product.get('variants') if isinstance(product.get('variants'), list) else []
+            if any(int(v.get('stock', 0)) < LOW_STOCK_THRESHOLD for v in variants):
+                low_variant_count += 1
+            if not variants:
+                no_variant_count += 1
+
+        if filter_low_variant or filter_no_variant:
+            filtered_products = []
+            for product in products:
+                variants = product.get('variants') if isinstance(product.get('variants'), list) else []
+                is_low_variant = any(int(v.get('stock', 0)) < LOW_STOCK_THRESHOLD for v in variants)
+                is_no_variant = not variants
+                if (filter_low_variant and is_low_variant) or (filter_no_variant and is_no_variant):
+                    filtered_products.append(product)
+            products = filtered_products
+
         products = sorted(products, key=lambda x: x.get('created_at', ''), reverse=True)
+
+        if filter_low_variant and filter_no_variant:
+            inventory_filter = 'combined'
+        elif filter_low_variant:
+            inventory_filter = 'low_variant'
+        elif filter_no_variant:
+            inventory_filter = 'no_variant'
+        else:
+            inventory_filter = 'all'
+
+        current_filter_args = {}
+        if filter_low_variant:
+            current_filter_args['f_low_variant'] = '1'
+        if filter_no_variant:
+            current_filter_args['f_no_variant'] = '1'
+
+        current_products_url = url_for('admin_products', **current_filter_args) if current_filter_args else url_for('admin_products')
         
-        return render_template('admin_products.html', products=products)
+        return render_template(
+            'admin_products.html',
+            products=products,
+            inventory_filter=inventory_filter,
+            low_variant_count=low_variant_count,
+            no_variant_count=no_variant_count,
+            filter_low_variant=filter_low_variant,
+            filter_no_variant=filter_no_variant,
+            current_products_url=current_products_url,
+            restored_from_session=restored_from_session
+        )
     except Exception as e:
         app.logger.error(f'Error loading products: {e}')
         flash('Lỗi khi tải danh sách sản phẩm', 'error')
         return redirect(url_for('profile'))
 
+
+@app.route('/admin/products/migrate-default-variant', methods=['POST'])
+@requires_admin_auth
+def admin_migrate_products_default_variant():
+    """Migrate legacy products to default variant inventory shape."""
+    next_url = (request.form.get('next') or '').strip()
+    try:
+        updated_count = migrate_legacy_products_to_default_variant()
+        if updated_count > 0:
+            flash(f'Đã chuyển {updated_count} sản phẩm sang biến thể mặc định', 'success')
+        else:
+            flash('Không có sản phẩm cũ cần chuyển đổi', 'info')
+    except Exception as e:
+        app.logger.error(f'Error migrating products to default variant: {e}')
+        flash('Lỗi khi chuyển đổi dữ liệu biến thể', 'error')
+
+    if next_url.startswith('/admin/products'):
+        return redirect(next_url)
+    return redirect(url_for('admin_products'))
+
 @app.route('/admin/product/add', methods=['GET', 'POST'])
 @requires_admin_auth
 def admin_add_product():
     """Add new product"""
+    next_url = (request.values.get('next') or '').strip()
     if request.method == 'POST':
         try:
+            variants = parse_variant_lines(request.form.get('variants_text', ''))
+            stock_value = int(request.form.get('stock', 0))
+
             product_data = {
                 'name': request.form.get('name', '').strip(),
                 'category': request.form.get('category', 'pesticide'),
                 'price': int(request.form.get('price', 0)),
                 'description': request.form.get('description', '').strip(),
                 'image': request.form.get('image', 'images/tomato.jpg'),
-                'stock': int(request.form.get('stock', 0)),
+                'stock': sum(v.get('stock', 0) for v in variants) if variants else max(0, stock_value),
                 'sold': 0,
                 'rating_avg': 0,
                 'rating_count': 0,
                 'status': 'active'
             }
+
+            if variants:
+                product_data['variants'] = variants
             
             save_product(product_data)
             flash('Đã thêm sản phẩm thành công', 'success')
+            if next_url.startswith('/admin/products'):
+                return redirect(next_url)
             return redirect(url_for('admin_products'))
         except Exception as e:
             app.logger.error(f'Error adding product: {e}')
             flash('Lỗi khi thêm sản phẩm', 'error')
     
-    return render_template('admin_product_form.html', product=None)
+    return render_template('admin_product_form.html', product=None, next_url=next_url)
 
 @app.route('/admin/product/<int:product_id>/edit', methods=['GET', 'POST'])
 @requires_admin_auth
 def admin_edit_product(product_id):
     """Edit product"""
+    next_url = (request.values.get('next') or '').strip()
     product = get_product_by_id(product_id)
     if not product:
         flash('Không tìm thấy sản phẩm', 'error')
+        if next_url.startswith('/admin/products'):
+            return redirect(next_url)
         return redirect(url_for('admin_products'))
     
     if request.method == 'POST':
         try:
+            variants = parse_variant_lines(request.form.get('variants_text', ''))
+
             product['name'] = request.form.get('name', '').strip()
             product['category'] = request.form.get('category', 'pesticide')
             product['price'] = int(request.form.get('price', 0))
             product['description'] = request.form.get('description', '').strip()
             product['image'] = request.form.get('image', 'images/tomato.jpg')
-            product['stock'] = int(request.form.get('stock', 0))
+            if variants:
+                product['variants'] = variants
+                product['stock'] = sum(v.get('stock', 0) for v in variants)
+            else:
+                product.pop('variants', None)
+                product['stock'] = int(request.form.get('stock', 0))
             product['status'] = request.form.get('status', 'active')
             
             save_product(product)
             flash('Đã cập nhật sản phẩm thành công', 'success')
+            if next_url.startswith('/admin/products'):
+                return redirect(next_url)
             return redirect(url_for('admin_products'))
         except Exception as e:
             app.logger.error(f'Error updating product: {e}')
             flash('Lỗi khi cập nhật sản phẩm', 'error')
     
-    return render_template('admin_product_form.html', product=product)
+    return render_template('admin_product_form.html', product=product, next_url=next_url)
 
 @app.route('/admin/product/<int:product_id>/delete', methods=['POST'])
 @requires_admin_auth
 def admin_delete_product(product_id):
     """Delete product"""
+    next_url = (request.form.get('next') or '').strip()
     try:
         delete_product(product_id)
         flash('Đã xóa sản phẩm', 'success')
@@ -7925,6 +8874,8 @@ def admin_delete_product(product_id):
         app.logger.error(f'Error deleting product: {e}')
         flash('Lỗi khi xóa sản phẩm', 'error')
     
+    if next_url.startswith('/admin/products'):
+        return redirect(next_url)
     return redirect(url_for('admin_products'))
 
 
@@ -9727,6 +10678,12 @@ def crop_management():
         return redirect(url_for('index'))
     
     return render_template('crop_management.html')
+    
+@app.route('/crop-yield-prediction')
+@login_required
+def crop_yield_prediction():
+    """Crop yield prediction page"""
+    return render_template('crop_yield_prediction.html')
 
 @app.route('/api/crops', methods=['GET'])
 @login_required
@@ -9796,6 +10753,8 @@ def api_add_crop():
             'health_status': 'healthy',  # healthy, monitoring, diseased
             'yield_target': data.get('yield_target', ''),
             'yield_actual': None,
+            'estimated_price_per_kg': data.get('estimated_price_per_kg', ''),
+            'sale_price_per_kg': data.get('sale_price_per_kg', ''),
             'location': data.get('location', ''),
             'notes': data.get('notes', ''),
             'expenses': [],
@@ -9875,7 +10834,8 @@ def api_update_crop(crop_id):
                                 # Update fields
                                 for key in ['crop_name', 'variety', 'area', 'location', 'notes', 
                                            'status', 'stage', 'health_status', 'yield_target', 
-                                           'yield_actual', 'actual_harvest', 'expected_harvest']:
+                                           'yield_actual', 'actual_harvest', 'expected_harvest',
+                                           'estimated_price_per_kg', 'sale_price_per_kg']:
                                     if key in data:
                                         crop[key] = data[key]
                                 crop['updated_at'] = datetime.utcnow().isoformat()
@@ -10047,6 +11007,309 @@ def api_delete_crop(crop_id):
     except Exception as e:
         app.logger.error(f'Error deleting crop: {e}')
         return jsonify({'ok': False, 'error': 'Không thể xóa'}), 500
+
+
+def _parse_numeric_value(raw_value):
+    """Parse number from text like '2.5', '2,5', '2000 kg', '45.000'."""
+    if raw_value is None:
+        return None
+
+    if isinstance(raw_value, (int, float)):
+        return float(raw_value)
+
+    text = str(raw_value).strip()
+    if not text:
+        return None
+
+    matches = re.findall(r'-?[\d.,]+', text)
+    if not matches:
+        return None
+
+    token = matches[0]
+    if token.count(',') == 1 and token.count('.') == 0:
+        token = token.replace(',', '.')
+    else:
+        token = token.replace(',', '')
+
+    try:
+        return float(token)
+    except ValueError:
+        return None
+
+
+def _crop_stage_risk_adjustment(stage):
+    """Return score adjustment and recommendations by crop stage."""
+    stage_key = (stage or '').strip().lower()
+    mapping = {
+        'seedling': {
+            'delta': 1,
+            'recommendation': 'Cây con nhạy cảm với ẩm độ cao, ưu tiên thông thoáng và tưới nhẹ.'
+        },
+        'vegetative': {
+            'delta': 0,
+            'recommendation': 'Giai đoạn sinh trưởng cần cân đối nước và đạm, tránh dư ẩm kéo dài.'
+        },
+        'flowering': {
+            'delta': 1,
+            'recommendation': 'Giai đoạn ra hoa dễ rụng hoa khi thời tiết bất lợi, theo dõi độ ẩm sát sao.'
+        },
+        'fruiting': {
+            'delta': 1,
+            'recommendation': 'Giai đoạn kết trái cần kiểm soát nấm bệnh trên tán lá và quả non.'
+        },
+        'completed': {
+            'delta': -1,
+            'recommendation': 'Mùa vụ gần hoàn tất, duy trì chăm sóc tối thiểu và chuẩn bị tổng kết.'
+        }
+    }
+    return mapping.get(stage_key, {'delta': 0, 'recommendation': ''})
+
+
+def _compute_crop_weather_risk(crop):
+    """Compute weather risk with stage adjustment for a crop."""
+    location = (crop.get('location') or '').strip() or 'Hanoi'
+    cache_key = f'crop:risk:{location.lower()}'
+    weather = get_cached_weather(cache_key)
+    if not weather:
+        weather = fetch_weather_from_api(city=location)
+        if weather:
+            cache_weather(cache_key, weather)
+
+    if not weather:
+        return {
+            'available': False,
+            'message': 'Không lấy được dữ liệu thời tiết hiện tại',
+            'weather': None,
+            'risk': None
+        }
+
+    risk = assess_disease_risk_from_weather(weather)
+    stage_adjustment = _crop_stage_risk_adjustment(crop.get('stage'))
+    adjusted_score = max(0, int(risk.get('risk_score', 0)) + int(stage_adjustment['delta']))
+
+    if adjusted_score >= 6:
+        level = 'high'
+        level_text = 'Cao'
+    elif adjusted_score >= 3:
+        level = 'medium'
+        level_text = 'Trung bình'
+    else:
+        level = 'low'
+        level_text = 'Thấp'
+
+    recommendations = list(risk.get('recommendations', []))
+    if stage_adjustment['recommendation']:
+        recommendations.append(stage_adjustment['recommendation'])
+
+    return {
+        'available': True,
+        'weather': weather,
+        'risk': {
+            **risk,
+            'risk_level': level,
+            'risk_text': level_text,
+            'risk_score': adjusted_score,
+            'stage': crop.get('stage', ''),
+            'recommendations': recommendations
+        }
+    }
+
+
+def _generate_weekly_plan(crop, risk_payload):
+    """Generate a simple next-7-day care plan based on stage and risk."""
+    today = datetime.utcnow().date()
+    stage = (crop.get('stage') or '').strip().lower()
+    risk_level = ((risk_payload or {}).get('risk') or {}).get('risk_level', 'low')
+
+    stage_tasks = {
+        'seedling': ['Tưới nhẹ buổi sáng', 'Kiểm tra độ ẩm giá thể', 'Theo dõi sâu ăn lá non'],
+        'vegetative': ['Tưới theo độ ẩm đất', 'Tỉa lá già sát gốc', 'Bổ sung phân cân đối'],
+        'flowering': ['Theo dõi rụng hoa', 'Tưới ổn định tránh sốc nước', 'Bổ sung vi lượng nếu cần'],
+        'fruiting': ['Kiểm tra nứt quả', 'Tăng kali theo khuyến nghị', 'Kiểm tra nấm bệnh trên lá'],
+        'completed': ['Dọn vệ sinh vườn', 'Ghi nhận năng suất', 'Chuẩn bị đất cho vụ mới']
+    }
+
+    base_tasks = stage_tasks.get(stage, ['Kiểm tra vườn tổng quát', 'Ghi nhận tình trạng cây'])
+    if risk_level == 'high':
+        base_tasks.append('Phun phòng bệnh theo hướng dẫn và kiểm tra lại sau 48 giờ')
+    elif risk_level == 'medium':
+        base_tasks.append('Tăng tần suất kiểm tra bệnh lên mỗi ngày')
+
+    weekly_plan = []
+    for idx, task in enumerate(base_tasks[:5]):
+        due_date = (today + timedelta(days=idx + 1)).isoformat()
+        weekly_plan.append({
+            'title': task,
+            'task_type': 'other',
+            'frequency': 'once',
+            'next_due': due_date,
+            'priority': 'high' if risk_level == 'high' else 'normal'
+        })
+
+    return weekly_plan
+
+
+def _calculate_crop_finance(crop):
+    """Calculate P/L summary for a crop."""
+    expenses = crop.get('expenses', []) if isinstance(crop.get('expenses'), list) else []
+    total_expenses = 0.0
+    for item in expenses:
+        try:
+            total_expenses += float(item.get('amount', 0) or 0)
+        except (TypeError, ValueError):
+            continue
+
+    yield_actual = _parse_numeric_value(crop.get('yield_actual'))
+    yield_target = _parse_numeric_value(crop.get('yield_target'))
+    sale_price = _parse_numeric_value(crop.get('sale_price_per_kg'))
+    estimated_price = _parse_numeric_value(crop.get('estimated_price_per_kg'))
+
+    revenue_actual = (yield_actual or 0) * (sale_price or 0) if yield_actual is not None and sale_price is not None else None
+    revenue_estimated = (yield_target or 0) * (estimated_price or 0) if yield_target is not None and estimated_price is not None else None
+
+    profit_actual = revenue_actual - total_expenses if revenue_actual is not None else None
+    roi_percent = ((profit_actual / total_expenses) * 100) if (profit_actual is not None and total_expenses > 0) else None
+
+    return {
+        'total_expenses': round(total_expenses, 2),
+        'yield_actual_kg': yield_actual,
+        'yield_target_kg': yield_target,
+        'sale_price_per_kg': sale_price,
+        'estimated_price_per_kg': estimated_price,
+        'revenue_actual': round(revenue_actual, 2) if revenue_actual is not None else None,
+        'revenue_estimated': round(revenue_estimated, 2) if revenue_estimated is not None else None,
+        'profit_actual': round(profit_actual, 2) if profit_actual is not None else None,
+        'roi_percent': round(roi_percent, 2) if roi_percent is not None else None
+    }
+
+
+@app.route('/api/crops/<crop_id>/dashboard', methods=['GET'])
+@login_required
+def api_crop_dashboard(crop_id):
+    """Get crop dashboard data: reminders, risk, weekly plan, finance."""
+    try:
+        user_id = session.get('user_id')
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        crop = None
+
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if row.get('id') == crop_id and row.get('user_id') == user_id:
+                        crop = row
+                        break
+
+        if not crop:
+            return {'ok': False, 'error': 'Không tìm thấy mùa vụ'}, 404
+
+        schedules = [
+            s for s in load_care_schedule(user_id)
+            if s.get('crop_id') == crop_id and s.get('active', True)
+        ]
+        schedules = sorted(schedules, key=lambda x: x.get('next_due', ''))
+
+        risk_payload = _compute_crop_weather_risk(crop)
+        weekly_plan = _generate_weekly_plan(crop, risk_payload)
+        finance = _calculate_crop_finance(crop)
+
+        return {
+            'ok': True,
+            'crop_id': crop_id,
+            'reminders': schedules,
+            'risk': risk_payload,
+            'weekly_plan': weekly_plan,
+            'finance': finance
+        }
+    except Exception as e:
+        app.logger.error(f'Error getting crop dashboard: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/crops/<crop_id>/reminder', methods=['POST'])
+@login_required
+def api_add_crop_reminder(crop_id):
+    """Create reminder for crop care calendar."""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json(silent=True) or {}
+
+        title = (data.get('title') or '').strip()
+        next_due = (data.get('next_due') or '').strip()
+        if not title or not next_due:
+            return {'ok': False, 'error': 'Thiếu tiêu đề hoặc ngày nhắc'}, 400
+
+        schedule = {
+            'id': str(uuid4()),
+            'user_id': user_id,
+            'crop_id': crop_id,
+            'title': title,
+            'description': (data.get('description') or '').strip(),
+            'task_type': (data.get('task_type') or 'other').strip(),
+            'frequency': (data.get('frequency') or 'once').strip(),
+            'next_due': next_due,
+            'active': True,
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+
+        save_care_schedule(schedule)
+        return {'ok': True, 'schedule': schedule, 'message': 'Đã tạo nhắc việc'}
+    except Exception as e:
+        app.logger.error(f'Error creating crop reminder: {e}')
+        return {'ok': False, 'error': str(e)}, 500
+
+
+@app.route('/api/crops/<crop_id>/weekly-plan/apply', methods=['POST'])
+@login_required
+def api_apply_crop_weekly_plan(crop_id):
+    """Apply generated weekly plan into care schedule reminders."""
+    try:
+        user_id = session.get('user_id')
+        dashboard = api_crop_dashboard(crop_id)
+
+        # api_crop_dashboard returns tuple on error
+        if isinstance(dashboard, tuple):
+            payload, status_code = dashboard
+            if status_code != 200:
+                return payload, status_code
+            dashboard = payload
+
+        if not dashboard.get('ok'):
+            return {'ok': False, 'error': 'Không thể tạo kế hoạch'}, 500
+
+        created = []
+        for item in dashboard.get('weekly_plan', []):
+            schedule = {
+                'id': str(uuid4()),
+                'user_id': user_id,
+                'crop_id': crop_id,
+                'title': item.get('title', ''),
+                'description': 'Kế hoạch tự động theo tuần',
+                'task_type': item.get('task_type', 'other'),
+                'frequency': item.get('frequency', 'once'),
+                'next_due': item.get('next_due'),
+                'active': True,
+                'created_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            save_care_schedule(schedule)
+            created.append(schedule)
+
+        return {
+            'ok': True,
+            'created_count': len(created),
+            'schedules': created,
+            'message': f'Đã thêm {len(created)} nhắc việc từ kế hoạch tuần'
+        }
+    except Exception as e:
+        app.logger.error(f'Error applying weekly plan: {e}')
+        return {'ok': False, 'error': str(e)}, 500
 
 
 @app.route('/history/clear', methods=['POST'])
@@ -13101,6 +14364,430 @@ def api_contact_admin():
     except Exception as e:
         app.logger.exception('Error in api_contact_admin')
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ============= CROP YIELD PREDICTION ROUTES =============
+
+@app.route('/api/crops/<crop_id>/predict-yield', methods=['POST'])
+@login_required
+def api_predict_crop_yield(crop_id):
+    """Get yield prediction for a crop"""
+    try:
+        user_id = session.get('user_id')
+        
+        # Get crop details
+        estimate = get_yield_estimate(crop_id, user_id)
+        if not estimate:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        prediction = estimate['prediction']
+        
+        # Save prediction record
+        prediction_record = {
+            'id': f"pred_{crop_id}_{int(datetime.utcnow().timestamp())}",
+            'user_id': user_id,
+            'crop_id': crop_id,
+            'timestamp': datetime.utcnow().isoformat(),
+            'prediction': prediction,
+            'crop_info': {
+                'name': estimate['crop_name'],
+                'variety': estimate['variety'],
+                'area': estimate['area'],
+                'stage': estimate['current_stage']
+            }
+        }
+        
+        save_yield_prediction(prediction_record)
+        
+        return jsonify({
+            'ok': True,
+            'crop_id': crop_id,
+            'prediction': prediction,
+            'message': f"Dự đoán: {prediction['estimated_kg']:.0f}kg (khoảng: {prediction['min_kg']:.0f} - {prediction['max_kg']:.0f}kg)"
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error predicting yield: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/crops/<crop_id>/yield-estimate', methods=['GET'])
+@login_required
+def api_get_yield_estimate(crop_id):
+    """Get current yield estimate (without saving)"""
+    try:
+        user_id = session.get('user_id')
+        
+        estimate = get_yield_estimate(crop_id, user_id)
+        if not estimate:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        return jsonify({
+            'ok': True,
+            'estimate': estimate
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error getting yield estimate: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/crops/<crop_id>/actual-yield', methods=['POST'])
+@login_required
+def api_log_actual_yield(crop_id):
+    """Log actual harvest yield"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        
+        actual_yield = data.get('yield_kg')
+        harvest_date = data.get('harvest_date', datetime.now().strftime('%Y-%m-%d'))
+        notes = data.get('notes', '')
+        quality = data.get('quality', 'normal')  # excellent, normal, poor
+        
+        if not actual_yield:
+            return jsonify({'ok': False, 'error': 'Thiếu thông tin năng suất'}), 400
+        
+        try:
+            actual_yield = float(actual_yield)
+        except:
+            return jsonify({'ok': False, 'error': 'Năng suất phải là số'}), 400
+        
+        # Update crop record
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        updated_crops = []
+        found = False
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                crop['yield_actual'] = actual_yield
+                                crop['actual_harvest'] = harvest_date
+                                crop['status'] = 'harvested'
+                                crop['stage'] = 'completed'
+                                crop['updated_at'] = datetime.utcnow().isoformat()
+                                
+                                # Add harvest activity
+                                if crop.get('activities'):
+                                    crop['activities'].append({
+                                        'date': harvest_date,
+                                        'activity': 'Thu hoạch',
+                                        'note': f"Thu hoạch: {actual_yield}kg (chất lượng: {quality})"
+                                    })
+                                
+                                found = True
+                            
+                            updated_crops.append(crop)
+                        except json.JSONDecodeError:
+                            continue
+        
+        if not found:
+            return jsonify({'ok': False, 'error': 'Không tìm thấy mùa vụ'}), 404
+        
+        # Write back
+        with open(crops_file, 'w', encoding='utf-8') as f:
+            for crop in updated_crops:
+                f.write(json.dumps(crop, ensure_ascii=False) + '\n')
+        
+        # Save yield record
+        get_estimate = get_yield_estimate(crop_id, user_id)
+        predicted_yield = get_estimate['prediction']['estimated_kg'] if get_estimate else 0
+        
+        yield_record = {
+            'id': f"yield_{crop_id}_{int(datetime.utcnow().timestamp())}",
+            'user_id': user_id,
+            'crop_id': crop_id,
+            'predicted_kg': predicted_yield,
+            'actual_kg': actual_yield,
+            'accuracy_pct': calculate_yield_accuracy(predicted_yield, actual_yield),
+            'harvest_date': harvest_date,
+            'quality': quality,
+            'notes': notes,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        yield_file = BASE_DIR / 'data' / 'yield_predictions.jsonl'
+        with open(yield_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(yield_record, ensure_ascii=False) + '\n')
+        
+        app.logger.info(f'Yield recorded for crop {crop_id}: {actual_yield}kg')
+        
+        return jsonify({
+            'ok': True,
+            'message': f'Đã ghi lại năng suất: {actual_yield}kg',
+            'accuracy_pct': yield_record['accuracy_pct'],
+            'comparison': f"Dự đoán: {predicted_yield:.0f}kg, Thực tế: {actual_yield}kg"
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error logging actual yield: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/api/analytics/yield-comparison', methods=['GET'])
+@login_required
+def api_yield_comparison():
+    """Compare predicted vs actual yields"""
+    try:
+        user_id = session.get('user_id')
+        
+        yield_file = BASE_DIR / 'data' / 'yield_predictions.jsonl'
+        comparisons = []
+        
+        if yield_file.exists():
+            with open(yield_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            record = json.loads(line)
+                            if record.get('user_id') == user_id:
+                                comparisons.append(record)
+                        except json.JSONDecodeError:
+                            continue
+        
+        # Calculate stats
+        if comparisons:
+            accuracies = [c['accuracy_pct'] for c in comparisons if c.get('accuracy_pct') is not None]
+            
+            avg_accuracy = sum(accuracies) / len(accuracies) if accuracies else 0
+            overestimate = sum(1 for c in comparisons if c.get('accuracy_pct', 0) < 0)
+            underestimate = sum(1 for c in comparisons if c.get('accuracy_pct', 0) > 0)
+            
+            stats = {
+                'total_harvests': len(comparisons),
+                'avg_accuracy_pct': round(avg_accuracy, 1),
+                'overestimate_count': overestimate,
+                'underestimate_count': underestimate,
+                'best_prediction': max(comparisons, key=lambda x: abs(x.get('accuracy_pct', 0)))['crop_id'] if comparisons else None,
+            }
+        else:
+            stats = {
+                'total_harvests': 0,
+                'avg_accuracy_pct': 0,
+                'overestimate_count': 0,
+                'underestimate_count': 0,
+            }
+        
+        return jsonify({
+            'ok': True,
+            'stats': stats,
+            'comparisons': sorted(comparisons, key=lambda x: x['timestamp'], reverse=True)[:20]
+        })
+    
+    except Exception as e:
+        app.logger.error(f'Error getting yield comparison: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+# ============= CROP YIELD PREDICTION HELPERS =============
+
+def calculate_yield_prediction(crop):
+    """
+    Calculate estimated crop yield based on crop characteristics
+    
+    Features:
+    - Base yield by variety
+    - Area multiplier
+    - Days to maturity
+    - Care activities (positive impact)
+    - Health status (negative if diseased)
+    - Expenses level (higher expenses = better inputs)
+    """
+    try:
+        # Base yield by crop variety (kg/m² under ideal conditions)
+        base_yields = {
+            'cherry tomato': 2.5, 'cherry': 2.5,
+            'beefsteak': 1.8, 'beef': 1.8,
+            'roma': 2.2, 'roma vf': 2.2,
+            'cocktail': 2.3,
+            'heirloom': 1.5,
+            'plum': 2.0,
+        }
+        
+        # Get variety name and find base yield
+        variety_lower = crop.get('variety', '').lower()
+        base_yield_per_m2 = 2.0  # Default
+        
+        for key, value in base_yields.items():
+            if key in variety_lower:
+                base_yield_per_m2 = value
+                break
+        
+        # Calculate area in m²
+        area_str = crop.get('area', '0').replace('m²', '').replace(',', '').strip()
+        try:
+            area_m2 = float(area_str)
+        except:
+            area_m2 = 500  # Default
+        
+        # Base yield = base_yield_per_m2 * area
+        base_production = base_yield_per_m2 * area_m2
+        
+        # Multipliers
+        yield_multiplier = 1.0
+        
+        # 1. Days to maturity factor (affects final yield timing accuracy)
+        planting_date = crop.get('planting_date', '')
+        expected_harvest = crop.get('expected_harvest', '')
+        
+        if planting_date and expected_harvest:
+            try:
+                from datetime import datetime
+                p_date = datetime.fromisoformat(planting_date)
+                h_date = datetime.fromisoformat(expected_harvest)
+                days_to_harvest = (h_date - p_date).days
+                
+                # Optimal days: 60-90 for most tomato varieties
+                if 60 <= days_to_harvest <= 120:
+                    yield_multiplier *= 1.0  # Optimal
+                elif days_to_harvest < 60:
+                    yield_multiplier *= 0.8  # Too fast, undersized fruit
+                else:
+                    yield_multiplier *= 1.1  # More time = some improvement
+            except:
+                pass
+        
+        # 2. Care activities factor
+        activities_count = len(crop.get('activities', []))
+        # More care activities = better management
+        if activities_count >= 5:
+            yield_multiplier *= 1.15
+        elif activities_count >= 3:
+            yield_multiplier *= 1.08
+        
+        # 3. Health status factor
+        health_status = crop.get('health_status', 'healthy')
+        if health_status == 'diseased':
+            yield_multiplier *= 0.6  # 40% loss from disease
+        elif health_status == 'monitoring':
+            yield_multiplier *= 0.85  # 15% potential loss
+        # 'healthy' = 1.0x
+        
+        # 4. Expense level factor (quality of inputs)
+        expenses = crop.get('expenses', [])
+        total_expense = sum(e.get('amount', 0) for e in expenses)
+        
+        # Better budget = better inputs
+        expense_per_m2 = total_expense / area_m2 if area_m2 > 0 else 0
+        if expense_per_m2 >= 1000:
+            yield_multiplier *= 1.2  # High investment in inputs
+        elif expense_per_m2 >= 500:
+            yield_multiplier *= 1.1  # Medium investment
+        
+        # 5. Crop stage factor (for growing crops)
+        stage = crop.get('stage', 'seedling')
+        status = crop.get('status', 'planning')
+        
+        if status == 'harvested':
+            # Already harvested - use actual yield if available
+            actual_yield = crop.get('yield_actual')
+            if actual_yield:
+                try:
+                    return float(actual_yield)
+                except:
+                    pass
+        elif status == 'growing':
+            # Adjust prediction based on current stage
+            if stage == 'fruiting':
+                yield_multiplier *= 1.1  # Advanced stage = good sign
+            elif stage == 'flowering':
+                yield_multiplier *= 1.0
+            elif stage == 'vegetative':
+                yield_multiplier *= 0.9  # Early stage
+        
+        # Final prediction
+        predicted_yield = base_production * yield_multiplier
+        
+        # Add some randomness/confidence interval (±10%)
+        confidence_range = predicted_yield * 0.1
+        
+        return {
+            'estimated_kg': round(predicted_yield, 0),
+            'min_kg': round(predicted_yield - confidence_range, 0),
+            'max_kg': round(predicted_yield + confidence_range, 0),
+            'confidence_pct': min(95, max(50, 70 + (activities_count * 3))),
+            'base_yield': base_production,
+            'multiplier': round(yield_multiplier, 2),
+            'factors': {
+                'variety': variety_lower,
+                'area_m2': area_m2,
+                'health_status': health_status,
+                'activities': activities_count,
+                'expenses': total_expense,
+            }
+        }
+    
+    except Exception as e:
+        app.logger.error(f"Error calculating yield prediction: {e}")
+        return {
+            'estimated_kg': 0,
+            'min_kg': 0,
+            'max_kg': 0,
+            'confidence_pct': 0,
+            'error': str(e)
+        }
+
+def get_yield_estimate(crop_id, user_id):
+    """Get current yield estimate for a crop"""
+    try:
+        crops_file = BASE_DIR / 'data' / 'crops.jsonl'
+        
+        if crops_file.exists():
+            with open(crops_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            crop = json.loads(line)
+                            if crop['id'] == crop_id and crop['user_id'] == user_id:
+                                prediction = calculate_yield_prediction(crop)
+                                return {
+                                    'crop_id': crop_id,
+                                    'crop_name': crop.get('crop_name'),
+                                    'variety': crop.get('variety'),
+                                    'area': crop.get('area'),
+                                    'current_stage': crop.get('stage'),
+                                    'prediction': prediction,
+                                    'target_yield': crop.get('yield_target'),
+                                    'actual_yield': crop.get('yield_actual')
+                                }
+                        except json.JSONDecodeError:
+                            continue
+        
+        return None
+    
+    except Exception as e:
+        app.logger.error(f"Error getting yield estimate: {e}")
+        return None
+
+def save_yield_prediction(prediction_data):
+    """Save yield prediction to file"""
+    try:
+        yield_file = BASE_DIR / 'data' / 'yield_predictions.jsonl'
+        
+        with open(yield_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(prediction_data, ensure_ascii=False) + '\n')
+        
+        return prediction_data
+    
+    except Exception as e:
+        app.logger.error(f"Error saving yield prediction: {e}")
+        return None
+
+def calculate_yield_accuracy(predicted_kg, actual_kg):
+    """
+    Calculate accuracy percentage between predicted and actual yield
+    Returns: % difference (can be negative if underestimated)
+    """
+    try:
+        if actual_kg == 0 or predicted_kg == 0:
+            return None
+        
+        accuracy = ((actual_kg - predicted_kg) / predicted_kg) * 100
+        return round(accuracy, 1)
+    
+    except:
+        return None
 
 
 # ============= FLASK ERROR HANDLERS =============

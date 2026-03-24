@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+
+{% block title %}Yêu cầu đổi trả/hoàn tiền | Admin{% endblock %}
+
+{% set status_vi = {
+  'requested': 'Đang chờ duyệt',
+  'approved': 'Đã duyệt',
+  'received': 'Đã nhận hàng hoàn',
+  'exchange_shipped': 'Đã gửi hàng đổi',
+  'refunded': 'Đã hoàn tiền',
+  'completed': 'Hoàn tất',
+  'rejected': 'Từ chối',
+  'cancelled': 'Đã hủy'
+} %}
+
+{% block content %}
+<style>
+  .admin-container {
+    max-width: 1500px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .admin-title {
+    margin: 0;
+    font-size: 2rem;
+    color: #2d5016;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-link {
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: white;
+    font-weight: 600;
+    background: #6c757d;
+  }
+
+  .btn-link.primary {
+    background: var(--tomato-500);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.25rem;
+  }
+
+  .stat-card {
+    background: white;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #e6ece9;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="dark"] .stat-card {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: #60757d;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #bb4827;
+  }
+
+  .filters {
+    background: white;
+    border: 1px solid #e6ece9;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  [data-theme="dark"] .filters {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+  }
+
+  .filters select,
+  .filters button {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #d4ded9;
+  }
+
+  .filters button {
+    background: var(--tomato-500);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .tab-link {
+    display: inline-block;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d4ded9;
+    color: #2f3f45;
+    background: #f6fbf9;
+    font-weight: 600;
+  }
+
+  .tab-link.active {
+    color: white;
+    background: var(--tomato-500);
+    border-color: var(--tomato-500);
+  }
+
+  .requests-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e6ece9;
+  }
+
+  [data-theme="dark"] .requests-table {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+  }
+
+  .table-header,
+  .table-row {
+    display: grid;
+    grid-template-columns: 110px 100px 140px 160px 1fr 130px 230px;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+  }
+
+  .table-header {
+    font-weight: 700;
+    background: #f2f7f5;
+    border-bottom: 1px solid #e1ebe7;
+  }
+
+  .table-row {
+    border-bottom: 1px solid #edf2ef;
+  }
+
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .badge.requested { background: #fff3cd; color: #856404; }
+  .badge.approved { background: #cfe2ff; color: #084298; }
+  .badge.received { background: #d1ecf1; color: #0c5460; }
+  .badge.exchange_shipped { background: #e2d4ff; color: #452c8d; }
+  .badge.refunded { background: #d4edda; color: #155724; }
+  .badge.completed { background: #d1e7dd; color: #0f5132; }
+  .badge.rejected { background: #f8d7da; color: #842029; }
+  .badge.cancelled { background: #f1f3f5; color: #495057; }
+
+  .mini-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mini-form select,
+  .mini-form input,
+  .mini-form button {
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #d7dfdb;
+  }
+
+  .mini-form button {
+    background: #2f8f46;
+    color: white;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .order-link {
+    color: #1565c0;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .logs-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e6ece9;
+  }
+
+  [data-theme="dark"] .logs-table {
+    background: var(--bg-secondary);
+    border-color: var(--bg-tertiary);
+  }
+
+  .logs-table .table-header,
+  .logs-table .table-row {
+    display: grid;
+    grid-template-columns: 150px 170px 140px 120px 150px 1fr 120px;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+  }
+
+  @media (max-width: 1280px) {
+    .table-header,
+    .table-row {
+      grid-template-columns: 1fr;
+    }
+
+    .table-header {
+      display: none;
+    }
+
+    .table-row {
+      gap: 7px;
+      padding: 14px;
+    }
+  }
+</style>
+
+<div class="admin-container">
+  <div class="admin-header">
+    <h1 class="admin-title">↩️ Yêu cầu đổi trả/hoàn tiền</h1>
+    <div class="header-actions">
+      <a href="{{ url_for('admin_orders') }}" class="btn-link primary">📦 Quản lý đơn hàng</a>
+      <a href="{{ url_for('profile') }}" class="btn-link">← Quay lại</a>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Tổng yêu cầu</div><div class="stat-value">{{ stats.total }}</div></div>
+    <div class="stat-card"><div class="stat-label">Đang chờ duyệt</div><div class="stat-value">{{ stats.requested }}</div></div>
+    <div class="stat-card"><div class="stat-label">Đã duyệt</div><div class="stat-value">{{ stats.approved }}</div></div>
+    <div class="stat-card"><div class="stat-label">Đã hoàn tiền</div><div class="stat-value">{{ stats.refunded }}</div></div>
+    <div class="stat-card"><div class="stat-label">Hoàn tất</div><div class="stat-value">{{ stats.completed }}</div></div>
+    <div class="stat-card"><div class="stat-label">Từ chối</div><div class="stat-value">{{ stats.rejected }}</div></div>
+    <div class="stat-card"><div class="stat-label">Tổng logs</div><div class="stat-value">{{ stats.log_total }}</div></div>
+  </div>
+
+  <div class="tabs">
+    <a class="tab-link {% if active_tab == 'requests' %}active{% endif %}" href="{{ url_for('admin_returns', tab='requests') }}">Yêu cầu</a>
+    <a class="tab-link {% if active_tab == 'logs' %}active{% endif %}" href="{{ url_for('admin_returns', tab='logs') }}">Nhật ký kiểm tra</a>
+  </div>
+
+  {% if active_tab == 'requests' %}
+  <form method="GET" action="{{ url_for('admin_returns') }}" class="filters">
+    <input type="hidden" name="tab" value="requests">
+    <select name="status">
+      <option value="all" {% if selected_status == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+      <option value="requested" {% if selected_status == 'requested' %}selected{% endif %}>{{ status_vi.get('requested') }}</option>
+      <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>{{ status_vi.get('approved') }}</option>
+      <option value="received" {% if selected_status == 'received' %}selected{% endif %}>{{ status_vi.get('received') }}</option>
+      <option value="exchange_shipped" {% if selected_status == 'exchange_shipped' %}selected{% endif %}>{{ status_vi.get('exchange_shipped') }}</option>
+      <option value="refunded" {% if selected_status == 'refunded' %}selected{% endif %}>{{ status_vi.get('refunded') }}</option>
+      <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>{{ status_vi.get('completed') }}</option>
+      <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>{{ status_vi.get('rejected') }}</option>
+      <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>{{ status_vi.get('cancelled') }}</option>
+    </select>
+
+    <select name="action">
+      <option value="all" {% if selected_action == 'all' %}selected{% endif %}>Tất cả hình thức</option>
+      <option value="refund" {% if selected_action == 'refund' %}selected{% endif %}>Hoàn tiền</option>
+      <option value="exchange" {% if selected_action == 'exchange' %}selected{% endif %}>Đổi hàng</option>
+    </select>
+
+    <button type="submit">Lọc</button>
+  </form>
+
+  <div class="requests-table">
+    <div class="table-header">
+      <div>Mã YC</div>
+      <div>Hình thức</div>
+      <div>Đơn hàng</div>
+      <div>Khách hàng</div>
+      <div>Lý do</div>
+      <div>Trạng thái</div>
+      <div>Xử lý nhanh</div>
+    </div>
+
+    {% if requests %}
+      {% for req in requests %}
+      <div class="table-row">
+        <div>
+          <strong>#{{ req.id }}</strong><br>
+          <small style="color: #6b7f86;">{{ req.created_at[:16].replace('T', ' ') }}</small>
+        </div>
+        <div>{{ 'Hoàn tiền' if req.action == 'refund' else 'Đổi hàng' }}</div>
+        <div>
+          <a class="order-link" href="{{ url_for('admin_order_detail', order_id=req.order_id) }}">#{{ req.order_id }}</a><br>
+          <small>{{ "{:,.0f}".format(req.order_total or 0) }}đ</small>
+        </div>
+        <div>{{ req.order_customer_name }}</div>
+        <div>
+          <div>{{ req.reason }}</div>
+          {% if req.details %}
+          <small style="color: #6b7f86;">{{ req.details }}</small>
+          {% endif %}
+        </div>
+        <div>
+          <span class="badge {{ req.status }}">{{ status_vi.get(req.status, req.status) }}</span>
+          {% if req.timeline and req.timeline|length > 0 %}
+          {% set last_step = req.timeline[-1] %}
+          {% if last_step.actor_role or last_step.actor_id %}
+          <div style="margin-top: 6px; font-size: 0.78rem; color: #60757d;">
+            bởi {{ last_step.actor_role or 'actor' }}: {{ last_step.actor_id or 'N/A' }}
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+        <div>
+          <form method="POST" action="{{ url_for('admin_update_return_request_status', request_id=req.id) }}" class="mini-form">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <select name="status" required>
+              <option value="requested" {% if req.status == 'requested' %}selected{% endif %}>{{ status_vi.get('requested') }}</option>
+              <option value="approved" {% if req.status == 'approved' %}selected{% endif %}>{{ status_vi.get('approved') }}</option>
+              <option value="received" {% if req.status == 'received' %}selected{% endif %}>{{ status_vi.get('received') }}</option>
+              <option value="exchange_shipped" {% if req.status == 'exchange_shipped' %}selected{% endif %}>{{ status_vi.get('exchange_shipped') }}</option>
+              <option value="refunded" {% if req.status == 'refunded' %}selected{% endif %}>{{ status_vi.get('refunded') }}</option>
+              <option value="completed" {% if req.status == 'completed' %}selected{% endif %}>{{ status_vi.get('completed') }}</option>
+              <option value="rejected" {% if req.status == 'rejected' %}selected{% endif %}>{{ status_vi.get('rejected') }}</option>
+              <option value="cancelled" {% if req.status == 'cancelled' %}selected{% endif %}>{{ status_vi.get('cancelled') }}</option>
+            </select>
+            {% if req.action == 'refund' %}
+            <input type="number" name="refund_amount" min="0" step="1000" placeholder="Số tiền hoàn (tùy chọn)">
+            {% endif %}
+            <input type="text" name="note" placeholder="Ghi chú nội bộ (tùy chọn)">
+            <button type="submit">Cập nhật</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding: 2rem; text-align: center; color: #78909c;">Không có yêu cầu đổi trả/hoàn tiền nào.</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <form method="GET" action="{{ url_for('admin_returns') }}" class="filters">
+    <input type="hidden" name="tab" value="logs">
+
+    <select name="actor">
+      <option value="all" {% if selected_actor == 'all' %}selected{% endif %}>Tất cả admin</option>
+      {% for admin_actor in admin_actors %}
+      <option value="{{ admin_actor|lower }}" {% if selected_actor == admin_actor|lower %}selected{% endif %}>{{ admin_actor }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="to_status">
+      <option value="all" {% if selected_to_status == 'all' %}selected{% endif %}>Tất cả trạng thái đến</option>
+      <option value="requested" {% if selected_to_status == 'requested' %}selected{% endif %}>{{ status_vi.get('requested') }}</option>
+      <option value="approved" {% if selected_to_status == 'approved' %}selected{% endif %}>{{ status_vi.get('approved') }}</option>
+      <option value="received" {% if selected_to_status == 'received' %}selected{% endif %}>{{ status_vi.get('received') }}</option>
+      <option value="exchange_shipped" {% if selected_to_status == 'exchange_shipped' %}selected{% endif %}>{{ status_vi.get('exchange_shipped') }}</option>
+      <option value="refunded" {% if selected_to_status == 'refunded' %}selected{% endif %}>{{ status_vi.get('refunded') }}</option>
+      <option value="completed" {% if selected_to_status == 'completed' %}selected{% endif %}>{{ status_vi.get('completed') }}</option>
+      <option value="rejected" {% if selected_to_status == 'rejected' %}selected{% endif %}>{{ status_vi.get('rejected') }}</option>
+      <option value="cancelled" {% if selected_to_status == 'cancelled' %}selected{% endif %}>{{ status_vi.get('cancelled') }}</option>
+    </select>
+
+    <input type="date" name="start_date" value="{{ selected_start_date }}">
+    <input type="date" name="end_date" value="{{ selected_end_date }}">
+
+    <button type="submit">Lọc</button>
+    <a href="{{ url_for('admin_export_return_logs_csv', actor=selected_actor, to_status=selected_to_status, start_date=selected_start_date, end_date=selected_end_date) }}"
+       class="tab-link"
+       style="background: #2f8f46; color: white; border-color: #2f8f46;">
+      Xuất CSV
+    </a>
+  </form>
+
+  <div class="logs-table">
+    <div class="table-header">
+      <div>Thời gian</div>
+      <div>Admin</div>
+      <div>Request</div>
+      <div>Action</div>
+      <div>Trạng thái</div>
+      <div>Ghi chú</div>
+      <div>IP</div>
+    </div>
+
+    {% if logs %}
+      {% for log in logs %}
+      <div class="table-row">
+        <div>{{ log.timestamp[:19].replace('T', ' ') }}</div>
+        <div>{{ log.actor_id or 'N/A' }}<br><small>{{ log.actor_role or '' }}</small></div>
+        <div>
+          <a class="order-link" href="{{ url_for('admin_order_detail', order_id=log.order_id) }}">#{{ log.request_id }}</a><br>
+          <small>đơn #{{ log.order_id }} - {{ log.order_customer_name }}</small>
+        </div>
+        <div>{{ log.action_name }}</div>
+        <div>{{ status_vi.get(log.from_status, log.from_status or 'Mới') }} -> {{ status_vi.get(log.to_status, log.to_status or 'N/A') }}</div>
+        <div>{{ log.note or '-' }}</div>
+        <div>{{ log.ip or '-' }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding: 2rem; text-align: center; color: #78909c;">Không có audit logs phù hợp bộ lọc.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

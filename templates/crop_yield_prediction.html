@@ -1,0 +1,787 @@
+{% extends 'base.html' %}
+
+{% block title %}Dự đoán Năng suất - Tomato AI{% endblock %}
+
+{% block content %}
+<style>
+  .yield-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .yield-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .yield-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+
+  [data-theme="dark"] .yield-header h1 {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .yield-header p {
+    color: #6b7280;
+    font-size: 1.1rem;
+  }
+
+  [data-theme="dark"] .yield-header p {
+    color: #9ca3af;
+  }
+
+  .yield-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+  }
+
+  @media (max-width: 768px) {
+    .yield-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s;
+  }
+
+  [data-theme="dark"] .card {
+    background: #1f2937;
+    border-color: #374151;
+  }
+
+  .card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  [data-theme="dark"] .card-title {
+    color: #f3f4f6;
+  }
+
+  .prediction-box {
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+    border-radius: 12px;
+    padding: 24px;
+    color: white;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .pred-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+
+  .pred-label {
+    font-size: 0.95rem;
+    opacity: 0.95;
+  }
+
+  .pred-range {
+    font-size: 1.2rem;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  [data-theme="dark"] .form-group label {
+    color: #f3f4f6;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+
+  [data-theme="dark"] .form-group input,
+  [data-theme="dark"] .form-group select,
+  [data-theme="dark"] .form-group textarea {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+  }
+
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+  }
+
+  .btn-orange {
+    background: #f59e0b;
+    color: white;
+  }
+
+  .btn-orange:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  }
+
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .stat-item {
+    background: #f3f4f6;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  [data-theme="dark"] .stat-item {
+    background: #374151;
+  }
+
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #f59e0b;
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 5px;
+  }
+
+  [data-theme="dark"] .stat-label {
+    color: #9ca3af;
+  }
+
+  .comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+
+  .comparison-table th {
+    background: #f3f4f6;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+  }
+
+  [data-theme="dark"] .comparison-table th {
+    background: #374151;
+    color: #f3f4f6;
+    border-color: #4b5563;
+  }
+
+  .comparison-table td {
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    color: #4b5563;
+  }
+
+  [data-theme="dark"] .comparison-table td {
+    border-color: #4b5563;
+    color: #9ca3af;
+  }
+
+  .comparison-table tr:nth-child(even) {
+    background: #f9fafb;
+  }
+
+  [data-theme="dark"] .comparison-table tr:nth-child(even) {
+    background: #111827;
+  }
+
+  .accuracy-good {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .accuracy-poor {
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+  }
+
+  [data-theme="dark"] .empty-state {
+    color: #9ca3af;
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+  }
+
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid;
+  }
+
+  .alert-success {
+    background: #ecfdf5;
+    border-color: #10b981;
+    color: #065f46;
+  }
+
+  [data-theme="dark"] .alert-success {
+    background: #064e3b;
+    border-color: #10b981;
+    color: #d1fae5;
+  }
+
+  .alert-info {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1e40af;
+  }
+
+  [data-theme="dark"] .alert-info {
+    background: #0c2340;
+    border-color: #3b82f6;
+    color: #bfdbfe;
+  }
+
+  .loader {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #f59e0b;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<div class="yield-container">
+  <div class="yield-header">
+    <h1>🌾 Dự đoán Năng suất Cà chua</h1>
+    <p>Dự đoán năng suất dựa trên điều kiện mùa vụ, quản lý chăm sóc và lịch sử</p>
+  </div>
+
+  <!-- Tab navigation -->
+  <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+    <button class="btn btn-orange" onclick="switchTab('predict')">📊 Dự đoán</button>
+    <button class="btn btn-secondary" onclick="switchTab('history')">📈 Lịch sử</button>
+    <button class="btn btn-secondary" onclick="switchTab('analytics')">📉 Phân tích</button>
+  </div>
+
+  <!-- TAB 1: PREDICT -->
+  <div id="predict-tab" class="tab-content active">
+    <div class="yield-grid">
+      <!-- Left: Crop Selection -->
+      <div class="card">
+        <div class="card-title">🌱 Chọn mùa vụ</div>
+        
+        <div class="form-group">
+          <label>Mùa vụ</label>
+          <select id="crop-select" onchange="loadCropDetails()">
+            <option value="">-- Chọn mùa vụ --</option>
+          </select>
+        </div>
+
+        <div id="crop-details-box" style="display: none;">
+          <div class="form-group">
+            <label>Tên cà chua</label>
+            <input type="text" id="crop-name" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Loại giống</label>
+            <input type="text" id="crop-variety" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Diện tích</label>
+            <input type="text" id="crop-area" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Giai đoạn hiện tại</label>
+            <input type="text" id="crop-stage" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Sức khỏe</label>
+            <input type="text" id="crop-health" readonly>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Prediction Result -->
+      <div class="card">
+        <div class="card-title">📊 Kết quả dự đoán</div>
+        
+        <div id="prediction-loading" style="display: none; text-align: center;">
+          <div class="loader" style="margin: 20px auto;"></div>
+          <p>Đang dự đoán năng suất...</p>
+        </div>
+
+        <div id="prediction-result" style="display: none;">
+          <div class="prediction-box">
+            <div class="pred-label">Dự đoán năng suất</div>
+            <div class="pred-value" id="pred-value">0</div>
+            <div class="pred-label">kg</div>
+            
+            <div class="pred-range">
+              <strong>Khoảng:</strong> <span id="pred-range">0 - 0</span> kg
+              <br>
+              <strong>Độ tin cậy:</strong> <span id="pred-confidence">0</span>%
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Chỉ tiêu</div>
+              <div class="stat-value" id="target-yield">0</div>
+              <div class="stat-label">kg</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">So với dự tính</div>
+              <div class="stat-value" id="variance-pct">0%</div>
+              <div class="stat-label" id="variance-text">vượt chỉ tiêu</div>
+            </div>
+          </div>
+
+          <button class="btn btn-orange" onclick="getPrediction()" style="width: 100%; justify-content: center;">
+            ⚡ Cập nhật dự đoán
+          </button>
+        </div>
+
+        <div id="prediction-empty" style="text-align: center; padding: 40px 20px;">
+          <p style="color: #6b7280;">Chọn mùa vụ để xem dự đoán năng suất</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actual Harvest Section -->
+    <div class="card" id="harvest-section" style="display: none;">
+      <div class="card-title">✂️ Ghi nhận thu hoạch thực tế</div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="form-group">
+          <label>Năng suất thực tế (kg)</label>
+          <input type="number" id="actual-yield" placeholder="Nhập số lượng kg" step="0.1" min="0">
+        </div>
+
+        <div class="form-group">
+          <label>Ngày thu hoạch</label>
+          <input type="date" id="harvest-date" value="">
+        </div>
+
+        <div class="form-group">
+          <label>Chất lượng sản phẩm</label>
+          <select id="harvest-quality">
+            <option value="normal">Bình thường</option>
+            <option value="excellent">Xuất sắc</option>
+            <option value="poor">Không tốt</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Ghi chú</label>
+          <textarea id="harvest-notes" placeholder="Ghi chú về thu hoạch..." rows="2"></textarea>
+        </div>
+      </div>
+
+      <button class="btn btn-orange" onclick="logActualYield()" style="width: 100%; justify-content: center;">
+        💾 Lưu năng suất thu hoạch
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 2: HISTORY -->
+  <div id="history-tab" class="tab-content" style="display: none;">
+    <div class="card">
+      <div class="card-title">📝 Lịch sử dự đoán</div>
+      <table class="comparison-table" id="history-table">
+        <thead>
+          <tr>
+            <th>Mùa vụ</th>
+            <th>Dự đoán (kg)</th>
+            <th>Thực tế (kg)</th>
+            <th>Độ chính xác</th>
+            <th>Ngày thu hoạch</th>
+            <th>Chất lượng</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr>
+            <td colspan="6" style="text-align: center; color: #9ca3af;">Chưa có dữ liệu</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 3: ANALYTICS -->
+  <div id="analytics-tab" class="tab-content" style="display: none;">
+    <div class="card">
+      <div class="card-title">📊 Phân tích độ chính xác</div>
+      
+      <div id="analytics-empty" style="text-align: center; padding: 40px 20px;">
+        <p style="color: #6b7280;">Chưa có đủ dữ liệu để phân tích</p>
+      </div>
+
+      <div id="analytics-content" style="display: none;">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-label">Tổng lần thu hoạch</div>
+            <div class="stat-value" id="total-harvests">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Độ chính xác trung bình</div>
+            <div class="stat-value" id="avg-accuracy">0%</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Dự đoán thấp hơn</div>
+            <div class="stat-value" id="underestimate-count">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Dự đoán cao hơn</div>
+            <div class="stat-value" id="overestimate-count">0</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+          <p style="color: #1e40af; margin: 0;">
+            <strong>💡 Mẹo:</strong> Theo dõi lịch sử dự đoán của bạn giúp cải thiện độ chính xác trong các mùa vụ tiếp theo.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Global state
+  let crops = [];
+  let currentCrop = null;
+
+  // Load crops on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    loadCrops();
+    document.getElementById('harvest-date').valueAsDate = new Date();
+  });
+
+  function switchTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').style.display = 'block';
+    
+    // Update buttons
+    document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('btn-orange'));
+    event.target.classList.add('btn-orange');
+
+    // Load data for specific tabs
+    if (tabName === 'history') {
+      loadPredictionHistory();
+    } else if (tabName === 'analytics') {
+      loadAnalytics();
+    }
+  }
+
+  async function loadCrops() {
+    try {
+      const response = await fetch('/api/crops');
+      const data = await response.json();
+      
+      if (data.ok) {
+        crops = data.crops || [];
+        updateCropSelect();
+      }
+    } catch (error) {
+      console.error('Error loading crops:', error);
+      showAlert('Lỗi tải danh sách mùa vụ', 'error');
+    }
+  }
+
+  function updateCropSelect() {
+    const select = document.getElementById('crop-select');
+    const currentValue = select.value;
+    
+    select.innerHTML = '<option value="">-- Chọn mùa vụ --</option>';
+    
+    crops.forEach(crop => {
+      const option = document.createElement('option');
+      option.value = crop.id;
+      option.textContent = `${crop.crop_name} (${crop.variety}) - ${crop.area}`;
+      select.appendChild(option);
+    });
+    
+    if (currentValue) {
+      select.value = currentValue;
+      loadCropDetails();
+    }
+  }
+
+  function loadCropDetails() {
+    const cropId = document.getElementById('crop-select').value;
+    
+    if (!cropId) {
+      document.getElementById('crop-details-box').style.display = 'none';
+      document.getElementById('prediction-empty').style.display = 'block';
+      document.getElementById('prediction-result').style.display = 'none';
+      document.getElementById('harvest-section').style.display = 'none';
+      return;
+    }
+
+    currentCrop = crops.find(c => c.id === cropId);
+    
+    if (currentCrop) {
+      // Fill in details
+      document.getElementById('crop-name').value = currentCrop.crop_name;
+      document.getElementById('crop-variety').value = currentCrop.variety;
+      document.getElementById('crop-area').value = currentCrop.area;
+      document.getElementById('crop-stage').value = currentCrop.stage || 'N/A';
+      document.getElementById('crop-health').value = currentCrop.health_status || 'healthy';
+      
+      // Show details and prediction sections
+      document.getElementById('crop-details-box').style.display = 'block';
+      document.getElementById('prediction-empty').style.display = 'none';
+      document.getElementById('prediction-result').style.display = 'block';
+      document.getElementById('harvest-section').style.display = currentCrop.status === 'growing' ? 'block' : 'none';
+      
+      // Load prediction
+      getPrediction();
+    }
+  }
+
+  async function getPrediction() {
+    if (!currentCrop) return;
+
+    document.getElementById('prediction-loading').style.display = 'block';
+    document.getElementById('prediction-result').style.display = 'none';
+
+    try {
+      const response = await fetch(`/api/crops/${currentCrop.id}/yield-estimate`);
+      const data = await response.json();
+      
+      if (data.ok) {
+        const estimate = data.estimate;
+        const pred = estimate.prediction;
+        
+        // Display prediction
+        document.getElementById('pred-value').textContent = Math.round(pred.estimated_kg);
+        document.getElementById('pred-range').textContent = `${Math.round(pred.min_kg)} - ${Math.round(pred.max_kg)}`;
+        document.getElementById('pred-confidence').textContent = pred.confidence_pct;
+        
+        // Target yield comparison
+        const targetYield = estimate.target_yield ? parseFloat(estimate.target_yield) : 0;
+        document.getElementById('target-yield').textContent = Math.round(targetYield) || '0';
+        
+        if (targetYield > 0) {
+          const variance = ((pred.estimated_kg - targetYield) / targetYield * 100);
+          document.getElementById('variance-pct').textContent = Math.round(variance) + '%';
+          document.getElementById('variance-text').textContent = variance >= 0 ? 'vượt chỉ tiêu' : 'dưới chỉ tiêu';
+          document.getElementById('variance-pct').className = variance >= 0 ? 'accuracy-good' : 'accuracy-poor';
+        }
+        
+        document.getElementById('prediction-loading').style.display = 'none';
+        document.getElementById('prediction-result').style.display = 'block';
+      } else {
+        showAlert(data.error || 'Lỗi dự đoán', 'error');
+      }
+    } catch (error) {
+      console.error('Error getting prediction:', error);
+      showAlert('Lỗi kết nối', 'error');
+    }
+  }
+
+  async function logActualYield() {
+    if (!currentCrop) return;
+
+    const yieldKg = document.getElementById('actual-yield').value;
+    const harvestDate = document.getElementById('harvest-date').value;
+    const quality = document.getElementById('harvest-quality').value;
+    const notes = document.getElementById('harvest-notes').value;
+
+    if (!yieldKg) {
+      showAlert('Vui lòng nhập năng suất thu hoạch', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/crops/${currentCrop.id}/actual-yield`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          yield_kg: yieldKg,
+          harvest_date: harvestDate,
+          quality: quality,
+          notes: notes
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.ok) {
+        showAlert(data.message, 'success');
+        
+        // Clear form
+        document.getElementById('actual-yield').value = '';
+        document.getElementById('harvest-notes').value = '';
+        
+        // Reload crops and show updated prediction
+        await loadCrops();
+        loadCropDetails();
+      } else {
+        showAlert(data.error || 'Lỗi lưu năng suất', 'error');
+      }
+    } catch (error) {
+      console.error('Error logging yield:', error);
+      showAlert('Lỗi kết nối', 'error');
+    }
+  }
+
+  async function loadPredictionHistory() {
+    try {
+      const response = await fetch('/api/analytics/yield-comparison');
+      const data = await response.json();
+      
+      if (data.ok && data.comparisons && data.comparisons.length > 0) {
+        const tbody = document.getElementById('history-body');
+        tbody.innerHTML = '';
+        
+        data.comparisons.forEach(comp => {
+          const row = document.createElement('tr');
+          const accuracy = comp.accuracy_pct;
+          const accuracyClass = accuracy >= 0 ? 'accuracy-good' : 'accuracy-poor';
+          
+          row.innerHTML = `
+            <td>${comp.crop_id}</td>
+            <td>${Math.round(comp.predicted_kg)}kg</td>
+            <td>${Math.round(comp.actual_kg)}kg</td>
+            <td class="${accuracyClass}">${accuracy >= 0 ? '+' : ''}${accuracy}%</td>
+            <td>${comp.harvest_date}</td>
+            <td>${comp.quality}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+    }
+  }
+
+  async function loadAnalytics() {
+    try {
+      const response = await fetch('/api/analytics/yield-comparison');
+      const data = await response.json();
+      
+      if (data.ok && data.stats) {
+        const stats = data.stats;
+        
+        if (stats.total_harvests > 0) {
+          document.getElementById('analytics-empty').style.display = 'none';
+          document.getElementById('analytics-content').style.display = 'block';
+          
+          document.getElementById('total-harvests').textContent = stats.total_harvests;
+          document.getElementById('avg-accuracy').textContent = stats.avg_accuracy_pct + '%';
+          document.getElementById('underestimate-count').textContent = stats.underestimate_count;
+          document.getElementById('overestimate-count').textContent = stats.overestimate_count;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    }
+  }
+
+  function showAlert(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-info';
+    const icon = type === 'success' ? '✓' : 'ℹ';
+    
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = `alert ${alertClass}`;
+    alert.textContent = `${icon} ${message}`;
+    
+    // Insert at top of container
+    const container = document.querySelector('.yield-container');
+    container.insertBefore(alert, container.firstChild);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => alert.remove(), 4000);
+  }
+</script>
+{% endblock %}

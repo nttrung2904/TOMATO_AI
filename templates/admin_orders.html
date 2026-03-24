@@ -303,7 +303,10 @@
 <div class="admin-container">
   <div class="admin-header">
     <h1 class="admin-title">📦 Quản lý đơn hàng</h1>
-    <a href="{{ url_for('profile') }}" class="back-btn">← Quay lại</a>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <a href="{{ url_for('admin_returns') }}" class="btn-view">↩️ Đổi trả/Hoàn tiền</a>
+      <a href="{{ url_for('profile') }}" class="back-btn">← Quay lại</a>
+    </div>
   </div>
   
   <!-- Statistics -->
