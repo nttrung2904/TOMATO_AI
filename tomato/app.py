@@ -28,7 +28,7 @@ from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, make_response, jsonify
 from functools import wraps
 import tensorflow as tf
-import shutil 
+import shutil
 from PIL import Image
 from utils import (
     compute_hist, 
@@ -48,6 +48,10 @@ from collections import Counter, defaultdict
 import time
 from typing import Dict, List, Optional, Tuple, Any
 import requests
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
 from payment import VNPayPayment, MoMoPayment, get_client_ip
 from notifications import (
     init_email_service, 
@@ -196,6 +200,17 @@ POS_SIM_THRESH = float(os.environ.get('POS_SIM_THRESH', os.environ.get('POS_SIM_
 NEG_SIM_THRESH = float(os.environ.get('NEG_SIM_THRESH', os.environ.get('NEG_SIM_THRES', '0.75')))
 MODELS_DIR = BASE_DIR / "model"
 DATA_DIR = BASE_DIR / "data"
+PREDICTION_HISTORY_FILE = DATA_DIR / 'prediction_history.jsonl'
+POINTS_HISTORY_FILE = DATA_DIR / 'points_history.jsonl'
+USERS_FILE = DATA_DIR / 'users.jsonl'
+POSTS_FILE = DATA_DIR / 'posts.jsonl'
+POST_COMMENTS_FILE = DATA_DIR / 'post_comments.jsonl'
+POST_LIKES_FILE = DATA_DIR / 'post_likes.jsonl'
+USER_FOLLOWS_FILE = DATA_DIR / 'user_follows.jsonl'
+SAVED_POSTS_FILE = DATA_DIR / 'saved_posts.jsonl'
+POST_SHARES_FILE = DATA_DIR / 'post_shares.jsonl'
+FARM_PROGRESS_FILE = DATA_DIR / 'farm_progress.jsonl'
+ADDRESSES_FILE = DATA_DIR / 'addresses.jsonl'
 ALLOWED_EXT = {'png', 'jpg', 'jpeg'}
 IMG_SIZE = (224, 224)
 CLASS_NAMES = [
@@ -589,6 +604,10 @@ OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY', '')
 WEATHER_CACHE = {}  # Simple in-memory cache: {cache_key: (data, timestamp)}
 WEATHER_CACHE_TTL = 600  # 10 minutes
 
+# ----------------- Chat Expert Avatar Configuration -----------------
+EXPERT_AVATAR_MODEL_URL = os.environ.get('EXPERT_AVATAR_MODEL_URL', '').strip()
+EXPERT_AVATAR_POSTER_URL = os.environ.get('EXPERT_AVATAR_POSTER_URL', '').strip()
+
 if OPENWEATHER_API_KEY:
     masked_key = f"{OPENWEATHER_API_KEY[:8]}***{OPENWEATHER_API_KEY[-4:]}" if len(OPENWEATHER_API_KEY) > 12 else "***"
     print(f"[OK] OpenWeatherMap API configured: {masked_key}")
@@ -980,16 +999,18 @@ def get_gemini_response(user_question: str) -> str:
         model_names.insert(0, LAST_WORKING_MODEL)
     
     # Tạo prompt
-    system_prompt = """Bạn là chuyên gia cà chua. Trả lời HOÀN CHỈNH, TỰ NHIÊN bằng tiếng Việt.
+    system_prompt = """Bạn là chuyên gia cà chua thực địa trong vai trợ lý thực tế ảo.
+Trả lời HOÀN CHỈNH, TỰ NHIÊN bằng tiếng Việt, ưu tiên hướng dẫn có thể làm ngay tại vườn.
 
-Nếu hỏi về cà chua: Giải thích rõ ràng, cụ thể, đầy đủ (3-5 câu).
+Nếu hỏi về cà chua: trả lời rõ ràng, cụ thể, hành động được, gồm 3-5 câu.
+Nếu phù hợp, đưa theo cấu trúc ngắn: dấu hiệu -> nguyên nhân -> cách xử lý -> cách phòng ngừa.
 Nếu KHÔNG về cà chua: "Xin lỗi, tôi chỉ trả lời về cà chua."
 
-QUAN TRỌNG: 
-- Trả lời ĐẦY ĐỦ, KHÔNG bỏ dở giữa chừng
+QUAN TRỌNG:
+- Trả lời đầy đủ, không bỏ dở giữa chừng
 - Dùng ngôn ngữ đời thường, dễ hiểu
-- Đi thẳng vào nội dung
-- Kết thúc câu trả lời một cách hoàn chỉnh"""
+- Đi thẳng vào nội dung, tránh lan man
+- Không bịa nguồn hoặc thông tin không chắc chắn"""
     
     full_prompt = f"{system_prompt}\n\nCâu hỏi: {user_question}\n\nTrả lời:"
     
@@ -1622,7 +1643,7 @@ def about_page():
 
 def _read_history_file():
     """Helper function to read and parse history file"""
-    history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+    history_file = PREDICTION_HISTORY_FILE
     history_list = []
     
     if not history_file.exists():
@@ -2178,18 +2199,9 @@ FARM_ITEMS = {
 def _get_farm_progress(user_id):
     """Load farm progress for a user"""
     try:
-        progress_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
-        if not progress_file.exists():
-            return None
-        
-        with open(progress_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    data = json.loads(line.strip())
-                    if data.get('user_id') == user_id:
-                        return data
-                except json.JSONDecodeError:
-                    continue
+        for data in _load_jsonl_records(FARM_PROGRESS_FILE):
+            if data.get('user_id') == user_id:
+                return data
         return None
     except Exception:
         app.logger.exception('Error loading farm progress')
@@ -2198,20 +2210,11 @@ def _get_farm_progress(user_id):
 def _save_farm_progress(user_id, progress_data):
     """Save farm progress for a user"""
     try:
-        progress_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
-        progress_file.parent.mkdir(parents=True, exist_ok=True)
-        
         # Load existing data
-        all_data = []
-        if progress_file.exists():
-            with open(progress_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    try:
-                        data = json.loads(line.strip())
-                        if data.get('user_id') != user_id:
-                            all_data.append(data)
-                    except json.JSONDecodeError:
-                        continue
+        all_data = [
+            data for data in _load_jsonl_records(FARM_PROGRESS_FILE)
+            if data.get('user_id') != user_id
+        ]
         
         # Add new data
         progress_data['user_id'] = user_id
@@ -2219,9 +2222,7 @@ def _save_farm_progress(user_id, progress_data):
         all_data.append(progress_data)
         
         # Write all data
-        with open(progress_file, 'w', encoding='utf-8') as f:
-            for data in all_data:
-                f.write(json.dumps(data, ensure_ascii=False) + '\n')
+        _write_jsonl_records(FARM_PROGRESS_FILE, all_data)
         
         return True
     except Exception:
@@ -2971,9 +2972,47 @@ def do_daily_checkin():
         app.logger.exception('Error in daily checkin')
         return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại sau'}, 500
 
+@app.route('/api/checkin/makeup', methods=['POST'])
+def do_makeup_checkin():
+    """Makeup checkin - costs 1000 VND from wallet"""
+    try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            return {'ok': False, 'error': 'Vui lòng đăng nhập để bù điểm danh'}, 401
+        
+        user_id = session.get('user_id')
+        
+        if user_id == 'admin':
+            return {'ok': False, 'error': 'Admin không thể bù điểm danh'}, 403
+        
+        makeup_result = process_makeup_checkin(user_id)
+        
+        if not makeup_result.get('ok'):
+            return {
+                'ok': False,
+                'error': makeup_result.get('error', 'Không thể bù điểm danh')
+            }, 400
+        
+        # Update session points
+        session['user_points'] = makeup_result.get('total_points', session.get('user_points', 0))
+        
+        return {
+            'ok': True,
+            'message': makeup_result.get('message', 'Bù điểm danh thành công!'),
+            'points_earned': makeup_result.get('points_earned', MAKEUP_CHECKIN_POINTS),
+            'cost': makeup_result.get('cost', MAKEUP_CHECKIN_COST),
+            'wallet_balance': makeup_result.get('wallet_balance', 0),
+            'streak_days': makeup_result.get('streak_days', 0),
+            'total_checkin_days': makeup_result.get('total_checkin_days', 0),
+            'makeup_remaining': makeup_result.get('makeup_remaining', 0)
+        }
+    except Exception as e:
+        app.logger.exception('Error in makeup checkin')
+        return {'ok': False, 'error': 'Lỗi hệ thống. Vui lòng thử lại sau'}, 500
+
 @app.route('/api/checkin/status', methods=['GET'])
 def checkin_status():
-    """Check if user can checkin today"""
+    """Check if user can checkin today and makeup eligibility"""
     try:
         # Check if user is logged in
         if 'user_id' not in session:
@@ -2994,6 +3033,7 @@ def checkin_status():
         
         now = datetime.now()
         today = now.date()
+        current_month = now.strftime('%Y-%m')
         last_checkin_date = None
         
         if user.get('last_checkin'):
@@ -3004,9 +3044,38 @@ def checkin_status():
         
         can_checkin = last_checkin_date != today
         
+        # Check makeup eligibility
+        can_makeup = False
+        makeup_remaining = 0
+        
+        if last_checkin_date and not can_checkin:  # Already checked in today
+            can_makeup = False
+        elif last_checkin_date and (today - last_checkin_date).days == 1:  # Checked in yesterday
+            can_makeup = False
+        elif not last_checkin_date or (today - last_checkin_date).days >= 2:  # Missed 1+ days
+            # Check if remaining makeup quota
+            makeup_month = user.get('makeup_checkins_month', '')
+            makeup_count = user.get('makeup_checkins_this_month', 0)
+            
+            if makeup_month != current_month:
+                makeup_count = 0
+                makeup_remaining = MAKEUP_CHECKIN_MAX_PER_MONTH
+            else:
+                makeup_remaining = max(0, MAKEUP_CHECKIN_MAX_PER_MONTH - makeup_count)
+            
+            can_makeup = makeup_remaining > 0
+        
+        # Get wallet balance for makeup checki
+        wallet = get_user_wallet(user_id)
+        wallet_balance = float(wallet.get('balance', 0))
+        
         return {
             'ok': True,
             'can_checkin': can_checkin,
+            'can_makeup': can_makeup,
+            'makeup_cost': MAKEUP_CHECKIN_COST,
+            'makeup_remaining': makeup_remaining,
+            'wallet_balance': wallet_balance,
             'streak_days': user.get('streak_days', 0),
             'total_checkin_days': user.get('total_checkin_days', 0),
             'last_checkin_date': str(last_checkin_date) if last_checkin_date else None
@@ -4175,6 +4244,11 @@ DAILY_CHECKIN_POINTS = 20
 DAILY_CHECKIN_VOUCHER_INTERVAL = 30
 DAILY_CHECKIN_VOUCHER_VALUE = 20000
 
+# Makeup Checkin Constants
+MAKEUP_CHECKIN_COST = 1000  # 1000 VND per makeup
+MAKEUP_CHECKIN_MAX_PER_MONTH = 5  # Max 5 times per month
+MAKEUP_CHECKIN_POINTS = 20  # Same as regular checkin
+
 
 def process_daily_checkin(user_id):
     """Process a once-per-day check-in reward for a user."""
@@ -4255,21 +4329,125 @@ def process_daily_checkin(user_id):
         app.logger.error(f'Error processing daily check-in: {e}')
         return {'ok': False, 'error': 'Lỗi khi điểm danh'}
 
+def process_makeup_checkin(user_id):
+    """Process a makeup check-in (for missed days) - costs 1000 VND"""
+    try:
+        user = get_user_by_id(user_id)
+        if not user:
+            return {'ok': False, 'error': 'Không tìm thấy người dùng'}
+
+        now = datetime.now()
+        today = now.date()
+        current_month = now.strftime('%Y-%m')
+        makeup_date = today - timedelta(days=1)
+
+        # Parse last check-in date once and reuse for all validations/calculations.
+        last_checkin = user.get('last_checkin')
+        last_checkin_date = None
+        if last_checkin:
+            try:
+                last_checkin_date = datetime.fromisoformat(last_checkin).date()
+                if last_checkin_date == today:
+                    return {'ok': False, 'error': 'Bạn đã điểm danh hoặc bù điểm danh hôm nay rồi'}
+            except ValueError:
+                last_checkin_date = None
+
+        # If user already has check-in for yesterday (or newer), there is no valid day to makeup.
+        if last_checkin_date and last_checkin_date >= makeup_date:
+            return {'ok': False, 'error': 'Bạn không có ngày cần bù điểm danh'}
+
+        # Check wallet balance
+        wallet = get_user_wallet(user_id)
+        balance = float(wallet.get('balance', 0))
+        if balance < MAKEUP_CHECKIN_COST:
+            return {'ok': False, 'error': f'Số dư ví không đủ. Cần {MAKEUP_CHECKIN_COST:,}đ, bạn có {int(balance):,}đ'}
+
+        # Count makeup checkings this month
+        makeup_count = user.get('makeup_checkins_this_month', 0)
+        month_key = user.get('makeup_checkins_month', '')
+        
+        # Reset counter if month changed
+        if month_key != current_month:
+            makeup_count = 0
+
+        if makeup_count >= MAKEUP_CHECKIN_MAX_PER_MONTH:
+            return {'ok': False, 'error': f'Bạn đã dùng hết {MAKEUP_CHECKIN_MAX_PER_MONTH} lần bù điểm danh trong tháng này'}
+
+        # Deduct from wallet
+        debit_tx = add_wallet_transaction(
+            user_id=user_id,
+            amount=-MAKEUP_CHECKIN_COST,
+            transaction_type='makeup_checkin',
+            description=f'Bù điểm danh ({MAKEUP_CHECKIN_COST:,}đ)'
+        )
+
+        if not debit_tx:
+            return {'ok': False, 'error': 'Lỗi khi trừ tiền từ ví'}
+
+        # Add points
+        if not add_points(user_id, MAKEUP_CHECKIN_POINTS, 'makeup_checkin', f'Bù điểm danh (+{MAKEUP_CHECKIN_POINTS} xu)'):
+            # Rollback wallet transaction
+            add_wallet_transaction(
+                user_id=user_id,
+                amount=MAKEUP_CHECKIN_COST,
+                transaction_type='makeup_checkin_refund',
+                description='Hoàn tiền bù điểm danh (lỗi khi thêm xu)'
+            )
+            return {'ok': False, 'error': 'Lỗi khi thêm xu'}
+
+        # Update user checkin info
+        previous_streak = int(user.get('streak_days', 0) or 0)
+
+        # Makeup fills yesterday. Streak only continues if previous check-in was
+        # exactly one day before the makeup target date.
+        if last_checkin_date and (makeup_date - last_checkin_date).days == 1:
+            streak_days = previous_streak + 1
+        else:
+            streak_days = 1
+
+        total_checkin_days = int(user.get('total_checkin_days', 0) or 0) + 1
+        new_makeup_count = makeup_count + 1
+
+        update_ok = update_user(user_id, {
+            'last_checkin': datetime.combine(makeup_date, now.time()).isoformat(),
+            'streak_days': streak_days,
+            'total_checkin_days': total_checkin_days,
+            'makeup_checkins_this_month': new_makeup_count,
+            'makeup_checkins_month': current_month
+        })
+
+        if not update_ok:
+            return {'ok': False, 'error': 'Không thể cập nhật trạng thái bù điểm danh'}
+
+        latest_user = get_user_by_id(user_id) or {}
+        total_points = latest_user.get('points', user.get('points', 0) + MAKEUP_CHECKIN_POINTS)
+        wallet_after = get_user_wallet(user_id)
+        wallet_balance = float(wallet_after.get('balance', 0))
+
+        message = f"Bù điểm danh thành công! +{MAKEUP_CHECKIN_POINTS} xu (Chi phí: {MAKEUP_CHECKIN_COST:,}đ)"
+        message += f"\nLượt bù còn lại tháng này: {MAKEUP_CHECKIN_MAX_PER_MONTH - new_makeup_count}/{MAKEUP_CHECKIN_MAX_PER_MONTH}"
+
+        return {
+            'ok': True,
+            'message': message,
+            'points_earned': MAKEUP_CHECKIN_POINTS,
+            'total_points': total_points,
+            'cost': MAKEUP_CHECKIN_COST,
+            'wallet_balance': wallet_balance,
+            'streak_days': streak_days,
+            'total_checkin_days': total_checkin_days,
+            'makeup_remaining': MAKEUP_CHECKIN_MAX_PER_MONTH - new_makeup_count
+        }
+    except Exception as e:
+        app.logger.error(f'Error processing makeup check-in: {e}')
+        return {'ok': False, 'error': 'Lỗi khi bù điểm danh'}
+
 def get_user_by_email(email):
     """Get user by email"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return None
-        
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    user = json.loads(line.strip())
-                    if user.get('email') == email:
-                        return user
-                except json.JSONDecodeError:
-                    continue
+        for user in load_users():
+            if user.get('email') == email:
+                return user
         return None
     except Exception:
         app.logger.exception('Error getting user')
@@ -4278,9 +4456,6 @@ def get_user_by_email(email):
 def create_user(email, password, full_name):
     """Create new user"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        users_file.parent.mkdir(parents=True, exist_ok=True)
-        
         user = {
             'id': str(uuid4())[:8],
             'email': email,
@@ -4304,9 +4479,8 @@ def create_user(email, password, full_name):
             'quiz_completed': 0,
             'memory_completed': 0
         }
-        
-        with open(users_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(user, ensure_ascii=False) + '\n')
+
+        _append_jsonl_record(USERS_FILE, user)
         
         return user
     except Exception:
@@ -4316,27 +4490,15 @@ def create_user(email, password, full_name):
 def update_user_field(user_id, field, value):
     """Update a specific field in user data"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return False
-        
-        users = []
+        users = load_users()
         updated = False
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    user = json.loads(line.strip())
-                    if user.get('id') == user_id:
-                        user[field] = value
-                        updated = True
-                    users.append(user)
-                except json.JSONDecodeError:
-                    continue
+        for user in users:
+            if user.get('id') == user_id:
+                user[field] = value
+                updated = True
         
         if updated:
-            with open(users_file, 'w', encoding='utf-8') as f:
-                for user in users:
-                    f.write(json.dumps(user, ensure_ascii=False) + '\n')
+            save_users(users)
         
         return updated
     except Exception:
@@ -4346,27 +4508,15 @@ def update_user_field(user_id, field, value):
 def update_user(user_id, updates):
     """Update multiple fields in user data"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return False
-        
-        users = []
+        users = load_users()
         updated = False
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    user = json.loads(line.strip())
-                    if user.get('id') == user_id:
-                        user.update(updates)
-                        updated = True
-                    users.append(user)
-                except json.JSONDecodeError:
-                    continue
+        for user in users:
+            if user.get('id') == user_id:
+                user.update(updates)
+                updated = True
         
         if updated:
-            with open(users_file, 'w', encoding='utf-8') as f:
-                for user in users:
-                    f.write(json.dumps(user, ensure_ascii=False) + '\n')
+            save_users(users)
         
         return updated
     except Exception:
@@ -4453,18 +4603,9 @@ def add_voucher_to_user(user_id, voucher_code, voucher_value, source):
 def get_user_by_id(user_id):
     """Get user by ID"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return None
-        
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    user = json.loads(line.strip())
-                    if user.get('id') == user_id:
-                        return user
-                except json.JSONDecodeError:
-                    continue
+        for user in load_users():
+            if user.get('id') == user_id:
+                return user
         return None
     except Exception:
         app.logger.exception('Error getting user by ID')
@@ -4568,20 +4709,10 @@ def get_user_statistics(user_id):
 def get_user_addresses(user_id):
     """Get all addresses for a user"""
     try:
-        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
-        if not addresses_file.exists():
-            return []
-        
-        addresses = []
-        with open(addresses_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    addr = json.loads(line.strip())
-                    if addr.get('user_id') == user_id:
-                        addresses.append(addr)
-                except json.JSONDecodeError:
-                    continue
-        return addresses
+        return [
+            addr for addr in _load_jsonl_records(ADDRESSES_FILE)
+            if addr.get('user_id') == user_id
+        ]
     except Exception:
         app.logger.exception('Error getting addresses')
         return []
@@ -4589,9 +4720,6 @@ def get_user_addresses(user_id):
 def save_address(user_id, address_data):
     """Save address for user"""
     try:
-        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
-        addresses_file.parent.mkdir(parents=True, exist_ok=True)
-        
         address = {
             'id': str(uuid4())[:8],
             'user_id': user_id,
@@ -4606,25 +4734,13 @@ def save_address(user_id, address_data):
         
         # If this is default, unset other defaults
         if address['is_default']:
-            addresses = []
-            if addresses_file.exists():
-                with open(addresses_file, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        try:
-                            addr = json.loads(line.strip())
-                            if addr.get('user_id') == user_id and addr.get('is_default'):
-                                addr['is_default'] = False
-                            addresses.append(addr)
-                        except json.JSONDecodeError:
-                            continue
-                
-                # Rewrite file
-                with open(addresses_file, 'w', encoding='utf-8') as f:
-                    for addr in addresses:
-                        f.write(json.dumps(addr, ensure_ascii=False) + '\n')
-        
-        with open(addresses_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(address, ensure_ascii=False) + '\n')
+            addresses = _load_jsonl_records(ADDRESSES_FILE)
+            for existing_addr in addresses:
+                if existing_addr.get('user_id') == user_id and existing_addr.get('is_default'):
+                    existing_addr['is_default'] = False
+            _write_jsonl_records(ADDRESSES_FILE, addresses)
+
+        _append_jsonl_record(ADDRESSES_FILE, address)
         
         return address
     except Exception:
@@ -4847,25 +4963,14 @@ def add_address():
 def delete_address(address_id):
     """Delete address"""
     try:
-        addresses_file = BASE_DIR / 'data' / 'addresses.jsonl'
-        if not addresses_file.exists():
+        if not ADDRESSES_FILE.exists():
             return {'ok': False, 'error': 'File not found'}, 404
-        
-        addresses = []
-        with open(addresses_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    addr = json.loads(line.strip())
-                    # Keep if not matching or not user's address
-                    if addr.get('id') != address_id or addr.get('user_id') != session.get('user_id'):
-                        addresses.append(addr)
-                except json.JSONDecodeError:
-                    continue
-        
-        # Rewrite file
-        with open(addresses_file, 'w', encoding='utf-8') as f:
-            for addr in addresses:
-                f.write(json.dumps(addr, ensure_ascii=False) + '\n')
+
+        addresses = [
+            addr for addr in _load_jsonl_records(ADDRESSES_FILE)
+            if addr.get('id') != address_id or addr.get('user_id') != session.get('user_id')
+        ]
+        _write_jsonl_records(ADDRESSES_FILE, addresses)
         
         return {'ok': True}
     except Exception as e:
@@ -9080,19 +9185,9 @@ def set_language(lang):
 
 def load_points_history(user_id=None):
     """Load points history"""
-    history = []
-    points_file = BASE_DIR / 'data' / 'points_history.jsonl'
-    
-    if points_file.exists():
-        with open(points_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        entry = json.loads(line)
-                        if user_id is None or entry.get('user_id') == user_id:
-                            history.append(entry)
-                    except json.JSONDecodeError:
-                        continue
+    history = _load_jsonl_records(POINTS_HISTORY_FILE)
+    if user_id is not None:
+        history = [entry for entry in history if entry.get('user_id') == user_id]
     
     # Sort by created_at descending
     history.sort(key=lambda x: x.get('created_at', ''), reverse=True)
@@ -9100,55 +9195,35 @@ def load_points_history(user_id=None):
 
 def save_points_entry(entry):
     """Save a points history entry"""
-    points_file = BASE_DIR / 'data' / 'points_history.jsonl'
-    points_file.parent.mkdir(parents=True, exist_ok=True)
+    points_file = POINTS_HISTORY_FILE
     
     # Generate ID if not exists
     if 'id' not in entry:
-        history = load_points_history()
-        max_id = 0
-        for h in history:
-            if h.get('id', '').startswith('PH'):
-                try:
-                    num = int(h['id'][2:])
-                    max_id = max(max_id, num)
-                except:
-                    pass
-        entry['id'] = f"PH{max_id + 1:03d}"
+        entry['id'] = _generate_next_prefixed_id(load_points_history(), 'id', 'PH', 3)
     
     # Add timestamp if not exists
     if 'created_at' not in entry:
         entry['created_at'] = datetime.now().isoformat()
     
-    with open(points_file, 'a', encoding='utf-8') as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    _append_jsonl_record(points_file, entry)
 
 def add_points(user_id, points, action, description):
     """Add points to user and record history"""
     try:
         # Update user points
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return False
-        
-        users = []
+        users = load_users()
         updated = False
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    user = json.loads(line)
-                    if user['id'] == user_id:
-                        user['points'] = user.get('points', 0) + points
-                        updated = True
-                    users.append(user)
+        for user in users:
+            if user.get('id') == user_id:
+                user['points'] = user.get('points', 0) + points
+                updated = True
         
         if not updated:
             return False
         
         # Save updated users
-        with open(users_file, 'w', encoding='utf-8') as f:
-            for user in users:
-                f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        if not save_users(users):
+            return False
         
         # Record history
         save_points_entry({
@@ -9168,16 +9243,7 @@ def add_points(user_id, points, action, description):
 def load_users():
     """Load all users from users.jsonl"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return []
-        
-        users = []
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    users.append(json.loads(line))
-        return users
+        return _load_jsonl_records(USERS_FILE)
     except Exception as e:
         app.logger.error(f'Error loading users: {e}')
         return []
@@ -9185,12 +9251,7 @@ def load_users():
 def save_users(users):
     """Save all users to users.jsonl"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        users_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(users_file, 'w', encoding='utf-8') as f:
-            for user in users:
-                f.write(json.dumps(user, ensure_ascii=False) + '\n')
+        _write_jsonl_records(USERS_FILE, users)
         return True
     except Exception as e:
         app.logger.error(f'Error saving users: {e}')
@@ -9199,17 +9260,13 @@ def save_users(users):
 def load_user_history(user_id):
     """Load prediction history for user"""
     try:
-        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
-        if not history_file.exists():
+        if not PREDICTION_HISTORY_FILE.exists():
             return []
-        
-        history = []
-        with open(history_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    entry = json.loads(line)
-                    if entry.get('user_id') == user_id:
-                        history.append(entry)
+
+        history = [
+            entry for entry in _load_jsonl_records(PREDICTION_HISTORY_FILE)
+            if entry.get('user_id') == user_id
+        ]
         return sorted(history, key=lambda x: x.get('timestamp', ''), reverse=True)
     except Exception as e:
         app.logger.error(f'Error loading user history: {e}')
@@ -9218,17 +9275,7 @@ def load_user_history(user_id):
 def load_farm_progress(user_id):
     """Load farm game progress for user"""
     try:
-        farm_file = BASE_DIR / 'data' / 'farm_progress.jsonl'
-        if not farm_file.exists():
-            return None
-        
-        with open(farm_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    progress = json.loads(line)
-                    if progress.get('user_id') == user_id:
-                        return progress
-        return None
+        return _get_farm_progress(user_id)
     except Exception as e:
         app.logger.error(f'Error loading farm progress: {e}')
         return None
@@ -9237,21 +9284,16 @@ def load_farm_progress(user_id):
 def get_leaderboard(limit=10):
     """Get top users by points"""
     try:
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        if not users_file.exists():
-            return []
-        
-        users = []
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    user = json.loads(line)
-                    users.append({
-                        'user_id': user['id'],
-                        'full_name': user.get('full_name', 'Anonymous'),
-                        'email': user.get('email', ''),
-                        'points': user.get('points', 0)
-                    })
+        users = [
+            {
+                'user_id': user.get('id'),
+                'full_name': user.get('full_name', 'Anonymous'),
+                'email': user.get('email', ''),
+                'points': user.get('points', 0)
+            }
+            for user in load_users()
+            if user.get('id')
+        ]
         
         # Sort by points descending
         users.sort(key=lambda x: x['points'], reverse=True)
@@ -9357,28 +9399,23 @@ def redeem_points():
         coupon_code = f"PTS{random.randint(100000, 999999)}"
         
         # Add coupon to user
-        users_file = BASE_DIR / 'data' / 'users.jsonl'
-        users = []
-        with open(users_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    u = json.loads(line)
-                    if u['id'] == user_id:
-                        if 'vouchers' not in u:
-                            u['vouchers'] = []
-                        u['vouchers'].append({
-                            'code': coupon_code,
-                            'value': coupon_value,
-                            'source': 'points_redemption',
-                            'created_at': datetime.now().isoformat(),
-                            'used': False,
-                            'expires_at': (datetime.now() + timedelta(days=30)).isoformat()
-                        })
-                    users.append(u)
-        
-        with open(users_file, 'w', encoding='utf-8') as f:
-            for u in users:
-                f.write(json.dumps(u, ensure_ascii=False) + '\n')
+        users = load_users()
+        for existing_user in users:
+            if existing_user.get('id') == user_id:
+                vouchers = list(existing_user.get('vouchers', []))
+                vouchers.append({
+                    'code': coupon_code,
+                    'value': coupon_value,
+                    'source': 'points_redemption',
+                    'created_at': datetime.now().isoformat(),
+                    'used': False,
+                    'expires_at': (datetime.now() + timedelta(days=30)).isoformat()
+                })
+                existing_user['vouchers'] = vouchers
+                break
+
+        if not save_users(users):
+            return {'ok': False, 'error': 'Lỗi khi cập nhật voucher'}, 500
         
         return {
             'ok': True, 
@@ -9528,24 +9565,57 @@ def _rewrite_jsonl_without_matching(file_path, predicate):
     return removed_count
 
 
+def _load_jsonl_records(file_path):
+    """Load JSONL records from a file, skipping blank/invalid lines."""
+    records = []
+    if not file_path.exists():
+        return records
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return records
+
+
+def _write_jsonl_records(file_path, records):
+    """Rewrite full JSONL file from in-memory records."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for record in records:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def _append_jsonl_record(file_path, record):
+    """Append one JSON record to a JSONL file."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def _generate_next_prefixed_id(records, key, prefix, width=3):
+    """Generate next sequential ID using a string prefix."""
+    max_id = 0
+    for record in records:
+        value = record.get(key, '')
+        if isinstance(value, str) and value.startswith(prefix):
+            try:
+                max_id = max(max_id, int(value[len(prefix):]))
+            except ValueError:
+                continue
+    return f"{prefix}{max_id + 1:0{width}d}"
+
+
 def load_saved_posts(user_id=None):
     """Load saved posts across users or for a single user."""
-    saved_posts = []
-    saved_file = BASE_DIR / 'data' / 'saved_posts.jsonl'
-
-    if saved_file.exists():
-        with open(saved_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if user_id is None or record.get('user_id') == user_id:
-                    saved_posts.append(record)
-
-    return saved_posts
+    records = _load_jsonl_records(SAVED_POSTS_FILE)
+    if user_id is None:
+        return records
+    return [record for record in records if record.get('user_id') == user_id]
 
 
 def get_saved_post_ids(user_id):
@@ -9557,9 +9627,6 @@ def get_saved_post_ids(user_id):
 
 def toggle_saved_post(post_id, user_id):
     """Toggle saved state for a post."""
-    saved_file = BASE_DIR / 'data' / 'saved_posts.jsonl'
-    saved_file.parent.mkdir(parents=True, exist_ok=True)
-
     saved_posts = load_saved_posts()
     existing_record = next(
         (
@@ -9580,9 +9647,7 @@ def toggle_saved_post(post_id, user_id):
         })
         is_saved = True
 
-    with open(saved_file, 'w', encoding='utf-8') as f:
-        for record in saved_posts:
-            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+    _write_jsonl_records(SAVED_POSTS_FILE, saved_posts)
 
     saves_count = len([record for record in saved_posts if record.get('post_id') == post_id])
     update_post(post_id, {'saves': saves_count})
@@ -9592,36 +9657,20 @@ def toggle_saved_post(post_id, user_id):
 
 def load_post_shares(post_id=None):
     """Load share events for community posts."""
-    shares = []
-    shares_file = BASE_DIR / 'data' / 'post_shares.jsonl'
-
-    if shares_file.exists():
-        with open(shares_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if post_id is None or record.get('post_id') == post_id:
-                    shares.append(record)
-
-    return shares
+    records = _load_jsonl_records(POST_SHARES_FILE)
+    if post_id is None:
+        return records
+    return [record for record in records if record.get('post_id') == post_id]
 
 
 def record_post_share(post_id, user_id=None, channel='copy_link'):
     """Record a share event for analytics and counters."""
-    shares_file = BASE_DIR / 'data' / 'post_shares.jsonl'
-    shares_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(shares_file, 'a', encoding='utf-8') as f:
-        f.write(json.dumps({
-            'post_id': post_id,
-            'user_id': user_id,
-            'channel': channel,
-            'created_at': datetime.now().isoformat()
-        }, ensure_ascii=False) + '\n')
+    _append_jsonl_record(POST_SHARES_FILE, {
+        'post_id': post_id,
+        'user_id': user_id,
+        'channel': channel,
+        'created_at': datetime.now().isoformat()
+    })
 
     share_count = len(load_post_shares(post_id))
     update_post(post_id, {'shares': share_count})
@@ -9894,37 +9943,14 @@ def get_social_highlights(current_user_id, posts, suggested_users=None):
 
 def load_posts():
     """Load all posts"""
-    posts = []
-    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
-    
-    if posts_file.exists():
-        with open(posts_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        posts.append(normalize_post(json.loads(line)))
-                    except json.JSONDecodeError:
-                        continue
-    
-    return posts
+    records = _load_jsonl_records(POSTS_FILE)
+    return [normalize_post(record) for record in records]
 
 def save_post(post):
     """Save a new post"""
-    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
-    posts_file.parent.mkdir(parents=True, exist_ok=True)
-    
     # Generate ID if not exists
     if 'id' not in post:
-        posts = load_posts()
-        max_id = 0
-        for p in posts:
-            if p.get('id', '').startswith('POST'):
-                try:
-                    num = int(p['id'][4:])
-                    max_id = max(max_id, num)
-                except:
-                    pass
-        post['id'] = f"POST{max_id + 1:03d}"
+        post['id'] = _generate_next_prefixed_id(load_posts(), 'id', 'POST', 3)
     
     # Add timestamps
     if 'created_at' not in post:
@@ -9938,105 +9964,67 @@ def save_post(post):
     post.setdefault('saves', 0)
     post.setdefault('topics', extract_post_topics(post.get('content', '')))
     
-    with open(posts_file, 'a', encoding='utf-8') as f:
-        f.write(json.dumps(post, ensure_ascii=False) + '\n')
+    _append_jsonl_record(POSTS_FILE, post)
     
     return post
 
 def update_post(post_id, updates):
     """Update post"""
-    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
-    if not posts_file.exists():
+    if not POSTS_FILE.exists():
         return False
     
-    posts = []
+    posts = _load_jsonl_records(POSTS_FILE)
     updated = False
-    with open(posts_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            if line.strip():
-                post = json.loads(line)
-                if post['id'] == post_id:
-                    post.update(updates)
-                    post['updated_at'] = datetime.now().isoformat()
-                    updated = True
-                posts.append(post)
+
+    for post in posts:
+        if post.get('id') == post_id:
+            post.update(updates)
+            post['updated_at'] = datetime.now().isoformat()
+            updated = True
     
     if updated:
-        with open(posts_file, 'w', encoding='utf-8') as f:
-            for post in posts:
-                f.write(json.dumps(post, ensure_ascii=False) + '\n')
+        _write_jsonl_records(POSTS_FILE, posts)
     
     return updated
 
 def delete_post(post_id):
     """Delete post"""
-    posts_file = BASE_DIR / 'data' / 'posts.jsonl'
-    if not posts_file.exists():
+    if not POSTS_FILE.exists():
         return False
     
     posts = []
     deleted = False
-    with open(posts_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            if line.strip():
-                post = json.loads(line)
-                if post['id'] == post_id:
-                    deleted = True
-                else:
-                    posts.append(post)
+    for post in _load_jsonl_records(POSTS_FILE):
+        if post.get('id') == post_id:
+            deleted = True
+        else:
+            posts.append(post)
     
     if deleted:
-        for file_name in ('post_comments.jsonl', 'post_likes.jsonl', 'saved_posts.jsonl', 'post_shares.jsonl'):
-            file_path = BASE_DIR / 'data' / file_name
+        for file_path in (POST_COMMENTS_FILE, POST_LIKES_FILE, SAVED_POSTS_FILE, POST_SHARES_FILE):
             _rewrite_jsonl_without_matching(file_path, lambda record: record.get('post_id') == post_id)
 
-        with open(posts_file, 'w', encoding='utf-8') as f:
-            for post in posts:
-                f.write(json.dumps(post, ensure_ascii=False) + '\n')
+        _write_jsonl_records(POSTS_FILE, posts)
     
     return deleted
 
 def load_post_comments(post_id=None):
     """Load comments for a post"""
-    comments = []
-    comments_file = BASE_DIR / 'data' / 'post_comments.jsonl'
-    
-    if comments_file.exists():
-        with open(comments_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        comment = json.loads(line)
-                        if post_id is None or comment.get('post_id') == post_id:
-                            comments.append(comment)
-                    except json.JSONDecodeError:
-                        continue
-    
-    return comments
+    records = _load_jsonl_records(POST_COMMENTS_FILE)
+    if post_id is None:
+        return records
+    return [comment for comment in records if comment.get('post_id') == post_id]
 
 def save_comment(comment):
     """Save a new comment"""
-    comments_file = BASE_DIR / 'data' / 'post_comments.jsonl'
-    comments_file.parent.mkdir(parents=True, exist_ok=True)
-    
     # Generate ID if not exists
     if 'id' not in comment:
-        comments = load_post_comments()
-        max_id = 0
-        for c in comments:
-            if c.get('id', '').startswith('CMT'):
-                try:
-                    num = int(c['id'][3:])
-                    max_id = max(max_id, num)
-                except:
-                    pass
-        comment['id'] = f"CMT{max_id + 1:03d}"
+        comment['id'] = _generate_next_prefixed_id(load_post_comments(), 'id', 'CMT', 3)
     
     if 'created_at' not in comment:
         comment['created_at'] = datetime.now().isoformat()
     
-    with open(comments_file, 'a', encoding='utf-8') as f:
-        f.write(json.dumps(comment, ensure_ascii=False) + '\n')
+    _append_jsonl_record(POST_COMMENTS_FILE, comment)
     
     # Update post comment count
     post_id = comment.get('post_id')
@@ -10048,25 +10036,10 @@ def save_comment(comment):
 
 def load_post_likes():
     """Load all post likes"""
-    likes = []
-    likes_file = BASE_DIR / 'data' / 'post_likes.jsonl'
-    
-    if likes_file.exists():
-        with open(likes_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        likes.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-    
-    return likes
+    return _load_jsonl_records(POST_LIKES_FILE)
 
 def toggle_post_like(post_id, user_id):
     """Toggle like on a post"""
-    likes_file = BASE_DIR / 'data' / 'post_likes.jsonl'
-    likes_file.parent.mkdir(parents=True, exist_ok=True)
-    
     likes = load_post_likes()
     
     # Check if already liked
@@ -10090,9 +10063,7 @@ def toggle_post_like(post_id, user_id):
         liked = True
     
     # Save updated likes
-    with open(likes_file, 'w', encoding='utf-8') as f:
-        for like in likes:
-            f.write(json.dumps(like, ensure_ascii=False) + '\n')
+    _write_jsonl_records(POST_LIKES_FILE, likes)
     
     # Update post like count
     likes_count = len([l for l in likes if l.get('post_id') == post_id])
@@ -10102,25 +10073,10 @@ def toggle_post_like(post_id, user_id):
 
 def load_user_follows():
     """Load all user follows"""
-    follows = []
-    follows_file = BASE_DIR / 'data' / 'user_follows.jsonl'
-    
-    if follows_file.exists():
-        with open(follows_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        follows.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-    
-    return follows
+    return _load_jsonl_records(USER_FOLLOWS_FILE)
 
 def toggle_follow(follower_id, following_id):
     """Toggle follow relationship"""
-    follows_file = BASE_DIR / 'data' / 'user_follows.jsonl'
-    follows_file.parent.mkdir(parents=True, exist_ok=True)
-    
     follows = load_user_follows()
     
     # Check if already following
@@ -10145,9 +10101,7 @@ def toggle_follow(follower_id, following_id):
         is_following = True
     
     # Save updated follows
-    with open(follows_file, 'w', encoding='utf-8') as f:
-        for follow in follows:
-            f.write(json.dumps(follow, ensure_ascii=False) + '\n')
+    _write_jsonl_records(USER_FOLLOWS_FILE, follows)
 
     try:
         sync_user_follow_cache(follower_id, following_id, is_following)
@@ -11312,11 +11266,35 @@ def api_apply_crop_weekly_plan(crop_id):
         return {'ok': False, 'error': str(e)}, 500
 
 
+def _can_access_prediction_entry(entry, current_user_id, current_user_email, is_admin):
+    """Check whether current session can access a prediction history entry."""
+    if is_admin:
+        return True
+
+    owner_user_id = entry.get('user_id')
+    owner_email = entry.get('user_email')
+    if not (owner_user_id or owner_email):
+        return True
+
+    return owner_user_id == current_user_id or owner_email == current_user_email
+
+
+def _find_prediction_entry_by_id(prediction_id):
+    """Find one prediction entry by ID from prediction history."""
+    if not PREDICTION_HISTORY_FILE.exists():
+        return None
+
+    for entry in _load_jsonl_records(PREDICTION_HISTORY_FILE):
+        if entry.get('id') == prediction_id:
+            return entry
+    return None
+
+
 @app.route('/history/clear', methods=['POST'])
 def clear_history():
     """Xóa lịch sử dự đoán"""
     try:
-        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        history_file = PREDICTION_HISTORY_FILE
         
         if not history_file.exists():
             flash('Đã xóa toàn bộ lịch sử dự đoán', 'success')
@@ -11331,24 +11309,17 @@ def clear_history():
             # User thường chỉ xóa lịch sử của mình
             current_user_id = session.get('user_id')
             current_user_email = session.get('user_email')
-            
-            # Đọc tất cả và chỉ giữ lại của user khác
-            remaining_entries = []
-            with open(history_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line.strip())
-                        # Giữ lại nếu không phải của user hiện tại
-                        if (entry.get('user_id') != current_user_id and 
-                            entry.get('user_email') != current_user_email):
-                            remaining_entries.append(entry)
-                    except json.JSONDecodeError:
-                        continue
-            
-            # Ghi lại file
-            with open(history_file, 'w', encoding='utf-8') as f:
-                for entry in remaining_entries:
-                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+
+            # Giữ lại nếu không phải của user hiện tại
+            remaining_entries = [
+                entry for entry in _load_jsonl_records(history_file)
+                if (
+                    entry.get('user_id') != current_user_id and
+                    entry.get('user_email') != current_user_email
+                )
+            ]
+
+            _write_jsonl_records(history_file, remaining_entries)
             
             app.logger.info(f'User {current_user_email} cleared their history')
             flash('Đã xóa lịch sử của bạn', 'success')
@@ -11363,7 +11334,7 @@ def clear_history():
 def view_prediction(prediction_id):
     """Xem chi tiết một dự đoán cụ thể"""
     try:
-        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        history_file = PREDICTION_HISTORY_FILE
         
         if not history_file.exists():
             flash('Không tìm thấy lịch sử dự đoán')
@@ -11372,45 +11343,35 @@ def view_prediction(prediction_id):
         current_user_id = session.get('user_id')
         current_user_email = session.get('user_email')
         is_admin = session.get('is_admin')
+
+        entry = _find_prediction_entry_by_id(prediction_id)
+        if entry is None:
+            flash('Không tìm thấy dự đoán này')
+            return redirect(url_for('history'))
+
+        if not _can_access_prediction_entry(entry, current_user_id, current_user_email, is_admin):
+            flash('Bạn không có quyền xem dự đoán này')
+            return redirect(url_for('history'))
+
+        # Format timestamp
+        try:
+            ts = datetime.fromisoformat(entry.get('timestamp', ''))
+            entry['formatted_time'] = ts.strftime('%d/%m/%Y %H:%M:%S')
+        except Exception:
+            entry['formatted_time'] = entry.get('timestamp', 'N/A')
+
+        # Get disease info
+        label = entry.get('predicted_label', '')
+        disease_info = DISEASE_INFO.get(label, {
+            'name': label,
+            'definition': 'Không có thông tin',
+            'prevention': []
+        })
+
+        return render_template('prediction_detail.html',
+                             prediction=entry,
+                             disease_info=disease_info)
         
-        # Tìm prediction theo ID
-        with open(history_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    if entry.get('id') == prediction_id:
-                        # Kiểm tra quyền truy cập
-                        if not is_admin:
-                            # User thường chỉ xem được của mình
-                            if (entry.get('user_id') != current_user_id and 
-                                entry.get('user_email') != current_user_email and
-                                (entry.get('user_id') or entry.get('user_email'))):
-                                flash('Bạn không có quyền xem dự đoán này')
-                                return redirect(url_for('history'))
-                        
-                        # Format timestamp
-                        try:
-                            ts = datetime.fromisoformat(entry.get('timestamp', ''))
-                            entry['formatted_time'] = ts.strftime('%d/%m/%Y %H:%M:%S')
-                        except:
-                            entry['formatted_time'] = entry.get('timestamp', 'N/A')
-                        
-                        # Get disease info
-                        label = entry.get('predicted_label', '')
-                        disease_info = DISEASE_INFO.get(label, {
-                            'name': label,
-                            'definition': 'Không có thông tin',
-                            'prevention': []
-                        })
-                        
-                        return render_template('prediction_detail.html',
-                                             prediction=entry,
-                                             disease_info=disease_info)
-                except json.JSONDecodeError:
-                    continue
-        
-        flash('Không tìm thấy dự đoán này')
-        return redirect(url_for('history'))
     except Exception as e:
         app.logger.exception('Error viewing prediction')
         flash('Không thể xem chi tiết dự đoán')
@@ -11434,7 +11395,7 @@ def export_prediction(prediction_id):
         app.logger.info("ReportLab libraries imported successfully")
         
         # Find prediction
-        history_file = BASE_DIR / 'data' / 'prediction_history.jsonl'
+        history_file = PREDICTION_HISTORY_FILE
         if not history_file.exists():
             flash('Không tìm thấy lịch sử dự đoán', 'error')
             return redirect(url_for('history'))
@@ -11442,26 +11403,11 @@ def export_prediction(prediction_id):
         current_user_id = session.get('user_id')
         current_user_email = session.get('user_email')
         is_admin = session.get('is_admin')
-        
-        prediction = None
-        with open(history_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    if entry.get('id') == prediction_id:
-                        # Kiểm tra quyền truy cập
-                        if not is_admin:
-                            # User thường chỉ export được của mình
-                            if (entry.get('user_id') != current_user_id and 
-                                entry.get('user_email') != current_user_email and
-                                (entry.get('user_id') or entry.get('user_email'))):
-                                flash('Bạn không có quyền xuất dự đoán này', 'error')
-                                return redirect(url_for('history'))
-                        
-                        prediction = entry
-                        break
-                except json.JSONDecodeError:
-                    continue
+
+        prediction = _find_prediction_entry_by_id(prediction_id)
+        if prediction and not _can_access_prediction_entry(prediction, current_user_id, current_user_email, is_admin):
+            flash('Bạn không có quyền xuất dự đoán này', 'error')
+            return redirect(url_for('history'))
         
         if not prediction:
             app.logger.warning(f"Prediction not found: {prediction_id}")
@@ -11806,7 +11752,6 @@ def admin_stats():
 @requires_admin_auth
 def admin_export_chat():
     """Export chat logs (data/chat_logs.jsonl) as CSV for Excel."""
-    import csv, io, json
     logs_file = BASE_DIR / 'data' / 'chat_logs.jsonl'
     if not logs_file.exists():
         return redirect(url_for('admin_feedback'))
@@ -12407,7 +12352,11 @@ def admin_wiki_delete(article_id):
 @app.route('/chat')
 def chat():
     """Render chat page"""
-    return render_template('chat.html')
+    return render_template(
+        'chat.html',
+        expert_avatar_model_url=EXPERT_AVATAR_MODEL_URL,
+        expert_avatar_poster_url=EXPERT_AVATAR_POSTER_URL
+    )
 
 
 @app.route('/api/chat', methods=['POST'])
@@ -12497,6 +12446,51 @@ def api_chat():
             "answer": "[!] Đã xảy ra lỗi. Vui lòng thử lại sau.",
             "error": "internal_error"
         }, 500
+
+
+@app.route('/api/tts', methods=['POST'])
+def api_tts():
+    """Sinh audio MP3 từ văn bản để frontend phân tích biên độ và lip sync chính xác."""
+    if gTTS is None:
+        return jsonify({
+            'error': 'tts_unavailable',
+            'message': 'Dịch vụ giọng nói chưa sẵn sàng trên server.'
+        }), 503
+
+    try:
+        data = request.get_json(force=True) or {}
+        text_raw = (data.get('text') or '').strip()
+    except Exception as e:
+        app.logger.error(f"Failed to parse TTS request: {e}")
+        return jsonify({'error': 'invalid_payload', 'message': 'Dữ liệu không hợp lệ.'}), 400
+
+    if not text_raw:
+        return jsonify({'error': 'empty_text', 'message': 'Văn bản trống.'}), 400
+
+    # Giới hạn độ dài để tránh request quá nặng và timeout.
+    text_clean = re.sub(r'\s+', ' ', text_raw).strip()
+    text_clean = text_clean[:800]
+
+    try:
+        audio_fp = io.BytesIO()
+        tts = gTTS(text=text_clean, lang='vi', slow=False)
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0)
+
+        response = send_file(
+            audio_fp,
+            mimetype='audio/mpeg',
+            as_attachment=False,
+            download_name='reply.mp3'
+        )
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+    except Exception as e:
+        app.logger.exception(f"Error in api_tts: {e}")
+        return jsonify({
+            'error': 'tts_failed',
+            'message': 'Không thể tạo giọng nói lúc này.'
+        }), 500
 
 # ============= PREDICTION HELPER FUNCTIONS =============
 

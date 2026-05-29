@@ -5,14 +5,369 @@
 {% block content %}
 <style>
   .chat-container {
-    max-width: 800px;
-    margin: 18px auto 0 auto;
+    width: 100%;
     border: 1px solid #e0e0e0;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    background: #ffffff;
+  }
+
+  .chat-page-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 420px;
+    gap: 18px;
+    align-items: start;
+    margin-top: 18px;
+  }
+
+  .chat-main-column {
+    min-width: 0;
+  }
+
+  .virtual-expert-sidebar {
+    position: sticky;
+    top: 92px;
+    align-self: start;
+    border: 1px solid #dce7ef;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #f5fbf5 0%, #eef7ff 100%);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+    overflow: hidden;
+  }
+
+  .virtual-expert-panel--sidebar {
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    gap: 14px;
+    border-bottom: none;
+    background: transparent;
+  }
+
+  .virtual-expert-panel {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid #e0e0e0;
+    background: linear-gradient(135deg, #f0f9f0 0%, #eef7ff 100%);
+  }
+
+  .expert-avatar {
+    width: 100%;
+    min-width: 0;
+    height: 520px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid #d7e6d7;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .expert-3d-canvas {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .expert-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .expert-custom-image {
+    width: 88%;
+    height: 88%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 16px rgba(19, 63, 33, 0.26));
+  }
+
+  .expert-svg.hidden,
+  .expert-custom-image.hidden {
+    display: none;
+  }
+
+  .expert-fallback.hidden {
+    display: none;
+  }
+
+  .expert-status-wrap {
+    flex: 1;
+  }
+
+  .expert-sidebar .expert-status-wrap {
+    padding: 0 2px;
+  }
+
+  .expert-title {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #1f2937;
+    font-weight: 700;
+  }
+
+  .expert-subtitle {
+    margin: 3px 0 8px;
+    color: #546477;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .expert-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background-color: #ffffff;
+    border: 1px solid #cfdde7;
+    color: #2d4558;
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+
+  .state-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: #4b5563;
+  }
+
+  .state-dot.idle { background-color: #4b5563; }
+  .state-dot.greeting { background-color: #2563eb; }
+  .state-dot.listening { background-color: #dc2626; }
+  .state-dot.thinking { background-color: #f59e0b; }
+  .state-dot.speaking { background-color: #16a34a; }
+
+  .expert-svg {
+    width: 420px;
+    height: 420px;
+    image-rendering: pixelated;
+    shape-rendering: crispEdges;
+    transform-origin: center;
+    transition: transform 0.2s ease;
+    animation: expert-breathe 4.2s ease-in-out infinite;
+  }
+
+  .expert-svg.action-speaking {
+    animation: expert-speak-body 0.72s ease-in-out infinite;
+  }
+
+  .expert-svg.action-thinking {
+    animation: expert-think-body 1.15s ease-in-out infinite;
+  }
+
+  .expert-svg.action-listening {
+    animation: expert-listen-body 0.8s ease-in-out infinite;
+  }
+
+  .expert-svg.action-greeting {
+    animation: expert-greeting-body 1s ease-in-out 2;
+  }
+
+  .mouth {
+    transform-origin: center;
+    transition: all 0.1s ease;
+  }
+
+  .torso {
+    transform-origin: 60px 84px;
+    transition: transform 0.18s ease;
+  }
+
+  .arm-left,
+  .arm-right,
+  .leg-left,
+  .leg-right {
+    transform-origin: center;
+    transition: transform 0.18s ease;
+  }
+
+  .hand {
+    transform-origin: 20px 60px;
+    transition: transform 0.2s ease;
+  }
+
+  .expert-svg.action-greeting .hand {
+    animation: hand-wave 0.5s ease-in-out 4;
+  }
+
+  .expert-svg.action-speaking .torso {
+    animation: torso-talk 0.72s ease-in-out infinite;
+  }
+
+  .expert-svg.action-thinking .torso {
+    animation: torso-think 1.15s ease-in-out infinite;
+  }
+
+  .expert-svg.action-listening .torso {
+    animation: torso-listen 0.8s ease-in-out infinite;
+  }
+
+  .expert-svg.action-greeting .torso {
+    animation: torso-greet 1s ease-in-out 2;
+  }
+
+  .expert-svg.hover-active .torso {
+    animation: torso-watch 0.8s ease-in-out infinite;
+  }
+
+  .expert-svg.hover-active .mouth {
+    animation: mouth-watch 0.8s ease-in-out infinite;
+  }
+
+  .expert-svg.hover-active {
+    filter: drop-shadow(0 6px 10px rgba(39, 86, 39, 0.22));
+  }
+
+  .expert-svg.action-laughing .torso {
+    animation: torso-laugh 0.38s ease-in-out infinite;
+  }
+
+  .expert-svg.action-laughing .mouth {
+    animation: mouth-laugh 0.38s ease-in-out infinite;
+  }
+
+  .expert-svg.action-laughing .arm-left,
+  .expert-svg.action-laughing .arm-right {
+    animation: arm-tickle 0.32s ease-in-out infinite;
+  }
+
+  .expert-svg.action-laughing .leg-left,
+  .expert-svg.action-laughing .leg-right {
+    animation: leg-bounce 0.32s ease-in-out infinite;
+  }
+
+  .expert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .expert-action-btn {
+    flex: 1 1 140px;
+    border: 1px solid #d3dbe4;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.88);
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.92rem;
+    color: #1f2937;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+
+  .expert-action-btn:hover {
+    transform: translateY(-2px);
+    border-color: #9db6cc;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  @keyframes expert-nod {
+    0%, 100% { transform: translateY(0px); }
+    40% { transform: translateY(2px); }
+    60% { transform: translateY(0px); }
+  }
+
+  @keyframes expert-breathe {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-1px) scale(1.01); }
+  }
+
+  @keyframes expert-speak-body {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    25% { transform: translateY(-2px) rotate(-2deg) scale(1.015); }
+    50% { transform: translateY(2px) rotate(2.4deg) scale(1.03); }
+    75% { transform: translateY(-1px) rotate(-1.4deg) scale(1.015); }
+  }
+
+  @keyframes expert-think-body {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    50% { transform: translateY(-1px) rotate(-2.5deg) scale(0.995); }
+  }
+
+  @keyframes expert-listen-body {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    50% { transform: translateY(1px) rotate(1.8deg) scale(1.02); }
+  }
+
+  @keyframes expert-greeting-body {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    35% { transform: translateY(-2px) rotate(-2deg) scale(1.01); }
+    70% { transform: translateY(1px) rotate(2deg) scale(1.015); }
+  }
+
+  @keyframes hand-wave {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(16deg); }
+  }
+
+  @keyframes torso-talk {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    25% { transform: translateY(-1px) rotate(-2deg) scale(1.01); }
+    50% { transform: translateY(2px) rotate(2.4deg) scale(1.03); }
+    75% { transform: translateY(-1px) rotate(-1.3deg) scale(1.01); }
+  }
+
+  @keyframes torso-think {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    50% { transform: translateY(-1px) rotate(-3deg) scale(0.995); }
+  }
+
+  @keyframes torso-listen {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    50% { transform: translateY(1px) rotate(2deg) scale(1.02); }
+  }
+
+  @keyframes torso-greet {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    35% { transform: translateY(-2px) rotate(-2deg) scale(1.01); }
+    70% { transform: translateY(1px) rotate(2.2deg) scale(1.015); }
+  }
+
+  @keyframes torso-watch {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    50% { transform: translateY(-1px) rotate(1.8deg) scale(1.01); }
+  }
+
+  @keyframes mouth-watch {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1, 1.05); }
+  }
+
+  @keyframes torso-laugh {
+    0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+    25% { transform: translateY(-2px) rotate(-2.6deg) scale(1.02); }
+    50% { transform: translateY(2px) rotate(3deg) scale(1.03); }
+    75% { transform: translateY(-1px) rotate(-1.8deg) scale(1.015); }
+  }
+
+  @keyframes mouth-laugh {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.6, 1.25); }
+  }
+
+  @keyframes arm-tickle {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(8deg); }
+  }
+
+  @keyframes leg-bounce {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-2px); }
   }
 
   #chat-window {
@@ -282,9 +637,39 @@
   
   /* Mobile optimization */
   @media (max-width: 768px) {
+    .chat-page-layout {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .virtual-expert-sidebar {
+      position: static;
+      top: auto;
+    }
     .chat-container { 
-      margin: 12px; 
       max-height: calc(100vh - 100px);
+    }
+    .virtual-expert-panel--sidebar {
+      padding: 14px;
+    }
+    .expert-avatar {
+      height: 380px;
+    }
+    .expert-3d-canvas,
+    .expert-fallback {
+      width: 100%;
+      height: 100%;
+    }
+    .expert-svg {
+      width: 320px;
+      height: 320px;
+    }
+    .expert-title {
+      font-size: 1rem;
+    }
+    .expert-subtitle {
+      font-size: 0.88rem;
+      margin-bottom: 6px;
     }
     #chat-window {
       max-height: calc(100vh - 250px);
@@ -306,25 +691,82 @@
   <h1 style="margin-top:18px;">Hỏi đáp các thông tin về cà chua và bệnh trên lá cà chua</h1>
 
   <main style="margin-top:18px">
-    <div class="chat-container">
-      <div id="chat-window">
-        <!-- Tin nhắn sẽ được thêm vào đây bằng JavaScript -->
+    <div class="chat-page-layout">
+      <div class="chat-main-column">
+        <div class="chat-container">
+          <div id="chat-window">
+            <!-- Tin nhắn sẽ được thêm vào đây bằng JavaScript -->
+          </div>
+
+          <div class="suggestion-bubbles" id="suggestion-bubbles">
+            <div class="suggestion-bubble" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Triệu chứng bệnh sớm?</div>
+            <div class="suggestion-bubble" onclick="askSuggestion('Cách phòng ngừa virus xoắn lá?')">Phòng ngừa virus xoắn lá?</div>
+            <div class="suggestion-bubble" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Lá khỏe mạnh?</div>
+            <div class="suggestion-bubble" onclick="askSuggestion('Sâu bệnh thường gặp?')">Sâu bệnh thường gặp?</div>
+            <div class="suggestion-bubble" onclick="askSuggestion('Cách bón phân cho cà chua?')">Cách bón phân?</div>
+          </div>
+
+          <div id="chat-input-area">
+            <button id="voice-btn" class="voice-btn" title="Nhấn để nói (hoặc giữ phím Space)">🎤</button>
+            <input id="chat-input" type="text" placeholder="Nhập câu hỏi hoặc nhấn 🎤 để nói..." style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
+            <button id="speaker-btn" class="speaker-btn" title="Bật/tắt đọc câu trả lời">🔊</button>
+            <button id="chat-send" class="btn">Gửi</button>
+          </div>
+        </div>
       </div>
 
-      <div class="suggestion-bubbles" id="suggestion-bubbles">
-        <div class="suggestion-bubble" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Triệu chứng bệnh sớm?</div>
-        <div class="suggestion-bubble" onclick="askSuggestion('Cách phòng ngừa virus xoắn lá?')">Phòng ngừa virus xoắn lá?</div>
-        <div class="suggestion-bubble" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Lá khỏe mạnh?</div>
-        <div class="suggestion-bubble" onclick="askSuggestion('Sâu bệnh thường gặp?')">Sâu bệnh thường gặp?</div>
-        <div class="suggestion-bubble" onclick="askSuggestion('Cách bón phân cho cà chua?')">Cách bón phân?</div>
-      </div>
-
-      <div id="chat-input-area">
-        <button id="voice-btn" class="voice-btn" title="Nhấn để nói (hoặc giữ phím Space)">🎤</button>
-        <input id="chat-input" type="text" placeholder="Nhập câu hỏi hoặc nhấn 🎤 để nói..." style="flex:1;padding:10px;border-radius:6px;border:1px solid #ddd">
-        <button id="speaker-btn" class="speaker-btn" title="Bật/tắt đọc câu trả lời">🔊</button>
-        <button id="chat-send" class="btn">Gửi</button>
-      </div>
+      <aside class="virtual-expert-sidebar">
+        <div class="virtual-expert-panel virtual-expert-panel--sidebar">
+          <div class="expert-avatar">
+            <div id="expert-3d-canvas" class="expert-3d-canvas" aria-label="Chuyên gia cà chua 3D"></div>
+            <div id="expert-fallback" class="expert-fallback" aria-hidden="true">
+              <img id="expert-custom-image" class="expert-custom-image hidden" alt="Nhân vật chuyên gia tùy chỉnh">
+              <svg id="expert-svg" class="expert-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-label="Chuyên gia cà chua ảo" shape-rendering="crispEdges">
+                <!-- Nền -->
+                <rect x="0" y="0" width="120" height="120" fill="#f3faf3"></rect>
+                
+                <!-- Đầu tròn đỏ -->
+                <circle cx="60" cy="55" r="42" fill="#d9392f"></circle>
+                
+                <!-- Cuống xanh (stem) ở trên -->
+                <rect x="56" y="10" width="8" height="12" fill="#2e7d32"></rect>
+                
+                <!-- Lá 1 (trái) -->
+                <polygon points="45,15 42,10 48,18" fill="#3fa348"></polygon>
+                
+                <!-- Lá 2 (phải) -->
+                <polygon points="75,15 78,10 72,18" fill="#3fa348"></polygon>
+                
+                <!-- Lá 3 (trên) -->
+                <polygon points="60,8 58,5 65,8" fill="#3fa348"></polygon>
+                
+                <!-- Mắt trái -->
+                <circle cx="45" cy="47" r="5" fill="#1f2937"></circle>
+                
+                <!-- Mắt phải -->
+                <circle cx="75" cy="47" r="5" fill="#1f2937"></circle>
+                
+                <!-- Miệng (ellipse để có thể animate) -->
+                <ellipse id="expert-mouth" cx="60" cy="67" rx="8" ry="3" fill="#8f2f2f"></ellipse>
+              </svg>
+            </div>
+          </div>
+          <div class="expert-status-wrap">
+            <h3 class="expert-title">Chuyên gia cà chua thực tế ảo</h3>
+            <p class="expert-subtitle">Trả lời ở bên phải, to, rõ và có thể giao tiếp bằng giọng nói</p>
+            <div class="expert-state">
+              <span id="state-dot" class="state-dot idle"></span>
+              <span id="state-text">Đang chờ câu hỏi</span>
+            </div>
+            <div class="expert-actions" style="margin-top:12px;">
+              <button class="expert-action-btn" type="button" onclick="askSuggestion('Triệu chứng bệnh sớm là gì?')">Hỏi triệu chứng</button>
+              <button class="expert-action-btn" type="button" onclick="askSuggestion('Cách điều trị và phòng ngừa bệnh này?')">Hỏi điều trị</button>
+              <button class="expert-action-btn" type="button" onclick="askSuggestion('Lá cà chua khỏe mạnh trông như thế nào?')">Xem lá khỏe</button>
+              <button class="expert-action-btn" type="button" onclick="askSuggestion('Chào bạn')">Chào nhân viên</button>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </main>
 {% endblock %}
@@ -332,15 +774,28 @@
 {% block scripts %}
 <!-- Marked.js for Markdown rendering -->
 <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
   const chatWindow = document.getElementById('chat-window');
   const input = document.getElementById('chat-input');
   const btn = document.getElementById('chat-send');
   const voiceBtn = document.getElementById('voice-btn');
   const speakerBtn = document.getElementById('speaker-btn');
+  const expertAvatar = document.querySelector('.expert-avatar');
+  const expert3DCanvas = document.getElementById('expert-3d-canvas');
+  const expertFallback = document.getElementById('expert-fallback');
+  const expertSvg = document.getElementById('expert-svg');
+  const expertCustomImage = document.getElementById('expert-custom-image');
+  const expertMouth = document.getElementById('expert-mouth');
+  const stateDot = document.getElementById('state-dot');
+  const stateText = document.getElementById('state-text');
 
   const BOT_AVATAR = "{{ url_for('static', filename='images/bot.png') }}";
   const USER_AVATAR = "{{ url_for('static', filename='images/avatar.jpg') }}";
+  const TTS_API_URL = "{{ url_for('api_tts') }}";
+  const EXPERT_MODEL_URL = {{ expert_avatar_model_url|default('', true)|tojson|safe }};
+  const EXPERT_POSTER_URL = {{ expert_avatar_poster_url|default('', true)|tojson|safe }};
 
   // Voice recognition setup
   let recognition = null;
@@ -348,6 +803,650 @@
   let autoSpeakEnabled = localStorage.getItem('autoSpeak') !== 'false'; // Default: enabled
   let speechSynthesis = window.speechSynthesis;
   let currentUtterance = null;
+  let lipSyncTimer = null;
+  let lipSyncRaf = null;
+  let speechLevel = 0;
+  let ttsAudio = null;
+  let audioContext = null;
+  let analyserNode = null;
+  let analyserData = null;
+  let mediaElementSource = null;
+  let ttsObjectUrl = null;
+  let expert3D = {
+    enabled: false,
+    renderer: null,
+    camera: null,
+    scene: null,
+    mixer: null,
+    clock: null,
+    group: null,
+    model: null,
+    head: null,
+    jaw: null,
+    mouth: null,
+    leftEye: null,
+    rightEye: null,
+    leftArm: null,
+    rightArm: null,
+    actions: {},
+    activeActionKey: '',
+    baseJawRotationX: 0,
+    state: 'idle',
+    motionProfile: {
+      intensity: 1,
+      sway: 1,
+      bounce: 1,
+      arm: 1,
+      nod: 1
+    },
+    lookTarget: { x: 0, y: 0 },
+    hoverActive: false,
+    laughUntil: 0,
+    laughResetTimer: null,
+    rafId: null,
+    resizeObserver: null
+  };
+
+  function updateMotionProfile(text) {
+    const words = (text || '').trim().split(/\s+/).filter(Boolean).length;
+    const exclamations = ((text || '').match(/[!！]/g) || []).length;
+    const questions = ((text || '').match(/[?？]/g) || []).length;
+    const commas = ((text || '').match(/[,;:]/g) || []).length;
+
+    const shortReply = words <= 12;
+    const longReply = words >= 50;
+
+    const intensity = shortReply ? 1.35 : longReply ? 0.85 : 1.0;
+    const sway = longReply ? 0.75 : 1.0 + Math.min(0.18, commas * 0.03);
+    const bounce = shortReply ? 1.25 : 1.0;
+    const arm = 1.0 + Math.min(0.45, exclamations * 0.12 + questions * 0.05);
+    const nod = shortReply ? 1.3 : 1.0;
+
+    expert3D.motionProfile = { intensity, sway, bounce, arm, nod };
+  }
+
+  function setHoverLookFromClient(clientX, clientY) {
+    if (!expertAvatar) return;
+    const rect = expertAvatar.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = ((clientY - rect.top) / rect.height) * 2 - 1;
+    expert3D.lookTarget = {
+      x: Math.max(-1, Math.min(1, x)),
+      y: Math.max(-1, Math.min(1, y))
+    };
+    expert3D.hoverActive = true;
+    if (expertSvg) {
+      expertSvg.classList.add('hover-active');
+      const tx = expert3D.lookTarget.x * 7;
+      const ty = expert3D.lookTarget.y * 5;
+      const rot = expert3D.lookTarget.x * 6;
+      expertSvg.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+    }
+  }
+
+  function setHoverLookFromPointer(event) {
+    if (!event) return;
+    setHoverLookFromClient(event.clientX, event.clientY);
+  }
+
+  function handleGlobalPointerMove(event) {
+    if (!expertAvatar || !event) return;
+    const rect = expertAvatar.getBoundingClientRect();
+    const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+
+    if (inside) {
+      setHoverLookFromClient(event.clientX, event.clientY);
+    } else if (expert3D.hoverActive) {
+      clearHoverLook();
+    }
+  }
+
+  function clearHoverLook() {
+    expert3D.hoverActive = false;
+    expert3D.lookTarget = { x: 0, y: 0 };
+    if (expertSvg) {
+      expertSvg.classList.remove('hover-active');
+      expertSvg.style.transform = '';
+    }
+  }
+
+  function initExpertInteractions() {
+    if (!expertAvatar) return;
+    expertAvatar.addEventListener('pointermove', setHoverLookFromPointer);
+    expertAvatar.addEventListener('pointerleave', clearHoverLook);
+    expertAvatar.addEventListener('click', triggerLaughReaction);
+    window.addEventListener('pointermove', handleGlobalPointerMove, { passive: true });
+  }
+
+  function setupExpertFallbackVisual() {
+    if (!expertCustomImage || !expertSvg) return;
+
+    const posterUrl = (EXPERT_POSTER_URL || '').trim();
+    if (posterUrl) {
+      expertCustomImage.src = posterUrl;
+      expertCustomImage.classList.remove('hidden');
+      expertSvg.classList.add('hidden');
+      return;
+    }
+
+    expertCustomImage.removeAttribute('src');
+    expertCustomImage.classList.add('hidden');
+    expertSvg.classList.remove('hidden');
+  }
+
+  function assignExpertModelNodes(modelRoot) {
+    if (!modelRoot || !window.THREE) return;
+
+    let head = null;
+    let jaw = null;
+    let mouth = null;
+    let leftEye = null;
+    let rightEye = null;
+    let leftArm = null;
+    let rightArm = null;
+
+    modelRoot.traverse((node) => {
+      if (!node || !node.isObject3D) return;
+      const n = (node.name || '').toLowerCase();
+
+      if (!head && (n.includes('head') || n.includes('face'))) head = node;
+      if (!jaw && n.includes('jaw')) jaw = node;
+      if (!mouth && (n.includes('mouth') || n.includes('lip'))) mouth = node;
+      if (!leftEye && (n.includes('lefteye') || n.includes('eye_l') || n.includes('eye.l'))) leftEye = node;
+      if (!rightEye && (n.includes('righteye') || n.includes('eye_r') || n.includes('eye.r'))) rightEye = node;
+      if (!leftArm && (n.includes('leftarm') || n.includes('arm_l') || n.includes('arm.l'))) leftArm = node;
+      if (!rightArm && (n.includes('rightarm') || n.includes('arm_r') || n.includes('arm.r'))) rightArm = node;
+    });
+
+    expert3D.head = head;
+    expert3D.jaw = jaw;
+    expert3D.mouth = mouth;
+    expert3D.leftEye = leftEye;
+    expert3D.rightEye = rightEye;
+    expert3D.leftArm = leftArm;
+    expert3D.rightArm = rightArm;
+    expert3D.body = null;
+
+    if (expert3D.jaw) {
+      expert3D.baseJawRotationX = expert3D.jaw.rotation ? expert3D.jaw.rotation.x : 0;
+    }
+  }
+
+  function normalizeModelToExpertFrame(modelRoot) {
+    const { Box3, Vector3 } = window.THREE;
+    const box = new Box3().setFromObject(modelRoot);
+    const size = box.getSize(new Vector3());
+    const center = box.getCenter(new Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+
+    modelRoot.position.sub(center);
+    const uniformScale = 2.7 / maxDim;
+    modelRoot.scale.setScalar(uniformScale);
+    modelRoot.position.y -= 0.45;
+  }
+
+  function loadExternalExpertModel(root) {
+    const modelUrl = (EXPERT_MODEL_URL || '').trim();
+    if (!modelUrl || !window.THREE || !window.THREE.GLTFLoader) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve, reject) => {
+      const loader = new window.THREE.GLTFLoader();
+      loader.load(
+        modelUrl,
+        (gltf) => {
+          const sceneModel = gltf?.scene || (gltf?.scenes && gltf.scenes[0]);
+          if (!sceneModel) {
+            reject(new Error('GLB không có scene hợp lệ'));
+            return;
+          }
+
+          while (root.children.length) {
+            root.remove(root.children[0]);
+          }
+
+          sceneModel.position.set(0, 0, 0);
+          sceneModel.rotation.set(0, 0, 0);
+          normalizeModelToExpertFrame(sceneModel);
+          root.add(sceneModel);
+
+          expert3D.model = sceneModel;
+          assignExpertModelNodes(sceneModel);
+          resolve(true);
+        },
+        undefined,
+        (error) => reject(error)
+      );
+    });
+  }
+
+  function triggerLaughReaction() {
+    const now = performance.now();
+    expert3D.laughUntil = now + 1800;
+    if (expert3D.laughResetTimer) {
+      clearTimeout(expert3D.laughResetTimer);
+    }
+    expert3D.motionProfile = {
+      intensity: 1.8,
+      sway: 1.2,
+      bounce: 1.8,
+      arm: 1.25,
+      nod: 1.6
+    };
+    setExpertState('speaking', 'Nhột quá, đang cười');
+    if (expertSvg) {
+      expertSvg.classList.remove('action-idle', 'action-greeting', 'action-listening', 'action-thinking', 'action-speaking');
+      expertSvg.classList.add('action-laughing');
+    }
+    expert3D.laughResetTimer = setTimeout(() => {
+      if (expertSvg) {
+        expertSvg.classList.remove('action-laughing');
+      }
+      stopLipSync();
+      setExpertState('idle', 'Đang chờ câu hỏi');
+      expert3D.motionProfile = {
+        intensity: 1,
+        sway: 1,
+        bounce: 1,
+        arm: 1,
+        nod: 1
+      };
+      expert3D.laughResetTimer = null;
+    }, 1800);
+  }
+
+  function buildProceduralExpert(root, threeRef) {
+    const { SphereGeometry, MeshStandardMaterial, Mesh, CylinderGeometry, BoxGeometry, ConeGeometry,
+      PlaneGeometry, TorusGeometry, DoubleSide } = threeRef;
+
+    const headMat = new MeshStandardMaterial({ color: 0xd63b31, roughness: 0.72, metalness: 0.02 });
+    const eyeMat = new MeshStandardMaterial({ color: 0x1f2937, roughness: 0.45, metalness: 0.06 });
+    const mouthMat = new MeshStandardMaterial({ color: 0x8f2f2f, roughness: 0.75, metalness: 0.0 });
+
+    root.scale.set(1.58, 1.58, 1.58);
+
+    // 圆形头部
+    const head = new Mesh(new SphereGeometry(0.9, 32, 32), headMat);
+    head.position.y = 0;
+    root.add(head);
+
+    // 眼睛
+    const eyeGeo = new SphereGeometry(0.08, 16, 16);
+    const leftEye = new Mesh(eyeGeo, eyeMat);
+    leftEye.position.set(-0.26, 0.14, 0.78);
+    root.add(leftEye);
+    const rightEye = new Mesh(eyeGeo, eyeMat);
+    rightEye.position.set(0.26, 0.14, 0.78);
+    root.add(rightEye);
+
+    // 简化的嘴巴 - 使用椭圆柱体
+    // 嘴巴使用两个球体来形成可以动的嘴型
+    const mouthOpen = new CylinderGeometry(0.15, 0.15, 0.08, 12, 2);
+    const mouth = new Mesh(mouthOpen, mouthMat);
+    mouth.position.set(0, -0.22, 0.82);
+    mouth.rotation.x = Math.PI / 2;
+    mouth.scale.y = 0.5; // 初始关闭状态
+    mouth.userData.isAnimated = true;
+    root.add(mouth);
+
+    expert3D.head = head;
+    expert3D.body = null;
+    expert3D.mouth = mouth;
+    expert3D.leftEye = leftEye;
+    expert3D.rightEye = rightEye;
+    expert3D.leftArm = null;
+    expert3D.rightArm = null;
+  }
+
+  function addGeneratedClipIfMissing(threeRef, key, targetNode, axis, baseValue, amplitude) {
+    if (!targetNode || !targetNode.name || expert3D.actions[key]) return;
+    const times = [0, 0.18, 0.36, 0.54, 0.72];
+    const values = [
+      baseValue,
+      baseValue + amplitude,
+      baseValue - amplitude * 0.45,
+      baseValue + amplitude * 0.8,
+      baseValue
+    ];
+    const track = new threeRef.NumberKeyframeTrack(`${targetNode.name}.rotation[${axis}]`, times, values);
+    const clip = new threeRef.AnimationClip(`Generated${key}`, 0.72, [track]);
+    const action = expert3D.mixer.clipAction(clip);
+    action.loop = threeRef.LoopRepeat;
+    action.clampWhenFinished = false;
+    expert3D.actions[key] = action;
+  }
+
+  function play3DActionForState(state) {
+    if (!expert3D.mixer || !expert3D.actions) return;
+    const stateToAction = {
+      idle: 'idle',
+      listening: 'idle',
+      thinking: 'idle',
+      greeting: 'wave',
+      speaking: 'talk'
+    };
+    const desiredKey = stateToAction[state] || 'idle';
+    const fallbackKey = expert3D.actions.idle ? 'idle' : Object.keys(expert3D.actions)[0];
+    const nextKey = expert3D.actions[desiredKey] ? desiredKey : fallbackKey;
+
+    if (!nextKey || nextKey === expert3D.activeActionKey) return;
+
+    const nextAction = expert3D.actions[nextKey];
+    const prevAction = expert3D.actions[expert3D.activeActionKey];
+    if (nextAction) {
+      nextAction.enabled = true;
+      nextAction.reset();
+      nextAction.setEffectiveWeight(1);
+      nextAction.setEffectiveTimeScale(1);
+      nextAction.fadeIn(0.18);
+      nextAction.play();
+    }
+    if (prevAction && prevAction !== nextAction) {
+      prevAction.fadeOut(0.18);
+    }
+    expert3D.activeActionKey = nextKey;
+  }
+
+  function initExpert3D() {
+    if (!window.THREE || !expert3DCanvas) return;
+    try {
+      const { Scene, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, Group,
+        Clock } = window.THREE;
+
+      const scene = new Scene();
+      const camera = new PerspectiveCamera(36, 1, 0.1, 100);
+      camera.position.set(0, 0.18, 4.6);
+
+      const renderer = new WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(expert3DCanvas.clientWidth || 118, expert3DCanvas.clientHeight || 118);
+      expert3DCanvas.appendChild(renderer.domElement);
+
+      const ambient = new AmbientLight(0xffffff, 0.9);
+      scene.add(ambient);
+      const keyLight = new DirectionalLight(0xffffff, 0.7);
+      keyLight.position.set(3, 4, 5);
+      scene.add(keyLight);
+
+      const root = new Group();
+      root.position.y = -0.95;
+      scene.add(root);
+
+      setupExpertFallbackVisual();
+
+      expert3D.enabled = true;
+      expert3D.renderer = renderer;
+      expert3D.camera = camera;
+      expert3D.scene = scene;
+      expert3D.clock = new Clock();
+      expert3D.mixer = null;
+      expert3D.group = root;
+      expert3D.model = null;
+      expert3D.actions = {};
+      expert3D.activeActionKey = '';
+      expert3D.jaw = null;
+      expert3D.baseJawRotationX = 0;
+
+      const buildLocalExpert = () => {
+        buildProceduralExpert(root, window.THREE);
+        expert3D.model = null;
+        if (expertFallback) {
+          expertFallback.classList.add('hidden');
+        }
+      };
+
+      const modelUrl = (EXPERT_MODEL_URL || '').trim();
+      if (modelUrl && window.THREE.GLTFLoader) {
+        loadExternalExpertModel(root)
+          .then((loaded) => {
+            if (loaded && expertFallback) {
+              expertFallback.classList.add('hidden');
+            } else {
+              buildLocalExpert();
+            }
+          })
+          .catch((error) => {
+            console.warn('Load external expert model failed, use local model:', error);
+            buildLocalExpert();
+          });
+      } else {
+        buildLocalExpert();
+      }
+
+      const renderLoop = () => {
+        if (!expert3D.enabled) return;
+        const t = performance.now() * 0.001;
+        const now = performance.now();
+        let bob = Math.sin(t * 2.0) * 0.02;
+        let tilt = 0;
+        const isLaughing = now < expert3D.laughUntil;
+
+        // 简化的头部动画 - 只根据状态调整呼吸和倾斜
+        if (isLaughing) {
+          bob += Math.sin(t * 22.0) * 0.045;
+          tilt = Math.sin(t * 16.0) * 0.14;
+        } else if (expert3D.state === 'listening') {
+          tilt = Math.sin(t * 6.0) * 0.06;
+          bob += 0.03;
+        } else if (expert3D.state === 'thinking') {
+          tilt = Math.sin(t * 2.2) * 0.12;
+        } else if (expert3D.state === 'speaking') {
+          bob += Math.sin(t * 7.5) * 0.03;
+          const motion = expert3D.motionProfile || { intensity: 1, bounce: 1, nod: 1 };
+          bob += Math.sin(t * 9.0) * 0.01 * motion.bounce;
+        } else if (expert3D.state === 'greeting') {
+          bob += 0.015;
+        }
+
+        // 简化的头部动画 - 只有呼吸和眨眼
+        expert3D.group.position.y = bob;
+        expert3D.group.position.x = Math.sin(t * 1.8) * 0.025;
+        expert3D.group.rotation.z = tilt;
+
+        // 头部看向和点头动画
+        if (expert3D.head) {
+          const motion = expert3D.motionProfile || { intensity: 1, sway: 1, bounce: 1, arm: 1, nod: 1 };
+          const lookX = expert3D.hoverActive ? expert3D.lookTarget.x * 0.28 : Math.sin(t * 1.4) * 0.03;
+          const lookY = expert3D.hoverActive ? -expert3D.lookTarget.y * 0.2 : Math.sin(t * 1.1) * 0.02;
+          
+          // 根据状态的头部旋转
+          expert3D.head.rotation.x = Math.sin(t * 2.8) * 0.02 + lookY + 
+            (isLaughing ? Math.sin(t * 14.0) * 0.08 : 
+             expert3D.state === 'speaking' ? speechLevel * 0.06 * motion.nod : 0);
+          
+          expert3D.head.rotation.y = Math.sin(t * 2.4 * motion.sway) * 0.04 + lookX + 
+            (isLaughing ? Math.sin(t * 17.0) * 0.06 : 
+             expert3D.state === 'speaking' ? Math.sin(t * 6.4) * 0.02 : 0);
+        }
+
+        // 眼睛眨眼和笑脸动画
+        const blink = 0.85 + Math.max(0, Math.sin(t * 1.8)) * 0.15;
+        if (expert3D.leftEye) expert3D.leftEye.scale.y = isLaughing ? 0.55 : blink;
+        if (expert3D.rightEye) expert3D.rightEye.scale.y = isLaughing ? 0.55 : blink;
+        
+        // 嘴巴笑脸动画（唇形同步由 startLipSyncFromAudio 处理）
+        if (expert3D.mouth && isLaughing) {
+          expert3D.mouth.scale.x = 1.35;
+          expert3D.mouth.scale.y = 1.8;
+        }
+
+        expert3D.renderer.render(expert3D.scene, expert3D.camera);
+        expert3D.rafId = requestAnimationFrame(renderLoop);
+      };
+
+      renderLoop();
+
+      const resizeRenderer = () => {
+        if (!expert3D.enabled || !expert3DCanvas) return;
+        const width = expert3DCanvas.clientWidth || 118;
+        const height = expert3DCanvas.clientHeight || 118;
+        expert3D.camera.aspect = width / height;
+        expert3D.camera.updateProjectionMatrix();
+        expert3D.renderer.setSize(width, height);
+      };
+
+      if (window.ResizeObserver) {
+        expert3D.resizeObserver = new ResizeObserver(resizeRenderer);
+        expert3D.resizeObserver.observe(expert3DCanvas);
+      }
+      window.addEventListener('resize', resizeRenderer);
+    } catch (error) {
+      console.warn('3D avatar initialization failed, fallback to SVG:', error);
+      expert3D.enabled = false;
+      if (expertFallback) {
+        expertFallback.classList.remove('hidden');
+      }
+    }
+  }
+
+  function setExpertState(state, label) {
+    if (!expertSvg || !stateDot || !stateText) return;
+    expertSvg.classList.remove('action-idle', 'action-greeting', 'action-listening', 'action-thinking', 'action-speaking');
+    expertSvg.classList.add(`action-${state}`);
+    if (expert3D.enabled) {
+      expert3D.state = state;
+      play3DActionForState(state);
+    }
+    stateDot.className = `state-dot ${state}`;
+    stateText.textContent = label;
+  }
+
+  function stopLipSync() {
+    if (lipSyncRaf) {
+      cancelAnimationFrame(lipSyncRaf);
+      lipSyncRaf = null;
+    }
+    if (lipSyncTimer) {
+      clearInterval(lipSyncTimer);
+      lipSyncTimer = null;
+    }
+    if (expertMouth) {
+      expertMouth.setAttribute('rx', '8');
+      expertMouth.setAttribute('ry', '3');
+    }
+    speechLevel = 0;
+  }
+
+  function startLipSyncFallback() {
+    if (!expertMouth) return;
+    stopLipSync();
+    const frames = [
+      { rx: 6, ry: 3 },
+      { rx: 8, ry: 5 },
+      { rx: 10, ry: 4 }
+    ];
+    lipSyncTimer = setInterval(() => {
+      const frame = frames[Math.floor(Math.random() * frames.length)];
+      expertMouth.setAttribute('rx', String(frame.rx));
+      expertMouth.setAttribute('ry', String(frame.ry));
+      speechLevel = 0.25 + Math.random() * 0.75;
+    }, 120);
+  }
+
+  function ensureAudioPipeline() {
+    if (!window.AudioContext && !window.webkitAudioContext) return false;
+
+    if (!audioContext) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioContext = new Ctx();
+    }
+
+    if (!ttsAudio) {
+      ttsAudio = new Audio();
+      ttsAudio.preload = 'auto';
+    }
+
+    if (!mediaElementSource) {
+      mediaElementSource = audioContext.createMediaElementSource(ttsAudio);
+      analyserNode = audioContext.createAnalyser();
+      analyserNode.fftSize = 512;
+      analyserData = new Uint8Array(analyserNode.fftSize);
+      mediaElementSource.connect(analyserNode);
+      analyserNode.connect(audioContext.destination);
+    }
+
+    return true;
+  }
+
+  async function resumeAudioContextIfNeeded() {
+    if (audioContext && audioContext.state === 'suspended') {
+      try {
+        await audioContext.resume();
+      } catch (e) {
+        console.warn('Unable to resume audio context:', e);
+      }
+    }
+  }
+
+  function startLipSyncFromAudio() {
+    if (!analyserNode || !analyserData) {
+      startLipSyncFallback();
+      return;
+    }
+
+    stopLipSync();
+
+    const render = () => {
+      if (!analyserNode || !analyserData) return;
+
+      analyserNode.getByteTimeDomainData(analyserData);
+      let sum = 0;
+      for (let i = 0; i < analyserData.length; i++) {
+        const sample = (analyserData[i] - 128) / 128;
+        sum += sample * sample;
+      }
+
+      const rms = Math.sqrt(sum / analyserData.length);
+      const normalized = Math.max(0, Math.min(1, (rms - 0.01) / 0.22));
+      speechLevel = normalized;
+
+      // 更新3D嘴巴的缩放
+      if (expert3D.mouth && expert3D.enabled) {
+        // 嘴巴从关闭(0.3)到打开(1.0)
+        const mouthScale = 0.3 + normalized * 0.7;
+        expert3D.mouth.scale.z = mouthScale;
+        expert3D.mouth.scale.y = mouthScale;
+      }
+
+      // Cập nhật miệng SVG để nhép theo âm thanh
+      if (expertMouth) {
+        const rx = 6 + normalized * 4;
+        const ry = 3 + normalized * 2;
+        expertMouth.setAttribute('rx', String(Math.round(rx * 10) / 10));
+        expertMouth.setAttribute('ry', String(Math.round(ry * 10) / 10));
+      }
+
+      lipSyncRaf = requestAnimationFrame(render);
+    };
+
+    lipSyncRaf = requestAnimationFrame(render);
+  }
+
+  function cleanupTtsAudioUrl() {
+    if (ttsObjectUrl) {
+      URL.revokeObjectURL(ttsObjectUrl);
+      ttsObjectUrl = null;
+    }
+  }
+
+  function stopCurrentSpeech() {
+    if (speechSynthesis) {
+      speechSynthesis.cancel();
+    }
+    currentUtterance = null;
+
+    if (ttsAudio) {
+      ttsAudio.pause();
+      ttsAudio.currentTime = 0;
+      ttsAudio.removeAttribute('src');
+      ttsAudio.load();
+    }
+
+    cleanupTtsAudioUrl();
+    stopLipSync();
+    setExpertState('idle', 'Đang chờ câu hỏi');
+  }
 
   // Initialize speech recognition
   if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -361,6 +1460,7 @@
       const transcript = event.results[0][0].transcript;
       input.value = transcript;
       stopRecording();
+      setExpertState('thinking', 'Đang phân tích câu hỏi');
     };
 
     recognition.onerror = (event) => {
@@ -371,6 +1471,7 @@
       } else if (event.error === 'not-allowed') {
         showToast('Vui lòng cho phép truy cập microphone.');
       }
+      setExpertState('idle', 'Đang chờ câu hỏi');
     };
 
     recognition.onend = () => {
@@ -402,8 +1503,8 @@
     updateSpeakerButton();
     
     // Stop current speech if disabling
-    if (!autoSpeakEnabled && currentUtterance) {
-      speechSynthesis.cancel();
+    if (!autoSpeakEnabled) {
+      stopCurrentSpeech();
     }
     
     showToast(autoSpeakEnabled ? '✓ Đã bật đọc tự động' : '✗ Đã tắt đọc tự động');
@@ -419,6 +1520,7 @@
     voiceBtn.title = 'Đang nghe... (nhấn để dừng)';
     
     try {
+      setExpertState('listening', 'Đang lắng nghe bạn nói');
       recognition.start();
       showToast('Đang nghe... Hãy nói câu hỏi của bạn');
     } catch (e) {
@@ -440,6 +1542,7 @@
     } catch (e) {
       console.error('Error stopping recognition:', e);
     }
+    setExpertState('idle', 'Đang chờ câu hỏi');
   }
 
   voiceBtn.addEventListener('click', () => {
@@ -468,12 +1571,11 @@
   });
 
   // Text-to-speech function
-  function speakText(text) {
-    if (!autoSpeakEnabled || !speechSynthesis) return;
-    
-    // Cancel any ongoing speech
-    speechSynthesis.cancel();
-    
+  async function speakText(text) {
+    if (!autoSpeakEnabled) return;
+
+    stopCurrentSpeech();
+
     // Remove markdown and special characters for cleaner speech
     const cleanText = text
       .replace(/\*\*/g, '')
@@ -482,19 +1584,85 @@
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
       .replace(/`/g, '')
       .replace(/\n+/g, '. ');
-    
+
+    updateMotionProfile(cleanText);
+
+    try {
+      const response = await fetch(TTS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanText })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS API failed with status ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      if (!audioBlob || audioBlob.size === 0) {
+        throw new Error('Empty TTS audio response');
+      }
+
+      if (!ensureAudioPipeline()) {
+        throw new Error('Web Audio API not supported');
+      }
+
+      await resumeAudioContextIfNeeded();
+      cleanupTtsAudioUrl();
+      ttsObjectUrl = URL.createObjectURL(audioBlob);
+
+      ttsAudio.onplay = () => {
+        setExpertState('speaking', 'Đang trả lời bằng giọng nói');
+        startLipSyncFromAudio();
+      };
+
+      ttsAudio.onended = () => {
+        cleanupTtsAudioUrl();
+        stopLipSync();
+        setExpertState('idle', 'Đang chờ câu hỏi');
+      };
+
+      ttsAudio.onerror = () => {
+        cleanupTtsAudioUrl();
+        stopLipSync();
+        setExpertState('idle', 'Đang chờ câu hỏi');
+      };
+
+      ttsAudio.src = ttsObjectUrl;
+      await ttsAudio.play();
+      return;
+    } catch (ttsError) {
+      console.warn('Server TTS failed, fallback to browser speech:', ttsError);
+    }
+
+    if (!speechSynthesis) return;
+
     currentUtterance = new SpeechSynthesisUtterance(cleanText);
     currentUtterance.lang = 'vi-VN';
     currentUtterance.rate = 0.9;
     currentUtterance.pitch = 1;
-    
-    // Find Vietnamese voice if available
+
     const voices = speechSynthesis.getVoices();
-    const viVoice = voices.find(voice => voice.lang.startsWith('vi'));
+    const viVoice = voices.find((voice) => voice.lang.startsWith('vi'));
     if (viVoice) {
       currentUtterance.voice = viVoice;
     }
-    
+
+    currentUtterance.onstart = () => {
+      setExpertState('speaking', 'Đang trả lời bằng giọng nói');
+      startLipSyncFallback();
+    };
+
+    currentUtterance.onend = () => {
+      stopLipSync();
+      setExpertState('idle', 'Đang chờ câu hỏi');
+    };
+
+    currentUtterance.onerror = () => {
+      stopLipSync();
+      setExpertState('idle', 'Đang chờ câu hỏi');
+    };
+
     speechSynthesis.speak(currentUtterance);
   }
 
@@ -655,6 +1823,7 @@
     
     append(q,'user');
     input.value = '';
+    setExpertState('thinking', 'Đang suy luận câu trả lời');
     
     // Handle greetings locally
     if (isGreeting(q)) {
@@ -665,6 +1834,8 @@
       setTimeout(() => {
         append(reply, 'bot');
         updateDynamicSuggestions(['Triệu chứng bệnh cháy sớm?', 'Cách chăm sóc cà chua', 'Khi nào thu hoạch?']);
+        setExpertState('speaking', 'Đang phản hồi lời chào');
+        speakText(reply);
         input.disabled = false;
         btn.disabled = false;
         input.focus();
@@ -698,6 +1869,7 @@
           ? '⚠️ Bạn đang hỏi quá nhanh. Vui lòng đợi một chút rồi thử lại.' 
           : '⚠️ Lỗi kết nối. Vui lòng thử lại.';
         append(errorMsg, 'bot');
+        setExpertState('idle', 'Đang chờ câu hỏi');
       } else {
         const answer = data.answer || 'Xin lỗi, tôi không có câu trả lời. Bạn có thể tham khảo thêm trên các nền tảng uy tín.';
         append(answer, 'bot');
@@ -711,6 +1883,7 @@
     } catch (error) {
       if (thinking) thinking.remove();
       append('⚠️ Không thể kết nối với server. Vui lòng thử lại sau.', 'bot');
+      setExpertState('idle', 'Đang chờ câu hỏi');
     } finally {
       input.disabled = false;
       btn.disabled = false;
@@ -876,10 +2049,18 @@
   // Initialize chat with welcome message
   window.addEventListener('DOMContentLoaded', function() {
     console.log('Chat initialized');
+    initExpertInteractions();
+    initExpert3D();
+    setExpertState('greeting', 'Sẵn sàng tư vấn cho bạn');
     setTimeout(() => {
       append('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua. 🍅', 'bot');
       speakText('Chào bạn! Tôi có thể giúp bạn trả lời các thông tin về cà chua.');
     }, 100);
+    setTimeout(() => {
+      if (!currentUtterance) {
+        setExpertState('idle', 'Đang chờ câu hỏi');
+      }
+    }, 1800);
   });
 
   // Add CSS animation for toast

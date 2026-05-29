@@ -2389,7 +2389,7 @@
 
             <!-- Checkin Button / Info -->
             {% if stats.checkin.can_checkin_today %}
-            <div style="margin-top: 25px; text-align: center;">
+            <div id="checkin-section-primary-action" style="margin-top: 25px; text-align: center;">
               <button id="checkin-section-btn" class="checkin-btn" onclick="handleDailyCheckin()">
                 <span>📅</span>
                 <span>Điểm Danh Ngay</span>
@@ -2405,6 +2405,14 @@
               </p>
             </div>
             {% endif %}
+
+            <div id="makeup-checkin-area" style="margin-top: 16px; text-align: center;">
+              <button id="makeup-checkin-btn" class="checkin-btn" onclick="handleMakeupCheckin()" style="background: linear-gradient(135deg, #ff8a3d 0%, #ff6b2c 100%); box-shadow: 0 4px 12px rgba(255, 128, 64, 0.35);">
+                <span>🛠️</span>
+                <span id="makeup-checkin-btn-text">Điểm Danh Bù</span>
+              </button>
+              <p id="makeup-checkin-hint" style="margin-top: 12px; color: #666; font-size: 0.92em;">Đang kiểm tra điều kiện điểm danh bù...</p>
+            </div>
           </div>
 
           <!-- Milestones -->
@@ -3795,8 +3803,74 @@ async function checkCheckinStatus() {
         btn.style.display = 'none';
       }
     }
+
+    updateMakeupCheckinUI(data);
   } catch (error) {
     console.error('Error checking checkin status:', error);
+  }
+}
+
+function updateMakeupCheckinUI(data) {
+  const makeupArea = document.getElementById('makeup-checkin-area');
+  const makeupBtn = document.getElementById('makeup-checkin-btn');
+  const makeupHint = document.getElementById('makeup-checkin-hint');
+
+  if (!makeupArea || !makeupBtn || !makeupHint || !data || !data.ok) {
+    return;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let missedDays = 0;
+  if (data.last_checkin_date) {
+    const last = new Date(data.last_checkin_date);
+    if (!Number.isNaN(last.getTime())) {
+      last.setHours(0, 0, 0, 0);
+      missedDays = Math.max(0, Math.floor((today - last) / (1000 * 60 * 60 * 24)) - 1);
+    }
+  }
+
+  const canMakeup = Boolean(data.can_makeup);
+  if (!canMakeup) {
+    makeupArea.style.display = 'block';
+    makeupBtn.disabled = true;
+
+    if (Number(data.makeup_remaining || 0) <= 0) {
+      makeupHint.innerHTML = '⚠️ Bạn đã dùng hết lượt điểm danh bù trong tháng này.';
+      return;
+    }
+
+    if (!data.can_checkin) {
+      makeupHint.innerHTML = 'ℹ️ Hôm nay bạn đã điểm danh. Khi lỡ 1 ngày, hãy bấm điểm danh bù trước khi điểm danh thường.';
+      return;
+    }
+
+    if (!data.last_checkin_date) {
+      makeupHint.innerHTML = 'ℹ️ Chưa có dữ liệu điểm danh trước đó để thực hiện bù.';
+      return;
+    }
+
+    if (missedDays < 1) {
+      makeupHint.innerHTML = 'ℹ️ Bạn chưa lỡ ngày điểm danh nào, nên chưa cần dùng điểm danh bù.';
+      return;
+    }
+
+    makeupHint.innerHTML = 'ℹ️ Hiện chưa đủ điều kiện điểm danh bù. Vui lòng thử lại sau.';
+    return;
+  }
+
+  const cost = Number(data.makeup_cost || 0);
+  const balance = Number(data.wallet_balance || 0);
+  const hasEnoughBalance = balance >= cost;
+  const remaining = Number(data.makeup_remaining || 0);
+
+  makeupArea.style.display = 'block';
+  makeupBtn.disabled = !hasEnoughBalance;
+
+  if (hasEnoughBalance) {
+    makeupHint.innerHTML = `💡 Bạn lỡ chuỗi điểm danh? Bù ngay với <strong>${cost.toLocaleString('vi-VN')}đ</strong>. Còn lại <strong>${remaining}</strong> lượt tháng này.`;
+  } else {
+    makeupHint.innerHTML = `⚠️ Ví chưa đủ để bù điểm danh. Cần <strong>${cost.toLocaleString('vi-VN')}đ</strong>, hiện có <strong>${balance.toLocaleString('vi-VN')}đ</strong>.`;
   }
 }
 
@@ -3841,6 +3915,9 @@ async function handleDailyCheckin() {
         // Also hide header button if visible
         const headerBtn = document.getElementById('checkin-btn');
         if (headerBtn) headerBtn.style.display = 'none';
+        
+        // Refresh check-in status to update makeup checkin UI
+        checkCheckinStatus();
       }, 1000);
       
       // Show toast notification
@@ -3862,6 +3939,55 @@ async function handleDailyCheckin() {
     alert('❌ Lỗi kết nối. Vui lòng thử lại');
     btn.disabled = false;
     const textSpan = btn.querySelector('span:last-child');
+    if (textSpan) textSpan.textContent = originalText;
+  }
+}
+
+async function handleMakeupCheckin() {
+  const btn = document.getElementById('makeup-checkin-btn');
+  if (!btn) return;
+
+  if (!confirm('Xác nhận dùng 1 lượt điểm danh bù? Hệ thống sẽ trừ tiền trong ví của bạn.')) {
+    return;
+  }
+
+  const textSpan = document.getElementById('makeup-checkin-btn-text');
+  const originalText = textSpan ? textSpan.textContent : 'Điểm Danh Bù';
+
+  try {
+    btn.disabled = true;
+    if (textSpan) textSpan.textContent = 'Đang xử lý...';
+
+    const response = await fetch('/api/checkin/makeup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'}
+    });
+
+    const data = await response.json();
+
+    if (data.ok) {
+      showDailyCheckinPopup(data);
+
+      if (window.showToast) {
+        window.showToast(data.message || 'Bù điểm danh thành công!', 'success');
+      }
+
+      setTimeout(() => {
+        location.reload();
+      }, 900);
+      return;
+    }
+
+    if (window.showToast) {
+      window.showToast(data.error || 'Không thể bù điểm danh', 'error');
+    } else {
+      alert('❌ ' + (data.error || 'Không thể bù điểm danh'));
+    }
+  } catch (error) {
+    console.error('Error in makeup checkin:', error);
+    alert('❌ Lỗi kết nối. Vui lòng thử lại');
+  } finally {
+    btn.disabled = false;
     if (textSpan) textSpan.textContent = originalText;
   }
 }
